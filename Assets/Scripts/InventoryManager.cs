@@ -22,7 +22,6 @@ public class InventoryManager : MonoBehaviour
 {
     public ItemObject test;
     [SerializeReference] public List<ItemInstance> slots = new();
-    private PlayerControllers playerController;
     public void Add(ItemObject item)
     {
         if (item is Armor a)
@@ -71,23 +70,6 @@ public class InventoryManager : MonoBehaviour
             {
                 Debug.Log("Item:" + i.item.itemName);
             }
-        }
-    }
-    private void Awake()
-    {
-        playerController = new PlayerControllers();
-    }
-    public void Update()
-    {
-        if (playerController.Player.Save.WasPressedThisFrame())
-        {
-            Debug.Log("Add");
-            Add(test);
-        }
-        else if (playerController.Player.Load.WasPressedThisFrame())
-        {
-            Debug.Log("printSlots");
-            printSlots();
         }
     }
 }
