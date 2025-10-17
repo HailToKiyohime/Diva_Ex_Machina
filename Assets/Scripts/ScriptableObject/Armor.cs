@@ -18,6 +18,7 @@ public class RandomBuff
 [CreateAssetMenu(fileName = "New Armor", menuName = "Inventory/Armor")]
 public class Armor : ItemObject
 {
+    public SkinnedMeshRenderer skinnedMeshRenderer;
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
     public List<RandomBuff> randomBuffs = new List<RandomBuff>();
     public RandomBuff GetRandomBuff()

@@ -35,5 +35,5 @@ public class ItemObject : ScriptableObject
     public ItemType type;
     public Sprite icon;
     public int maxStack;
-    public GameObject prefab;
+    public GameObject dropPrefab;
 }

@@ -10,13 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 713e8101e72f9564bb08c5fb592812d6, type: 3}
-  m_Name: New Armor
+  m_Name: TestLHandArmor
   m_EditorClassIdentifier: Assembly-CSharp::Armor
-  itemName: Head Armor
-  type: 1
+  itemName: Left Head Armor
+  type: 3
   icon: {fileID: 0}
   maxStack: 0
-  prefab: {fileID: 0}
+  dropPrefab: {fileID: 0}
+  skinnedMeshRenderer: {fileID: -2683083879783004936, guid: 74348e5b536b2dc4190786e67b1461f9, type: 3}
   buffs:
   - attribute: 3
     value: 5
