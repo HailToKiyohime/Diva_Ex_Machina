@@ -52,6 +52,7 @@ public class BoneCombiner : MonoBehaviour
             inventoryManager.Add(inventoryManager.test5);
             inventoryManager.Add(inventoryManager.test6);
             inventoryManager.Add(inventoryManager.test7);
+            inventoryManager.Add(inventoryManager.test7);
             SaveInventory();
         }
         else if (playerController.Player.Load.WasPressedThisFrame())
