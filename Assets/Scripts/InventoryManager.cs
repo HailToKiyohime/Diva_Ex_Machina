@@ -27,6 +27,9 @@ public class InventoryManager : MonoBehaviour
     public GameObject ButtonPrefab;
     public Transform contentParent;      // 放按鈕的容器(ScrollView/Panel)
     public bool clearOldButtons = true;  // 切換分頁時是否清空舊按鈕
+
+    [Header("BoneCombiner")]
+    public BoneCombiner boneCombiner;
     [Header("Inventory Slot")]
     public ItemObject test1;
     public ItemObject test2;
@@ -214,7 +217,10 @@ public class InventoryManager : MonoBehaviour
             // 綁定點擊事件
             var btn = go.GetComponent<Button>();
             if (btn != null)
+            {
+                Debug.Log("Working");
                 btn.onClick.AddListener(() => OnClickInventoryItem(id));
+            }
         }
     }
     private void OnClickInventoryItem(int id)
@@ -223,8 +229,7 @@ public class InventoryManager : MonoBehaviour
         if (inst is ArmorInstance ai && ai.item is Armor ar && ar.skinnedMeshRenderer != null)
         {
             Debug.Log($"Equip {ai.item.itemName}");
-            // 這裡呼叫裝備流程或事件。例如：
-            // Equip(ar);
+            boneCombiner.InstantiateEquipmentRenderer(ar.skinnedMeshRenderer);
         }
         else
         {

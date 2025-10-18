@@ -4,7 +4,7 @@ using UnityEngine.InputSystem;
 
 public class BoneCombiner : MonoBehaviour
 {
-    [SerializeField] private SkinnedMeshRenderer[] skinnedMeshRendererPrefab;
+    //[SerializeField] private SkinnedMeshRenderer[] skinnedMeshRendererPrefab;
     [SerializeField] private SkinnedMeshRenderer originalSkinnedMeshRenderer;
     [SerializeField] private Transform rootBone;
     private PlayerControllers playerController;
@@ -60,7 +60,7 @@ public class BoneCombiner : MonoBehaviour
             LoadInventory();
 
             inventoryManager.RebuildBuckets();
-
+            /*
             var temp = inventoryManager.EquipTest();
 
             foreach (SkinnedMeshRenderer skinnedMeshRenderer in temp)
@@ -68,7 +68,7 @@ public class BoneCombiner : MonoBehaviour
                 InstantiateEquipmentRenderer(skinnedMeshRenderer);
             }
 
-
+            */
             inventoryManager.printSlots();
             //test = test2;
         }
