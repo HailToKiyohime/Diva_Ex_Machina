@@ -10,14 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 713e8101e72f9564bb08c5fb592812d6, type: 3}
-  m_Name: TestWaistArmor 3
+  m_Name: TestWaistArmor
   m_EditorClassIdentifier: Assembly-CSharp::Armor
   itemName: Waist Armor
   type: 5
   icon: {fileID: 0}
   maxStack: 0
   dropPrefab: {fileID: 0}
-  skinnedMeshRenderer: {fileID: 4631837917492017835, guid: 74348e5b536b2dc4190786e67b1461f9, type: 3}
+  skinnedMeshRenderer: {fileID: 4800198369173343896, guid: cab473535dc273d4f9196471f26d00d4, type: 3}
   buffs:
   - attribute: 3
     value: 5

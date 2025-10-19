@@ -23,6 +23,8 @@ public class ArmorInstance : ItemInstance
 
 public class InventoryManager : MonoBehaviour
 {
+    public static InventoryManager Instance { get; private set; }
+
     [Header("UI Button Prefab")]
     public GameObject ButtonPrefab;
     public Transform contentParent;      // 放按鈕的容器(ScrollView/Panel)
@@ -48,6 +50,19 @@ public class InventoryManager : MonoBehaviour
 
     void Awake()
     {
+        // If an instance already exists and it's not this one, destroy this new instance
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return; // Exit to prevent further execution of this Awake method
+        }
+
+        // Otherwise, set this instance as the Singleton
+        Instance = this;
+
+        // Optional: Make the GameObject persistent across scene loads
+        DontDestroyOnLoad(gameObject);
+
         // 初始化所有枚舉類別的 bucket
         foreach (ItemType t in Enum.GetValues(typeof(ItemType)))
             buckets[t] = new List<int>();

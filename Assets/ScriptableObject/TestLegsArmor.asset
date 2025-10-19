@@ -17,7 +17,7 @@ MonoBehaviour:
   icon: {fileID: 0}
   maxStack: 0
   dropPrefab: {fileID: 0}
-  skinnedMeshRenderer: {fileID: -9165797768001435688, guid: 74348e5b536b2dc4190786e67b1461f9, type: 3}
+  skinnedMeshRenderer: {fileID: 2120994120809011884, guid: eacd9fbdf0732bc42abd9fc77f41d235, type: 3}
   buffs:
   - attribute: 3
     value: 5
