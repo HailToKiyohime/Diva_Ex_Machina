@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+ï»¿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -10,6 +10,8 @@ public class BoneCombiner : MonoBehaviour
     private PlayerControllers playerController;
 
     public InventoryManager inventoryManager;
+
+    public GameObject legs;
 
     const string SaveFile = "save.es3";
     const string KeyInventory = "inventory";
@@ -76,12 +78,12 @@ public class BoneCombiner : MonoBehaviour
 
     public void SaveInventory()
     {
-        // ª½±µ¦s¾ã­Ó²M³æ¡F§t¤lÃş«¬¸ê°T»P ScriptableObject ¤Ş¥Î
+        // ç›´æ¥å­˜æ•´å€‹æ¸…å–®ï¼›å«å­é¡å‹è³‡è¨Šèˆ‡ ScriptableObject å¼•ç”¨
         ES3.Save(KeyInventory, inventoryManager.slots, SaveFile);
-        // ¤]¥i¡GES3.Save<List<ItemInstance>>(KeyInventory, slots, SaveFile);
+        // ä¹Ÿå¯ï¼šES3.Save<List<ItemInstance>>(KeyInventory, slots, SaveFile);
     }
 
-    // ÅªÀÉ
+    // è®€æª”
     public void LoadInventory()
     {
         if (ES3.KeyExists(KeyInventory, SaveFile))
@@ -90,19 +92,56 @@ public class BoneCombiner : MonoBehaviour
             inventoryManager.slots = new List<ItemInstance>();
     }
 
-    public void InstantiateEquipmentRenderer(SkinnedMeshRenderer skinnedMeshRenderer)
+    public GameObject InstantiateEquipmentRenderer(SkinnedMeshRenderer skinnedMeshRenderer, List<Color> color)
     {
         if (skinnedMeshRenderer == null)
         {
             Debug.LogError("no Skinned Mesh Renderer was found");
-            return;
+            return null;
         }
-        // ²£¥Í¹ê¨Ò
+        // ç”¢ç”Ÿå¯¦ä¾‹
         var spawned = Instantiate(skinnedMeshRenderer, transform);
-
-        // ¤@«ß¹ï¡uspawned¡v³]¸m
         spawned.updateWhenOffscreen = true;
         spawned.bones = originalSkinnedMeshRenderer.bones;
         spawned.rootBone = rootBone;
+
+        // âœ… é€™è£¡ä¸€å®šè¦ new æè³ªä¸¦è¨­çµ¦ spawned
+        Material mat = new Material(skinnedMeshRenderer.sharedMaterials[0]);
+
+        if (mat.shader.name.Contains("Mix 3"))
+        {
+            mat.SetColor("_BaseColor", color[0]);
+            mat.SetColor("_Layer1Color", color[1]);
+            mat.SetColor("_Layer2Color", color[2]);
+        }
+        else if (mat.shader.name.Contains("Mix 4"))
+        {
+            mat.SetColor("_BaseColor", color[0]);
+            mat.SetColor("_Layer1Color", color[1]);
+            mat.SetColor("_Layer2Color", color[2]);
+            mat.SetColor("_Layer3Color", color[3]);
+        }
+        else if (mat.shader.name.Contains("Mix 5"))
+        {
+            mat.SetColor("_BaseColor", color[0]);
+            mat.SetColor("_Layer1Color", color[1]);
+            mat.SetColor("_Layer2Color", color[2]);
+            mat.SetColor("_Layer3Color", color[3]);
+            mat.SetColor("_Layer4Color", color[4]);
+        }
+
+        // âœ… æŒ‡å®šçµ¦ spawned è€Œä¸æ˜¯åŸ prefab
+        spawned.material = mat;
+
+        return spawned.gameObject;
+    }
+
+    public void HideLegs()
+    {
+        legs.SetActive(false);
+    }
+    public void ShowLegs()
+    {
+        legs.SetActive(true);
     }
 }

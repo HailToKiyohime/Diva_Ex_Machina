@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.EventSystems;
 
 [System.Serializable]
 public class ItemInstance
@@ -14,11 +15,20 @@ public class ItemInstance
 public class WeaponInstance: ItemInstance
 {
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
+
 }
 [System.Serializable]
 public class ArmorInstance : ItemInstance
 {
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
+
+    // 用來存不同 shader 的顏色
+    [SerializeField]
+    public List<Color> colors = new List<Color>();
+
+    // 可選：記錄此裝備用的 shader 名稱，方便還原
+    [SerializeField]
+    public string shaderName;
 }
 
 public class InventoryManager : MonoBehaviour
@@ -30,8 +40,10 @@ public class InventoryManager : MonoBehaviour
     public Transform contentParent;      // 放按鈕的容器(ScrollView/Panel)
     public bool clearOldButtons = true;  // 切換分頁時是否清空舊按鈕
 
-    [Header("BoneCombiner")]
-    public BoneCombiner boneCombiner;
+    private int currentEquipSlotId = -1;
+
+    [Header("EquipmentManager")]
+    public EquipmentManager equipmentManager;
     [Header("Inventory Slot")]
     public ItemObject test1;
     public ItemObject test2;
@@ -67,7 +79,6 @@ public class InventoryManager : MonoBehaviour
         foreach (ItemType t in Enum.GetValues(typeof(ItemType)))
             buckets[t] = new List<int>();
     }
-
     // 取得 bucket（UI 直接讀這個）
     public IReadOnlyList<int> GetBucket(ItemType t) => buckets[t];
 
@@ -81,6 +92,35 @@ public class InventoryManager : MonoBehaviour
         if (item is Armor a)
         {
             var inst = new ArmorInstance { item = item, amount = 1 };
+
+            var smr = a.skinnedMeshRenderer;
+            if (smr && smr.sharedMaterial)
+            {
+                var mat = smr.sharedMaterial;
+                var shader = mat.shader;
+                inst.shaderName = shader.name;
+
+                // 根據 shader 名稱決定要存幾個顏色
+                if (shader.name.Contains("Mix 3"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                }
+                else if (shader.name.Contains("Mix 4"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                    inst.colors.Add(mat.GetColor("_Layer3Color"));
+                }
+                else if (shader.name.Contains("Mix 5"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    for (int i = 1; i < 5; i++)
+                        inst.colors.Add(mat.GetColor($"_Layer{i}Color"));
+                }
+            }
 
             foreach (EquipmentBuff buff in a.buffs)
             {
@@ -116,24 +156,27 @@ public class InventoryManager : MonoBehaviour
         int last = slots.Count - 1;
         if (id < 0 || id > last) return;
 
-        // 取得最後元素與其類別 bucket
-        var lastItem = slots[last];
-        var lastBucket = buckets[lastItem.item.type];
+        // 記住被刪物件的類型（之後從對應 bucket 刪除 id）
+        var removedItem = slots[id];
+        var removedType = removedItem.item.type;
 
-        // 如果刪除的不是最後一個，做 swap
         if (id != last)
         {
+            // 取出最後一個，搬到 id 位置
+            var lastItem = slots[last];
             slots[id] = lastItem;
 
-            // 在 lastItem 所在 bucket 裡把「last -> id」
+            // 在「最後一個的 bucket」裡把索引 last 改成 id
+            var lastBucket = buckets[lastItem.item.type];
             int k = lastBucket.IndexOf(last);
             if (k >= 0) lastBucket[k] = id;
         }
 
-        // 從各自 bucket 移除對應索引
-        var removedType = slots[last].item.type;
-        buckets[removedType].Remove(last);
+        // 從「被刪物件的 bucket」移除 id（注意：不是移除 last）
+        var removedBucket = buckets[removedType];
+        removedBucket.Remove(id);
 
+        // 最後刪掉尾巴
         slots.RemoveAt(last);
         Touch();
     }
@@ -206,50 +249,71 @@ public class InventoryManager : MonoBehaviour
     {
         if (contentParent == null || ButtonPrefab == null)
         {
-            Debug.LogWarning("[Inventory] contentParent 或 ButtonPrefab 未設置。");
+            Debug.LogWarning("[Inventory] UI 未設置");
             return;
         }
-        if (clearOldButtons) ClearChildren(contentParent);
 
+        // 取得當前分頁的槽位ID
+        int equipSlotId = -1;
+        var src = EventSystem.current ? EventSystem.current.currentSelectedGameObject : null;
+        var bid = src ? src.GetComponentInParent<ButtonID>() : null;
+        if (bid) equipSlotId = bid.ID;
+        currentEquipSlotId = equipSlotId;
+
+        // 1) 先全部關閉
+        HideAllRemoveButtons();
+
+        // 2) 再只開當前分頁底下的
+        ShowRemoveButtonUnder(src ? src.transform : null, equipSlotId);
+
+        // 3) 清/生清單（原樣）
+        if (clearOldButtons) ClearChildren(contentParent);
         var ids = GetBucket(itemType);
         for (int i = 0; i < ids.Count; i++)
         {
-            int id = ids[i];                   // 重要：閉包捕獲
+            int id = ids[i];
             var inst = GetAt(id);
             if (inst?.item == null) continue;
 
             var go = Instantiate(ButtonPrefab, contentParent);
-
             var icon = go.transform.Find("Item Icon")?.GetComponent<Image>();
-            if (icon != null) icon.sprite = inst.item.icon;
+            if (icon) icon.sprite = inst.item.icon;
+            var label = go.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
+            if (label) label.text = inst.item.itemName;
 
-            // 設置文字（TMP）
-            var labelTMP = go.transform.Find("Item Name")?.GetComponent<TMP_Text>();
-            if (labelTMP != null) labelTMP.text = inst.item.itemName;
-
-
-
-            // 綁定點擊事件
             var btn = go.GetComponent<Button>();
             if (btn != null)
             {
-                Debug.Log("Working");
-                btn.onClick.AddListener(() => OnClickInventoryItem(id));
+                int slotId = equipSlotId;
+                btn.onClick.AddListener(() => OnClickInventoryItem(id, slotId));
             }
         }
     }
-    private void OnClickInventoryItem(int id)
+    private void OnClickInventoryItem(int id, int slotId)
     {
         var inst = GetAt(id);
         if (inst is ArmorInstance ai && ai.item is Armor ar && ar.skinnedMeshRenderer != null)
         {
-            Debug.Log($"Equip {ai.item.itemName}");
-            boneCombiner.InstantiateEquipmentRenderer(ar.skinnedMeshRenderer);
+            if (slotId < 0 || slotId >= equipmentManager.equipmentSlots.Count)
+            {
+                Debug.LogWarning("尚未選擇裝備槽");
+                return;
+            }
+
+            // 嘗試從背包裝備到指定槽
+            if (equipmentManager.TryEquipFromInventory(this, id, slotId))
+            {
+                // 從背包移除該項（注意：RemoveAt 是 swap-remove，UI 需重建）
+                RemoveAt(id);
+
+                // 依當前分頁類型重建清單（或記住當前 ItemType 後再呼叫）
+                // 這裡用物件的類型重建一次
+                OpenPartsInventory(inst.item.type);
+            }
         }
         else
         {
             Debug.Log($"Select {inst.item.itemName}");
-            // 開啟詳情/比較視窗…
         }
     }
 
@@ -257,5 +321,57 @@ public class InventoryManager : MonoBehaviour
     {
         for (int i = parent.childCount - 1; i >= 0; i--)
             Destroy(parent.GetChild(i).gameObject);
+    }
+
+    public void HideAllRemoveButtons()
+    {
+        if (!equipmentManager.EquipmentPage) return;
+        foreach (Transform t in equipmentManager.EquipmentPage.GetComponentsInChildren<Transform>(true))
+            if (t.name == "Remove Equipment Button") t.gameObject.SetActive(false);
+    }
+
+    private void ShowRemoveButtonUnder(Transform root, int equipSlotId)
+    {
+        if (!root) return;
+        if (equipSlotId < 0 || equipSlotId >= equipmentManager.equipmentSlots.Count) return;
+
+        foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+        {
+            if (t.name == "Remove Equipment Button" &&
+                equipmentManager.equipmentSlots[equipSlotId].equipedItem != null)
+            {
+                var go = t.gameObject;
+                go.SetActive(true);
+
+                var btn = go.GetComponent<Button>();
+                if (btn != null)
+                {
+                    btn.onClick.RemoveAllListeners();                // ★ 先清舊的
+                    int slotId = equipSlotId;                        // 捕捉
+                    btn.onClick.AddListener(() => RemoveEquipment(t, slotId));
+                }
+                break;
+            }
+        }
+    }
+
+    public void RemoveEquipment(Transform t, int equipSlotId)
+    {
+        equipmentManager.UnequipItem(equipSlotId);
+        if (equipmentManager.equipmentSlots[equipSlotId].equipedItem == null)
+        {
+            t.gameObject.SetActive(false);
+        }
+
+    }
+
+    public void AddInstance(ItemInstance inst)
+    {
+        if (inst == null || inst.item == null) return;
+
+        int id = slots.Count;
+        slots.Add(inst);
+        buckets[inst.item.type].Add(id);
+        Touch();
     }
 }

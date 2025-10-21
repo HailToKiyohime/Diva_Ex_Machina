@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 2900423272343977270}
   - component: {fileID: 3350046120491577610}
   m_Layer: 0
-  m_Name: Cube.040
+  m_Name: Head Armor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -57,7 +57,8 @@ SkinnedMeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: -1785240548281688245, guid: 74348e5b536b2dc4190786e67b1461f9, type: 3}
+  - {fileID: 2100000, guid: a0a9e809e9ac4e341a4efaaff48b5b89, type: 2}
+  - {fileID: 2100000, guid: e912af947410f9142b4c0e964b033b67, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
