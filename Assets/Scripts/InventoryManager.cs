@@ -45,13 +45,6 @@ public class InventoryManager : MonoBehaviour
     [Header("EquipmentManager")]
     public EquipmentManager equipmentManager;
     [Header("Inventory Slot")]
-    public ItemObject test1;
-    public ItemObject test2;
-    public ItemObject test3;
-    public ItemObject test4;
-    public ItemObject test5;
-    public ItemObject test6;
-    public ItemObject test7;
     [SerializeReference] public List<ItemInstance> slots = new();
 
     private readonly Dictionary<ItemType, List<int>> buckets = new();
@@ -267,7 +260,7 @@ public class InventoryManager : MonoBehaviour
         ShowRemoveButtonUnder(src ? src.transform : null, equipSlotId);
 
         // 3) 清/生清單（原樣）
-        if (clearOldButtons) ClearChildren(contentParent);
+        if (clearOldButtons) ClearInventoryButton();
         var ids = GetBucket(itemType);
         for (int i = 0; i < ids.Count; i++)
         {
@@ -317,10 +310,10 @@ public class InventoryManager : MonoBehaviour
         }
     }
 
-    private void ClearChildren(Transform parent)
+    public void ClearInventoryButton()
     {
-        for (int i = parent.childCount - 1; i >= 0; i--)
-            Destroy(parent.GetChild(i).gameObject);
+        for (int i = contentParent.childCount - 1; i >= 0; i--)
+            Destroy(contentParent.GetChild(i).gameObject);
     }
 
     public void HideAllRemoveButtons()

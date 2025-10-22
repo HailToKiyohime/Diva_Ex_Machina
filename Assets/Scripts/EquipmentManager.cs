@@ -1,10 +1,13 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System;
 
 [System.Serializable]
 public class EquipmentSlot
 {
+    [NonSerialized]                     // ©Î ES3NonSerializable
     public GameObject equipedItem;
+
     public ItemInstance item;
 }
 
@@ -99,6 +102,16 @@ public class EquipmentManager : MonoBehaviour
                 boneCombiner.ShowLegs();
             }
             slot.item = null;
+        }
+    }
+    public void CleanAllEquipItem()
+    {
+        foreach (var slot in equipmentSlots)
+        {
+            if (slot.equipedItem)
+            {
+                Destroy(slot.equipedItem);
+            }
         }
     }
 }

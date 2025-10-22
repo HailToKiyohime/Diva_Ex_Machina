@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 public class BoneCombiner : MonoBehaviour
@@ -10,11 +11,12 @@ public class BoneCombiner : MonoBehaviour
     private PlayerControllers playerController;
 
     public InventoryManager inventoryManager;
-
+    public EquipmentManager equipmentManager;
     public GameObject legs;
 
     const string SaveFile = "save.es3";
-    const string KeyInventory = "inventory";
+    const string KeyInventorySlots = "inventory.slots";
+    const string KeyEquipmentSlots = "inventory.equipment";
     //private Inputs
     public float test;
 
@@ -47,30 +49,12 @@ public class BoneCombiner : MonoBehaviour
     {
         if (playerController.Player.Save.WasPressedThisFrame())
         {
-            inventoryManager.Add(inventoryManager.test1);
-            inventoryManager.Add(inventoryManager.test2);
-            inventoryManager.Add(inventoryManager.test3);
-            inventoryManager.Add(inventoryManager.test4);
-            inventoryManager.Add(inventoryManager.test5);
-            inventoryManager.Add(inventoryManager.test6);
-            inventoryManager.Add(inventoryManager.test7);
-            inventoryManager.Add(inventoryManager.test7);
             SaveInventory();
         }
         else if (playerController.Player.Load.WasPressedThisFrame())
         {
             LoadInventory();
-
             inventoryManager.RebuildBuckets();
-            /*
-            var temp = inventoryManager.EquipTest();
-
-            foreach (SkinnedMeshRenderer skinnedMeshRenderer in temp)
-            {
-                InstantiateEquipmentRenderer(skinnedMeshRenderer);
-            }
-
-            */
             inventoryManager.printSlots();
             //test = test2;
         }
@@ -78,18 +62,47 @@ public class BoneCombiner : MonoBehaviour
 
     public void SaveInventory()
     {
-        // 直接存整個清單；含子類型資訊與 ScriptableObject 引用
-        ES3.Save(KeyInventory, inventoryManager.slots, SaveFile);
-        // 也可：ES3.Save<List<ItemInstance>>(KeyInventory, slots, SaveFile);
+        ES3.Save(KeyInventorySlots, InventoryManager.Instance.slots, SaveFile);
+        ES3.Save(KeyEquipmentSlots, equipmentManager.equipmentSlots, SaveFile);
     }
 
     // 讀檔
     public void LoadInventory()
     {
-        if (ES3.KeyExists(KeyInventory, SaveFile))
-            inventoryManager.slots = ES3.Load<List<ItemInstance>>(KeyInventory, SaveFile);
+        if (ES3.KeyExists(KeyInventorySlots, SaveFile))
+            InventoryManager.Instance.slots = ES3.Load<List<ItemInstance>>(KeyInventorySlots, SaveFile);
         else
-            inventoryManager.slots = new List<ItemInstance>();
+            InventoryManager.Instance.slots = new List<ItemInstance>();
+
+        if (ES3.KeyExists(KeyEquipmentSlots, SaveFile))
+        {
+            equipmentManager.CleanAllEquipItem();
+            equipmentManager.equipmentSlots = ES3.Load<List<EquipmentSlot>>(KeyEquipmentSlots, SaveFile);
+        }
+        else
+            equipmentManager.CreateEquipmentSlot(); // 或 new List<EquipmentSlot>()
+
+
+        InventoryManager.Instance.ClearInventoryButton();
+        InventoryManager.Instance.HideAllRemoveButtons();
+        if (EventSystem.current) EventSystem.current.SetSelectedGameObject(null); // 可選：清掉選取
+        // 讀完重建 bucket 與見樣
+        InventoryManager.Instance.RebuildBuckets();
+
+        // 依資料重建已穿裝備的外觀
+        for (int i = 0; i < equipmentManager.equipmentSlots.Count; i++)
+        {
+            var slot = equipmentManager.equipmentSlots[i];
+            if (slot?.item is ArmorInstance ai && ai.item is Armor armor && armor.skinnedMeshRenderer)
+            {
+                slot.equipedItem = equipmentManager
+                    .boneCombiner
+                    .InstantiateEquipmentRenderer(armor.skinnedMeshRenderer, ai.colors);
+
+                if (slot.item.item.type == ItemType.LegsArmor)
+                    equipmentManager.boneCombiner.HideLegs();
+            }
+        }
     }
 
     public GameObject InstantiateEquipmentRenderer(SkinnedMeshRenderer skinnedMeshRenderer, List<Color> color)
