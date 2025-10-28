@@ -5,8 +5,8 @@ using System;
 [System.Serializable]
 public class EquipmentSlot
 {
-    [NonSerialized]                     // 或 ES3NonSerializable
     public GameObject equipedItem;
+    public ItemType equipmentType;
 
     public ItemInstance item;
 }
@@ -14,104 +14,83 @@ public class EquipmentSlot
 
 public class EquipmentManager : MonoBehaviour
 {
-    [SerializeReference] public List<EquipmentSlot> equipmentSlots = new();
-    public BoneCombiner boneCombiner;
-    public Transform EquipmentPage;
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    public static EquipmentManager Instance { get; private set; }
+    public Transform equipmentPage;
+    [SerializeField] public List<EquipmentSlot> equipmentSlots = new();
     void Awake()
     {
-        CreateEquipmentSlot();
+        // If an instance already exists and it's not this one, destroy this new instance
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return; // Exit to prevent further execution of this Awake method
+        }
+        // Otherwise, set this instance as the Singleton
+        Instance = this;
     }
 
-    // Update is called once per frame
-    void Update()
+    public bool TryEquipFromInventory(ItemInstance item)
     {
+        if (item == null || item.item == null) return false;
 
+        for (int i = 0; i < equipmentSlots.Count; i++)
+        {
+            var slot = equipmentSlots[i];
+
+            if (slot.equipmentType != item.item.type) continue;
+
+            // 清掉舊實例
+            if (slot.equipedItem) Destroy(slot.equipedItem);
+
+            // 裝甲：生成並綁骨
+            if (item.item is Armor armor && armor.skinnedMeshRenderer)
+            {
+                slot.equipedItem = BoneCombiner.Instance.InstantiateMesh(armor.skinnedMeshRenderer);
+                if (!slot.equipedItem)
+                {
+                    return false; // 實例化失敗時不要當作成功
+                }
+                slot.item = item;
+
+                // 若有存色彩，這裡套回去（可選）
+                if (item is ArmorInstance ai && slot.equipedItem)
+                {
+                    var smr = slot.equipedItem.GetComponent<SkinnedMeshRenderer>();
+                    if (smr)
+                    {
+                        var mat = smr.material; // 每件裝備獨立材質
+                        if (!string.IsNullOrEmpty(ai.shaderName))
+                        {
+                            // 範例：依 shaderName 套回顏色
+                            if (ai.shaderName.Contains("Mix 3") && ai.colors.Count >= 3)
+                            {
+                                mat.SetColor("_BaseColor", ai.colors[0]);
+                                mat.SetColor("_Layer1Color", ai.colors[1]);
+                                mat.SetColor("_Layer2Color", ai.colors[2]);
+                            }
+                            else if (ai.shaderName.Contains("Mix 4") && ai.colors.Count >= 4)
+                            {
+                                mat.SetColor("_BaseColor", ai.colors[0]);
+                                mat.SetColor("_Layer1Color", ai.colors[1]);
+                                mat.SetColor("_Layer2Color", ai.colors[2]);
+                                mat.SetColor("_Layer3Color", ai.colors[3]);
+                            }
+                            else if (ai.shaderName.Contains("Mix 5") && ai.colors.Count >= 5)
+                            {
+                                mat.SetColor("_BaseColor", ai.colors[0]);
+                                for (int k = 1; k < 5; k++) mat.SetColor($"_Layer{k}Color", ai.colors[k]);
+                            }
+                        }
+                    }
+                }
+                return true; // 成功後立即回傳
+            }
+            return false; // 類型吻合但不是 Armor（或缺Renderer）
+        }
+        return false; // 找不到對應槽
     }
+
     public void CreateEquipmentSlot()
     {
-        equipmentSlots.Clear();
-
-        if (EquipmentPage == null) return;
-
-        for (int i = 0; i < EquipmentPage.childCount; i++)
-        {
-            // 若需要：確保每個子物件有 ButtonID
-            var child = EquipmentPage.GetChild(i).gameObject;
-            var buttonID = child.GetComponent<ButtonID>() ?? child.AddComponent<ButtonID>();
-            buttonID.ID = i;
-
-            // ★ 加入實例，而不是 null
-            equipmentSlots.Add(new EquipmentSlot());
-        }
-    }
-
-    public bool TryEquipFromInventory(InventoryManager inv, int invIndex, int slotId)
-    {
-        // 邊界檢查
-        if (invIndex < 0 || invIndex >= inv.slots.Count) return false;
-        if (slotId < 0 || slotId >= equipmentSlots.Count) return false;
-
-        var inst = inv.slots[invIndex];
-        if (inst == null || inst.item == null) return false;
-
-        // 外觀：只示範 Armor（其他型別自行擴充）
-        if (inst is ArmorInstance ai && ai.item is Armor armor)
-        {
-            // 先把舊裝備（若有）丟回背包
-            if (equipmentSlots[slotId].item != null)
-            {
-                inv.AddInstance(equipmentSlots[slotId].item);  // 回背包
-                                                               // 卸下舊外觀
-                if (equipmentSlots[slotId].equipedItem)
-                    Destroy(equipmentSlots[slotId].equipedItem);
-            }
-
-
-            // 設置新裝備（把 ItemInstance 轉移到裝備槽）
-            equipmentSlots[slotId].item = inst;
-            equipmentSlots[slotId].equipedItem =
-                boneCombiner.InstantiateEquipmentRenderer(armor.skinnedMeshRenderer, ai.colors);
-
-            if (equipmentSlots[slotId].item.item.type == ItemType.LegsArmor)
-            {
-                boneCombiner.HideLegs();
-            }
-            return true;
-        }
-
-        // 非 Armor 的處理…（依需求擴充）
-        return false;
-    }
-
-    public void UnequipItem(int buttonID)
-    {
-        if (buttonID < 0 || buttonID >= equipmentSlots.Count) return;
-        var slot = equipmentSlots[buttonID];
-
-        if (slot.equipedItem) Destroy(slot.equipedItem);
-        slot.equipedItem = null;
-
-        if (slot.item != null)
-        {
-            // 丟回背包並更新 buckets
-            InventoryManager.Instance.AddInstance(slot.item);
-            InventoryManager.Instance.OpenPartsInventory(slot.item.item.type);
-            if (slot.item.item.type == ItemType.LegsArmor)
-            {
-                boneCombiner.ShowLegs();
-            }
-            slot.item = null;
-        }
-    }
-    public void CleanAllEquipItem()
-    {
-        foreach (var slot in equipmentSlots)
-        {
-            if (slot.equipedItem)
-            {
-                Destroy(slot.equipedItem);
-            }
-        }
     }
 }

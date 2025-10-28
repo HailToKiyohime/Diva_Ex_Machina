@@ -21,7 +21,7 @@ public class PlayerPickup : MonoBehaviour
             if(other.TryGetComponent(out DropItem dropItem))
             {
                 Debug.Log("Destroy(other);");
-                InventoryManager.Instance.Add(dropItem.item);
+                InventoryManager.Instance.AddItemToInventory(dropItem.item);
                 Destroy(other.gameObject);
             }
 

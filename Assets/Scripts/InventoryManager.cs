@@ -12,7 +12,7 @@ public class ItemInstance
     public int amount;
 }
 [System.Serializable]
-public class WeaponInstance: ItemInstance
+public class WeaponInstance : ItemInstance
 {
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
 
@@ -34,25 +34,16 @@ public class ArmorInstance : ItemInstance
 public class InventoryManager : MonoBehaviour
 {
     public static InventoryManager Instance { get; private set; }
+    [Header("Inventory Slot")]
+    [SerializeReference] public List<ItemInstance> inventory = new();
 
     [Header("UI Button Prefab")]
-    public GameObject ButtonPrefab;
-    public Transform contentParent;      // 放按鈕的容器(ScrollView/Panel)
-    public bool clearOldButtons = true;  // 切換分頁時是否清空舊按鈕
-
-    private int currentEquipSlotId = -1;
-
-    [Header("EquipmentManager")]
-    public EquipmentManager equipmentManager;
-    [Header("Inventory Slot")]
-    [SerializeReference] public List<ItemInstance> slots = new();
-
-    private readonly Dictionary<ItemType, List<int>> buckets = new();
-
-
-    public int version { get; private set; } = 0;
-    public event Action<int> OnChanged;
-
+    public GameObject buttonPrefab;
+    public Transform itemsButtonParent;// 放按鈕的容器
+    public Transform inventoryButtonParent;// 放按鈕的容器
+    [Header("Color Block/ Inventory Block")]
+    public GameObject inventoryBlock;
+    public GameObject colorBlock;
     void Awake()
     {
         // If an instance already exists and it's not this one, destroy this new instance
@@ -61,26 +52,15 @@ public class InventoryManager : MonoBehaviour
             Destroy(gameObject);
             return; // Exit to prevent further execution of this Awake method
         }
-
         // Otherwise, set this instance as the Singleton
         Instance = this;
 
-        // Optional: Make the GameObject persistent across scene loads
-        DontDestroyOnLoad(gameObject);
-
-        // 初始化所有枚舉類別的 bucket
-        foreach (ItemType t in Enum.GetValues(typeof(ItemType)))
-            buckets[t] = new List<int>();
     }
-    // 取得 bucket（UI 直接讀這個）
-    public IReadOnlyList<int> GetBucket(ItemType t) => buckets[t];
-
-    // 由索引取實體
-    public ItemInstance GetAt(int id) => slots[id];
-
-
-
-    public void Add(ItemObject item)
+    private void Start()
+    {
+        EquipmentManager.Instance.CreateEquipmentSlot();
+    }
+    public void AddItemToInventory(ItemObject item)
     {
         if (item is Armor a)
         {
@@ -124,10 +104,7 @@ public class InventoryManager : MonoBehaviour
             if (pickedBuff != null)
                 inst.buffs.Add(pickedBuff.buff);
 
-            int id = slots.Count;
-            slots.Add(inst);
-            buckets[item.type].Add(id);
-            Touch();
+            inventory.Add(inst);
         }
         else
         {
@@ -136,96 +113,9 @@ public class InventoryManager : MonoBehaviour
                 item = item,
                 amount = 1,
             };
-            int id = slots.Count;
-            slots.Add(inst);
-            buckets[item.type].Add(id);  // ★ 同步更新 bucket
-            Touch();
+            inventory.Add(inst);
         }
     }
-
-    // （可選）移除：示範 swap-remove，維護 bucket
-    public void RemoveAt(int id)
-    {
-        int last = slots.Count - 1;
-        if (id < 0 || id > last) return;
-
-        // 記住被刪物件的類型（之後從對應 bucket 刪除 id）
-        var removedItem = slots[id];
-        var removedType = removedItem.item.type;
-
-        if (id != last)
-        {
-            // 取出最後一個，搬到 id 位置
-            var lastItem = slots[last];
-            slots[id] = lastItem;
-
-            // 在「最後一個的 bucket」裡把索引 last 改成 id
-            var lastBucket = buckets[lastItem.item.type];
-            int k = lastBucket.IndexOf(last);
-            if (k >= 0) lastBucket[k] = id;
-        }
-
-        // 從「被刪物件的 bucket」移除 id（注意：不是移除 last）
-        var removedBucket = buckets[removedType];
-        removedBucket.Remove(id);
-
-        // 最後刪掉尾巴
-        slots.RemoveAt(last);
-        Touch();
-    }
-
-    // 載入或大量變動後重建快取
-    [ContextMenu("RebuildBuckets")]
-    public void RebuildBuckets()
-    {
-        foreach (var kv in buckets) kv.Value.Clear();
-        for (int i = 0; i < slots.Count; i++)
-            buckets[slots[i].item.type].Add(i);
-        Touch();
-    }
-
-    void Touch() { version++; OnChanged?.Invoke(version); }
-
-    public void printSlots()
-    {
-        foreach (ItemInstance item in slots)
-        {
-            if (item is ArmorInstance a)
-            {
-                string buffText = "";
-                foreach (EquipmentBuff buff in a.buffs)
-                {
-                    buffText = buffText + "Buff: " + buff.attribute + ", Vale:" + buff.value + " |";
-                }
-
-
-                Debug.Log("Item:" + a.item.itemName + " ," + buffText);
-            }
-            else if (item is ItemInstance i)
-            {
-                Debug.Log("Item:" + i.item.itemName);
-            }
-        }
-    }
-
-    public List<SkinnedMeshRenderer> EquipTest()
-    {
-
-        var temp = new List<SkinnedMeshRenderer>();   // ✅ 初始化
-
-        foreach (var item in slots)
-        {
-            if (item is ArmorInstance ai && ai.item is Armor armor)
-            {
-                if (armor.skinnedMeshRenderer != null)   // ✅ 防呆
-                {
-                    temp.Add(armor.skinnedMeshRenderer);
-                }
-            }
-        }
-        return temp;
-    }
-    //run when button clicked
 
     public void OpenWeaponInventory() => OpenPartsInventory(ItemType.Weapon);
     public void OpenHeadArmorInventory() => OpenPartsInventory(ItemType.HeadArmor);
@@ -240,131 +130,142 @@ public class InventoryManager : MonoBehaviour
 
     public void OpenPartsInventory(ItemType itemType)
     {
-        if (contentParent == null || ButtonPrefab == null)
+        if (inventoryBlock.activeSelf == true)
         {
-            Debug.LogWarning("[Inventory] UI 未設置");
-            return;
-        }
-
-        // 取得當前分頁的槽位ID
-        int equipSlotId = -1;
-        var src = EventSystem.current ? EventSystem.current.currentSelectedGameObject : null;
-        var bid = src ? src.GetComponentInParent<ButtonID>() : null;
-        if (bid) equipSlotId = bid.ID;
-        currentEquipSlotId = equipSlotId;
-
-        // 1) 先全部關閉
-        HideAllRemoveButtons();
-
-        // 2) 再只開當前分頁底下的
-        ShowRemoveButtonUnder(src ? src.transform : null, equipSlotId);
-
-        // 3) 清/生清單（原樣）
-        if (clearOldButtons) ClearInventoryButton();
-        var ids = GetBucket(itemType);
-        for (int i = 0; i < ids.Count; i++)
-        {
-            int id = ids[i];
-            var inst = GetAt(id);
-            if (inst?.item == null) continue;
-
-            var go = Instantiate(ButtonPrefab, contentParent);
-            var icon = go.transform.Find("Item Icon")?.GetComponent<Image>();
-            if (icon) icon.sprite = inst.item.icon;
-            var label = go.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
-            if (label) label.text = inst.item.itemName;
-
-            var btn = go.GetComponent<Button>();
-            if (btn != null)
+            ClearInventoryButton();
+            foreach (var item in inventory)
             {
-                int slotId = equipSlotId;
-                btn.onClick.AddListener(() => OnClickInventoryItem(id, slotId));
+                if (itemType == item.item.type)
+                {
+                    var button = Instantiate(buttonPrefab, itemsButtonParent);
+                    var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
+                    if (icon) icon.sprite = item.item.icon;
+                    var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
+                    if (label) label.text = item.item.itemName;
+
+                    var btn = button.GetComponent<Toggle>();
+                    if (btn != null)
+                    {
+                        btn.onValueChanged.AddListener(isOn =>
+                        {
+                            if (!isOn) return;
+                            OnClickInventoryItem(item, btn); // 把 btn 傳進去
+                        });
+                        foreach (var slot in EquipmentManager.Instance.equipmentSlots)
+                        {
+
+                            if (item == slot.item)
+                            {
+                                btn.interactable = false;
+                            }
+                        }
+                    }
+
+                }
             }
         }
     }
-    private void OnClickInventoryItem(int id, int slotId)
+    public void ClearInventoryButton()
     {
-        var inst = GetAt(id);
-        if (inst is ArmorInstance ai && ai.item is Armor ar && ar.skinnedMeshRenderer != null)
+        for (int i = itemsButtonParent.childCount - 1; i >= 0; i--)
+            Destroy(itemsButtonParent.GetChild(i).gameObject);
+    }
+    private void OnClickInventoryItem(ItemInstance item, Toggle btn)
+    {
+        Debug.Log("Working");
+        if (EquipmentManager.Instance.TryEquipFromInventory(item))
         {
-            if (slotId < 0 || slotId >= equipmentManager.equipmentSlots.Count)
+            // 解鎖同一清單中的其他按鈕
+            foreach (var t in itemsButtonParent.GetComponentsInChildren<Toggle>(true))
             {
-                Debug.LogWarning("尚未選擇裝備槽");
-                return;
+                if (t != btn)
+                {
+                    t.interactable = true;
+                    t.isOn = false;
+                }
             }
 
-            // 嘗試從背包裝備到指定槽
-            if (equipmentManager.TryEquipFromInventory(this, id, slotId))
-            {
-                // 從背包移除該項（注意：RemoveAt 是 swap-remove，UI 需重建）
-                RemoveAt(id);
-
-                // 依當前分頁類型重建清單（或記住當前 ItemType 後再呼叫）
-                // 這裡用物件的類型重建一次
-                OpenPartsInventory(inst.item.type);
-            }
+            // 鎖住當前已裝備的按鈕
+            btn.interactable = false;
         }
         else
         {
-            Debug.Log($"Select {inst.item.itemName}");
+            // 失敗就還原選取
+            btn.isOn = false;
         }
     }
 
-    public void ClearInventoryButton()
+    public void OpenInventoryPage()
     {
-        for (int i = contentParent.childCount - 1; i >= 0; i--)
-            Destroy(contentParent.GetChild(i).gameObject);
-    }
-
-    public void HideAllRemoveButtons()
-    {
-        if (!equipmentManager.EquipmentPage) return;
-        foreach (Transform t in equipmentManager.EquipmentPage.GetComponentsInChildren<Transform>(true))
-            if (t.name == "Remove Equipment Button") t.gameObject.SetActive(false);
-    }
-
-    private void ShowRemoveButtonUnder(Transform root, int equipSlotId)
-    {
-        if (!root) return;
-        if (equipSlotId < 0 || equipSlotId >= equipmentManager.equipmentSlots.Count) return;
-
-        foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+        int index = GetSelectedSlotIndex();
+        var slots = EquipmentManager.Instance.equipmentSlots;
+        if (index < 0 || index >= slots.Count) // 先驗證索引範圍
         {
-            if (t.name == "Remove Equipment Button" &&
-                equipmentManager.equipmentSlots[equipSlotId].equipedItem != null)
-            {
-                var go = t.gameObject;
-                go.SetActive(true);
-
-                var btn = go.GetComponent<Button>();
-                if (btn != null)
-                {
-                    btn.onClick.RemoveAllListeners();                // ★ 先清舊的
-                    int slotId = equipSlotId;                        // 捕捉
-                    btn.onClick.AddListener(() => RemoveEquipment(t, slotId));
-                }
-                break;
-            }
+            Debug.LogWarning($"OpenColorPage: invalid slot index {index}");
+            return;
         }
+        if (!inventoryBlock.activeSelf) return;
+        OpenPartsInventory(slots[index].equipmentType);
     }
 
-    public void RemoveEquipment(Transform t, int equipSlotId)
+    //Color
+
+    public void OpenColorPage()
     {
-        equipmentManager.UnequipItem(equipSlotId);
-        if (equipmentManager.equipmentSlots[equipSlotId].equipedItem == null)
+        int index = GetSelectedSlotIndex();
+
+        var slots = EquipmentManager.Instance.equipmentSlots;
+        if (index < 0 || index >= slots.Count) // 先驗證索引範圍
         {
-            t.gameObject.SetActive(false);
+            return;
         }
+        if (!colorBlock.activeSelf) return;
 
+        var go = slots[index].equipedItem;
+        if (!go)
+        {
+            ColorPicker.Instance.targetGameObject = null;
+            ColorPicker.Instance.targetMaterials = new List<Material>();
+            ColorPicker.Instance.currentMaterialIndex = -1;
+            ColorPicker.Instance.currentTextureIndex = -1;
+            ColorPicker.Instance.ClearnButton();
+        }
+        else
+        {
+            ColorPicker.Instance.targetGameObject = go;
+            ColorPicker.Instance.AddTargetMaterialsToList();
+            ColorPicker.Instance.CreateButtons();
+        }
+    }
+    public void SelectPartToColor(int equipmentSlotsIndex)
+    {
+        if (EquipmentManager.Instance.equipmentSlots[equipmentSlotsIndex].equipedItem != null && colorBlock.activeSelf == true)
+        {
+            ColorPicker.Instance.targetGameObject = EquipmentManager.Instance.equipmentSlots[equipmentSlotsIndex].equipedItem;
+            ColorPicker.Instance.AddTargetMaterialsToList();
+            ColorPicker.Instance.CreateButtons();
+        }
+        else if(EquipmentManager.Instance.equipmentSlots[equipmentSlotsIndex].equipedItem == null && colorBlock.activeSelf == true)
+        {
+            ColorPicker.Instance.targetGameObject = null;
+            ColorPicker.Instance.targetMaterials = new List<Material>();
+            ColorPicker.Instance.currentMaterialIndex = -1;
+            ColorPicker.Instance.currentTextureIndex = -1;
+            ColorPicker.Instance.ClearnButton();
+        }
     }
 
-    public void AddInstance(ItemInstance inst)
+    public int GetSelectedSlotIndex()
     {
-        if (inst == null || inst.item == null) return;
-
-        int id = slots.Count;
-        slots.Add(inst);
-        buckets[inst.item.type].Add(id);
-        Touch();
+        for (int i = 0; i < inventoryButtonParent.childCount; i++)
+        {
+            var child = inventoryButtonParent.GetChild(i);
+            var t = child.GetComponentInChildren<Toggle>(true); // 允許巢狀/隱藏
+            if (t != null && t.isOn)
+                return i;
+        }
+        return -1;
     }
 }
+
+    
