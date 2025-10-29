@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Armor
   itemName: Chest Armor
   type: 2
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 2a813e1292f536b45b3bc6220f96e4c8, type: 3}
   maxStack: 0
   dropPrefab: {fileID: 0}
   skinnedMeshRenderer: {fileID: 5876969628934891584, guid: a35fcd7c2f1882544bb50be3d70f184d, type: 3}

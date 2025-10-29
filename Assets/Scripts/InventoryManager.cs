@@ -138,7 +138,8 @@ public class InventoryManager : MonoBehaviour
                 if (itemType == item.item.type)
                 {
                     var button = Instantiate(buttonPrefab, itemsButtonParent);
-                    var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
+                    var icon = button.transform.Find("Item Icon").GetComponent<Image>();
+                    Debug.Log(icon);
                     if (icon) icon.sprite = item.item.icon;
                     var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
                     if (label) label.text = item.item.itemName;
