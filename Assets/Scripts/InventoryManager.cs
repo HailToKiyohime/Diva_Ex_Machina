@@ -185,6 +185,8 @@ public class InventoryManager : MonoBehaviour
                     t.isOn = false;
                 }
             }
+            
+            FindGrandchildRecursive(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Item Icon").GetComponent<Image>().sprite = item.item.icon;
 
             // 鎖住當前已裝備的按鈕
             btn.interactable = false;
@@ -266,6 +268,25 @@ public class InventoryManager : MonoBehaviour
                 return i;
         }
         return -1;
+    }
+
+    public GameObject FindGrandchildRecursive(GameObject parentObject, string targetName)
+    {
+        foreach (Transform childTransform in parentObject.transform)
+        {
+            if (childTransform.gameObject.name == targetName)
+            {
+                return childTransform.gameObject; // Found the grandchild
+            }
+
+            // Recursively search in the child's children (grandchild's children, etc.)
+            GameObject foundGrandchild = FindGrandchildRecursive(childTransform.gameObject, targetName);
+            if (foundGrandchild != null)
+            {
+                return foundGrandchild;
+            }
+        }
+        return null; // Grandchild not found in this branch
     }
 }
 

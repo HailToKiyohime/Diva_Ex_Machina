@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Armor
   itemName: Head Armor
   type: 1
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 03951d0ab912e264f89410e173092495, type: 3}
   maxStack: 0
   dropPrefab: {fileID: 0}
   skinnedMeshRenderer: {fileID: 3350046120491577610, guid: 17e5ed8abab316244bb23b6212ec04fd, type: 3}
