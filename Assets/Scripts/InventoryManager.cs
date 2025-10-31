@@ -58,7 +58,7 @@ public class InventoryManager : MonoBehaviour
     }
     private void Start()
     {
-        EquipmentManager.Instance.CreateEquipmentSlot();
+        //EquipmentManager.Instance.CreateEquipmentSlot();
     }
     public void AddItemToInventory(ItemObject item)
     {
@@ -130,38 +130,81 @@ public class InventoryManager : MonoBehaviour
 
     public void OpenPartsInventory(ItemType itemType)
     {
-        if (inventoryBlock.activeSelf == true)
+        // UI 沒開就不要做
+        if (!inventoryBlock.activeSelf)
+            return;
+
+        // 先清空右邊的物品列表
+        ClearInventoryButton();
+
+        // 先記住目前選到哪個裝備槽
+        int slotIndex = GetSelectedSlotIndex();
+
+        // 把所有裝備槽上的「Remove Equipment Button」先關掉
+        for (int i = 0; i < inventoryButtonParent.childCount; i++)
         {
-            ClearInventoryButton();
-            foreach (var item in inventory)
+            var removeBtn = FindChild(inventoryButtonParent.GetChild(i).gameObject, "Remove Equipment Button");
+            if (removeBtn != null)
+                removeBtn.SetActive(false);
+        }
+
+        // 檢查這個槽現在是不是有裝東西
+        bool slotHasEquipment = false;
+        if (slotIndex >= 0 &&
+            EquipmentManager.Instance != null &&
+            slotIndex < EquipmentManager.Instance.equipmentSlots.Count)
+        {
+            slotHasEquipment = EquipmentManager.Instance.equipmentSlots[slotIndex].equipedItem != null;
+        }
+
+        // 開始生成符合這個類型的物品按鈕
+        foreach (var inv in inventory)
+        {
+            // 沒物品或型別不對就跳過
+            if (inv == null || inv.item == null || inv.item.type != itemType)
+                continue;
+
+            // 生成按鈕
+            var button = Instantiate(buttonPrefab, itemsButtonParent);
+
+            // 圖示
+            var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
+            if (icon != null)
+                icon.sprite = inv.item.icon;
+
+            // 名稱
+            var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
+            if (label != null)
+                label.text = inv.item.itemName;
+
+            // Toggle
+            var btn = button.GetComponent<Toggle>();
+            if (btn != null)
             {
-                if (itemType == item.item.type)
+                // 如果這個槽本來就有裝備，就把那個槽的 Remove Button 打開
+                if (slotHasEquipment && slotIndex >= 0)
                 {
-                    var button = Instantiate(buttonPrefab, itemsButtonParent);
-                    var icon = button.transform.Find("Item Icon").GetComponent<Image>();
-                    Debug.Log(icon);
-                    if (icon) icon.sprite = item.item.icon;
-                    var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
-                    if (label) label.text = item.item.itemName;
+                    var removeBtn = FindChild(inventoryButtonParent.GetChild(slotIndex).gameObject, "Remove Equipment Button");
+                    if (removeBtn != null)
+                        removeBtn.SetActive(true);
+                }
 
-                    var btn = button.GetComponent<Toggle>();
-                    if (btn != null)
+                // 為了避免閉包問題，做一個本地變數
+                ItemInstance capturedItem = inv;
+                btn.onValueChanged.AddListener(isOn =>
+                {
+                    if (!isOn) return;
+                    OnClickInventoryItem(capturedItem, btn);
+                });
+
+                // 如果這個物品已經裝在任一個槽上，就把它鎖住
+                foreach (var slot in EquipmentManager.Instance.equipmentSlots)
+                {
+                    if (slot != null && capturedItem == slot.item)
                     {
-                        btn.onValueChanged.AddListener(isOn =>
-                        {
-                            if (!isOn) return;
-                            OnClickInventoryItem(item, btn); // 把 btn 傳進去
-                        });
-                        foreach (var slot in EquipmentManager.Instance.equipmentSlots)
-                        {
-
-                            if (item == slot.item)
-                            {
-                                btn.interactable = false;
-                            }
-                        }
+                        btn.interactable = false;
+                        break;
                     }
-
                 }
             }
         }
@@ -185,9 +228,11 @@ public class InventoryManager : MonoBehaviour
                     t.isOn = false;
                 }
             }
-            
-            FindGrandchildRecursive(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Item Icon").GetComponent<Image>().sprite = item.item.icon;
 
+            Image spriteImage = FindChild(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Item Icon").GetComponent<Image>();
+            spriteImage.sprite = item.item.icon;
+            spriteImage.color = new Color(1,1,1,1);
+            FindChild(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Remove Equipment Button").SetActive(true);
             // 鎖住當前已裝備的按鈕
             btn.interactable = false;
         }
@@ -210,6 +255,18 @@ public class InventoryManager : MonoBehaviour
         if (!inventoryBlock.activeSelf) return;
         OpenPartsInventory(slots[index].equipmentType);
     }
+
+    public void Unequip()
+    {
+        int index = GetSelectedSlotIndex();
+        EquipmentManager.Instance.CleanEquipmentSlot(index);
+        FindChild(inventoryButtonParent.GetChild(index).gameObject, "Remove Equipment Button").SetActive(false);
+        Image spriteImage = FindChild(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Item Icon").GetComponent<Image>();
+        spriteImage.sprite = null;
+        spriteImage.color = new Color(1, 1, 1, 0);
+        OpenInventoryPage();
+    }
+
 
     //Color
 
@@ -270,7 +327,7 @@ public class InventoryManager : MonoBehaviour
         return -1;
     }
 
-    public GameObject FindGrandchildRecursive(GameObject parentObject, string targetName)
+    public GameObject FindChild(GameObject parentObject, string targetName)
     {
         foreach (Transform childTransform in parentObject.transform)
         {
@@ -280,7 +337,7 @@ public class InventoryManager : MonoBehaviour
             }
 
             // Recursively search in the child's children (grandchild's children, etc.)
-            GameObject foundGrandchild = FindGrandchildRecursive(childTransform.gameObject, targetName);
+            GameObject foundGrandchild = FindChild(childTransform.gameObject, targetName);
             if (foundGrandchild != null)
             {
                 return foundGrandchild;

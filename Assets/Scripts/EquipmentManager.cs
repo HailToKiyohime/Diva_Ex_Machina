@@ -90,7 +90,11 @@ public class EquipmentManager : MonoBehaviour
         return false; // 找不到對應槽
     }
 
-    public void CreateEquipmentSlot()
+    public void CleanEquipmentSlot(int equipmentSlotsIndex)
     {
+        EquipmentSlot slot = equipmentSlots[equipmentSlotsIndex];
+        Destroy(slot.equipedItem);
+        slot.equipedItem = null; 
+        slot.item = null;
     }
 }
