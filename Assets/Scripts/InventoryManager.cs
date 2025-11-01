@@ -130,9 +130,7 @@ public class InventoryManager : MonoBehaviour
 
     public void OpenPartsInventory(ItemType itemType)
     {
-        // UI 沒開就不要做
-        if (!inventoryBlock.activeSelf)
-            return;
+
 
         // 先清空右邊的物品列表
         ClearInventoryButton();
@@ -265,6 +263,10 @@ public class InventoryManager : MonoBehaviour
         spriteImage.sprite = null;
         spriteImage.color = new Color(1, 1, 1, 0);
         OpenInventoryPage();
+        if (colorBlock.activeSelf)
+        {
+            SelectPartToColor(index);
+        }
     }
 
 
