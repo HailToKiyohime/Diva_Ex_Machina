@@ -34,20 +34,23 @@ public class CharacterUI : MonoBehaviour,
         float deltaX = eventData.delta.x;
         float deltaY = eventData.delta.y;
 
-        // 先做旋轉（水平一定要順）
-        if (Mathf.Abs(deltaX) > 0.01f)
-        {
-            target.Rotate(0f, deltaX * horizontalRotationSpeed * Time.deltaTime, 0f, Space.World);
+        if (Mathf.Abs(deltaX )> Mathf.Abs(deltaY)) {
+            // 先做旋轉（水平一定要順）
+            if (Mathf.Abs(deltaX) > 0.01f)
+            {
+                target.Rotate(0f, deltaX * horizontalRotationSpeed * Time.deltaTime, 0f, Space.World);
+            }
         }
-
-        // 只有真的上下拖到一定距離才移動
-        if (Mathf.Abs(deltaY) > verticalDeadZone)
-        {
-            float worldDeltaY = deltaY * Time.deltaTime*0.1f;
-            var pos = target.position;
-            pos.y -= worldDeltaY;
-            pos.y = Mathf.Clamp(pos.y, minY, maxY);
-            target.position = pos;
+        else {
+            // 只有真的上下拖到一定距離才移動
+            if (Mathf.Abs(deltaY) > verticalDeadZone)
+            {
+                float worldDeltaY = deltaY * Time.deltaTime * 0.1f;
+                var pos = target.position;
+                pos.y -= worldDeltaY;
+                pos.y = Mathf.Clamp(pos.y, minY, maxY);
+                target.position = pos;
+            }
         }
     }
 

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 28b4e85413a4008439942ded93073de1
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 320067
+  packageName: TileWorldCreator 4
+  packageVersion: 4.1.6
+  assetPath: Assets/TileWorldCreator/Res/NormalGrid_DeadEndTile.twc
+  uploadId: 808272
