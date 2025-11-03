@@ -9,8 +9,21 @@ public enum ItemType {
     WaistArmor,
     LegsArmor,
     Thruster,
-    Consumable, 
-    Material }
+    RangeWeapon,
+    Part,
+    Consumable,
+    Material,
+}
+
+public enum WeaponPartType
+{
+    Receiver,
+    Scope,
+    Barrel,
+    Blade,
+    Grip,
+    Actuators
+}
 
 public enum Attributes
 {
