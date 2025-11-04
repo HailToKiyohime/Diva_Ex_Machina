@@ -10,7 +10,7 @@ public enum ItemType {
     LegsArmor,
     Thruster,
     RangeWeapon,
-    Part,
+    WeaponPart,
     Consumable,
     Material,
 }

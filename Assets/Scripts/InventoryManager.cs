@@ -138,99 +138,118 @@ public class InventoryManager : MonoBehaviour
 
     public void OpenPartsInventory(ItemType itemType)
     {
-        if (inventoryToggleGroup.AnyTogglesOn()) {
-            // 先清空右邊的物品列表
-            ClearInventoryButton();
-
-            // 先記住目前選到哪個裝備槽
-            int slotIndex = GetSelectedSlotIndex();
-
-            // 把所有裝備槽上的「Remove Equipment Button」先關掉
-            for (int i = 0; i < inventoryButtonParent.childCount; i++)
+        Debug.Log("colorBlock.activeSelf: " + colorBlock.activeSelf);
+        if (colorBlock.activeSelf != true)
+        {
+            Debug.Log("inventoryToggleGroup.AnyTogglesOn(): "+ inventoryToggleGroup.AnyTogglesOn());
+            if (inventoryToggleGroup.AnyTogglesOn())
             {
-                var removeBtn = FindChild(inventoryButtonParent.GetChild(i).gameObject, "Remove Equipment Button");
-                if (removeBtn != null)
-                    removeBtn.SetActive(false);
-            }
 
-            // 檢查這個槽現在是不是有裝東西
-            bool slotHasEquipment = false;
-            if (slotIndex >= 0 &&
-                EquipmentManager.Instance != null &&
-                slotIndex < EquipmentManager.Instance.equipmentSlots.Count)
-            {
-                slotHasEquipment = EquipmentManager.Instance.equipmentSlots[slotIndex].equipedItem != null;
-            }
+                // 先清空右邊的物品列表
+                ClearInventoryButton();
 
-            // 開始生成符合這個類型的物品按鈕
-            foreach (var inv in inventory)
-            {
-                // 沒物品或型別不對就跳過
-                if (inv == null || inv.item == null || inv.item.type != itemType)
-                    continue;
+                // 先記住目前選到哪個裝備槽
+                int slotIndex = GetSelectedSlotIndex();
 
-                // 生成按鈕
-                var button = Instantiate(buttonPrefab, itemsButtonParent);
-
-                // 圖示
-                var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
-                if (icon != null)
-                    icon.sprite = inv.item.icon;
-
-                // 名稱
-                var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
-                if (label != null)
-                    label.text = inv.item.itemName;
-
-                // Toggle
-                var btn = button.GetComponent<Toggle>();
-                if (btn != null)
+                // 把所有裝備槽上的「Remove Equipment Button」先關掉
+                for (int i = 0; i < inventoryButtonParent.childCount; i++)
                 {
-                    // 如果這個槽本來就有裝備，就把那個槽的 Remove Button 打開
-                    if (slotHasEquipment && slotIndex >= 0)
-                    {
-                        var removeBtn = FindChild(inventoryButtonParent.GetChild(slotIndex).gameObject, "Remove Equipment Button");
-                        if (removeBtn != null)
-                            removeBtn.SetActive(true);
-                    }
+                    var removeBtn = FindChild(inventoryButtonParent.GetChild(i).gameObject, "Remove Equipment Button");
+                    if (removeBtn != null)
+                        removeBtn.SetActive(false);
+                }
 
-                    // 為了避免閉包問題，做一個本地變數
-                    ItemInstance capturedItem = inv;
-                    btn.onValueChanged.AddListener(isOn =>
-                    {
-                        if (!isOn) return;
-                        OnClickInventoryItem(capturedItem, btn);
-                    });
+                // 檢查這個槽現在是不是有裝東西
+                bool slotHasEquipment = false;
+                if (slotIndex >= 0 &&
+                    EquipmentManager.Instance != null &&
+                    slotIndex < EquipmentManager.Instance.equipmentSlots.Count)
+                {
+                    slotHasEquipment = EquipmentManager.Instance.equipmentSlots[slotIndex].equipedItem != null;
+                }
 
-                    // 如果這個物品已經裝在任一個槽上，就把它鎖住
-                    foreach (var slot in EquipmentManager.Instance.equipmentSlots)
+                // 開始生成符合這個類型的物品按鈕
+                foreach (var inv in inventory)
+                {
+                    // 沒物品或型別不對就跳過
+                    if (inv == null || inv.item == null || inv.item.type != itemType)
+                        continue;
+
+                    // 生成按鈕
+                    var button = Instantiate(buttonPrefab, itemsButtonParent);
+
+                    // 圖示
+                    var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
+                    if (icon != null)
+                        icon.sprite = inv.item.icon;
+
+                    // 名稱
+                    var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
+                    if (label != null)
+                        label.text = inv.item.itemName;
+
+                    // Toggle
+                    var btn = button.GetComponent<Toggle>();
+                    if (btn != null)
                     {
-                        if (slot != null && capturedItem == slot.item)
+                        // 如果這個槽本來就有裝備，就把那個槽的 Remove Button 打開
+                        if (slotHasEquipment && slotIndex >= 0)
                         {
-                            btn.interactable = false;
-                            break;
+                            var removeBtn = FindChild(inventoryButtonParent.GetChild(slotIndex).gameObject, "Remove Equipment Button");
+                            if (removeBtn != null)
+                                removeBtn.SetActive(true);
+                        }
+
+                        // 為了避免閉包問題，做一個本地變數
+                        ItemInstance capturedItem = inv;
+                        btn.onValueChanged.AddListener(isOn =>
+                        {
+                            if (!isOn) return;
+                            OnClickInventoryItem(capturedItem, btn);
+                        });
+
+                        // 如果這個物品已經裝在任一個槽上，就把它鎖住
+                        foreach (var slot in EquipmentManager.Instance.equipmentSlots)
+                        {
+                            if (slot != null && capturedItem == slot.item)
+                            {
+                                btn.interactable = false;
+                                break;
+                            }
                         }
                     }
                 }
+                statBlock.SetActive(false);
+                inventoryBlock.SetActive(true);
+                currentPage = inventoryBlock;
             }
-            statBlock.SetActive(false);
-            inventoryBlock.SetActive(true);
-            currentPage = inventoryBlock;
+            else
+            {
+                statBlock.SetActive(true);
+                inventoryBlock.SetActive(false);
+                // 把所有裝備槽上的「Remove Equipment Button」先關掉
+                for (int i = 0; i < inventoryButtonParent.childCount; i++)
+                {
+                    var removeBtn = FindChild(inventoryButtonParent.GetChild(i).gameObject, "Remove Equipment Button");
+                    if (removeBtn != null)
+                        removeBtn.SetActive(false);
+                }
+
+                currentPage = statBlock;
+            }
+            pageSwitch.pages[0] = currentPage;
         }
         else
         {
-            statBlock.SetActive(true);
-            inventoryBlock.SetActive(false);
-            // 把所有裝備槽上的「Remove Equipment Button」先關掉
-            for (int i = 0; i < inventoryButtonParent.childCount; i++)
+            if (!inventoryToggleGroup.AnyTogglesOn())
             {
-                var removeBtn = FindChild(inventoryButtonParent.GetChild(i).gameObject, "Remove Equipment Button");
-                if (removeBtn != null)
-                    removeBtn.SetActive(false);
+                ColorPicker.Instance.targetGameObject = null;
+                ColorPicker.Instance.targetMaterials = new List<Material>();
+                ColorPicker.Instance.currentMaterialIndex = -1;
+                ColorPicker.Instance.currentTextureIndex = -1;
+                ColorPicker.Instance.ClearnButton();
             }
-            currentPage = statBlock;
         }
-        pageSwitch.pages[0] = currentPage;
     }
     public void ClearInventoryButton()
     {
@@ -275,8 +294,9 @@ public class InventoryManager : MonoBehaviour
             Debug.LogWarning($"OpenColorPage: invalid slot index {index}");
             return;
         }
-        if (!inventoryBlock.activeSelf) return;
+        //if (!inventoryBlock.activeSelf||!statBlock.activeSelf) return;
         OpenPartsInventory(slots[index].equipmentType);
+
     }
 
     public void Unequip()
@@ -300,7 +320,13 @@ public class InventoryManager : MonoBehaviour
     public void OpenColorPage()
     {
         int index = GetSelectedSlotIndex();
-
+        // 把所有裝備槽上的「Remove Equipment Button」先關掉
+        for (int i = 0; i < inventoryButtonParent.childCount; i++)
+        {
+            var removeBtn = FindChild(inventoryButtonParent.GetChild(i).gameObject, "Remove Equipment Button");
+            if (removeBtn != null)
+                removeBtn.SetActive(false);
+        }
         var slots = EquipmentManager.Instance.equipmentSlots;
         if (index < 0 || index >= slots.Count) // 先驗證索引範圍
         {

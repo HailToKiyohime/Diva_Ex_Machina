@@ -1,10 +1,13 @@
 using NUnit.Framework;
 using UnityEngine;
 using System.Collections.Generic;
-public class RangeWeaponPart : MonoBehaviour
+
+[CreateAssetMenu(fileName = "New Range Weapon Part", menuName = "Inventory/RangeWeaponPart")]
+public class RangeWeaponPart : ItemObject
 {
     public GameObject rangeWeaponPartPrefab;
-    public Transform newMuzzlePoint;
+    public WeaponPartType partType;
+    public Transform muzzlePoint;
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
     public List<RandomBuff> randomBuffs = new List<RandomBuff>();
 
