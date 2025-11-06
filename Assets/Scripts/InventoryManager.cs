@@ -114,6 +114,24 @@ public class InventoryManager : MonoBehaviour
 
             inventory.Add(inst);
         }
+        else if (item is RangeWeapon rw)
+        {
+            var inst = new RangeWeaponInstance
+            {
+                item = item,
+                amount = 1,
+                attachment = new ItemObject[rw.attachmentPoints.Count],
+                muzzlePoint = rw.GetMuzzlePoint()
+            };
+            foreach (EquipmentBuff buff in rw.buffs)
+            {
+                inst.buffs.Add(buff);
+            }
+            var pickedBuff = rw.GetRandomBuff();
+            if (pickedBuff != null)
+                inst.buffs.Add(pickedBuff.buff);
+            inventory.Add(inst);
+        }
         else
         {
             var inst = new ItemInstance

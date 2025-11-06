@@ -17,7 +17,7 @@ MonoBehaviour:
   icon: {fileID: 0}
   maxStack: 1
   dropPrefab: {fileID: 0}
-  rangeWeaponPartPrefab: {fileID: 0}
+  rangeWeaponPartPrefab: {fileID: 919132149155446097, guid: a13f683a1c38a6d4f83ba829bcf83ddd, type: 3}
   partType: 2
   muzzlePoint: {fileID: 0}
   buffs: []

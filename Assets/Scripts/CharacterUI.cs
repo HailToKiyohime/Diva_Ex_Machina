@@ -46,10 +46,10 @@ public class CharacterUI : MonoBehaviour,
             if (Mathf.Abs(deltaY) > verticalDeadZone)
             {
                 float worldDeltaY = deltaY * Time.deltaTime * 0.1f;
-                var pos = target.position;
+                var pos = target.localPosition;
                 pos.y -= worldDeltaY;
                 pos.y = Mathf.Clamp(pos.y, minY, maxY);
-                target.position = pos;
+                target.localPosition = pos;
             }
         }
     }
