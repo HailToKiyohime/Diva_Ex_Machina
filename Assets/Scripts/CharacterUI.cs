@@ -7,11 +7,13 @@ public class CharacterUI : MonoBehaviour,
 {
     public Transform target;
     public float horizontalRotationSpeed = 5f;
-
+    public float horizontalMoveSpeed = 1f;
+    public float minX = 0.5f;
+    public float maxX = -0.5f;
     [Header("Vertical Move")]
     public float minY = 0.5f;
     public float maxY = 2.0f;
-    public float verticalRotationSpeed = 3f; 
+    public float verticalMoveSpeed = 0.1f; 
     public float verticalDeadZone = 3f;   // 小於這個就當沒拖上下
 
     [Header("Zoom")]
@@ -21,9 +23,13 @@ public class CharacterUI : MonoBehaviour,
     public CinemachineCamera cinemachineCamera;
 
     bool dragging;
+    PointerEventData.InputButton dragButton;
+
+    public CinemachineRotationComposer cinemachineRotationComposer;
 
     public void OnBeginDrag(PointerEventData eventData)
     {
+        dragButton = eventData.button;
         dragging = true;
     }
 
@@ -31,25 +37,49 @@ public class CharacterUI : MonoBehaviour,
     {
         if (!dragging || target == null) return;
 
-        float deltaX = eventData.delta.x;
-        float deltaY = eventData.delta.y;
+        if (dragButton == PointerEventData.InputButton.Left)
+        {
 
-        if (Mathf.Abs(deltaX )> Mathf.Abs(deltaY)) {
-            // 先做旋轉（水平一定要順）
-            if (Mathf.Abs(deltaX) > 0.01f)
+            float deltaX = eventData.delta.x;
+            float deltaY = eventData.delta.y;
+
+            if (Mathf.Abs(deltaX) > Mathf.Abs(deltaY))
             {
-                target.Rotate(0f, deltaX * horizontalRotationSpeed * Time.deltaTime, 0f, Space.World);
+                // 先做旋轉（水平一定要順）
+                if (Mathf.Abs(deltaX) > 0.01f)
+                {
+                    target.Rotate(0f, deltaX * horizontalRotationSpeed * Time.deltaTime, 0f, Space.World);
+                }
             }
-        }
-        else {
-            // 只有真的上下拖到一定距離才移動
-            if (Mathf.Abs(deltaY) > verticalDeadZone)
+            else
             {
-                float worldDeltaY = deltaY * Time.deltaTime * 0.1f;
-                var pos = target.localPosition;
-                pos.y -= worldDeltaY;
-                pos.y = Mathf.Clamp(pos.y, minY, maxY);
-                target.localPosition = pos;
+                // 只有真的上下拖到一定距離才移動
+                if (Mathf.Abs(deltaY) > verticalDeadZone)
+                {
+                    float worldDeltaY = deltaY * Time.deltaTime * verticalMoveSpeed;
+                    var pos = target.localPosition;
+                    pos.y -= worldDeltaY;
+                    pos.y = Mathf.Clamp(pos.y, minY, maxY);
+                    target.localPosition = pos;
+                }
+            }
+        }else if (dragButton == PointerEventData.InputButton.Right)
+        {
+            if (cinemachineRotationComposer != null)
+            {
+                float deltaX = eventData.delta.x * horizontalMoveSpeed * Time.deltaTime;
+
+                // 先拿出來改，邏輯比較乾淨
+                var composition = cinemachineRotationComposer.Composition;
+                var screenPos = composition.ScreenPosition;
+
+                screenPos.x += deltaX;                      // 平移
+                screenPos.x = Mathf.Clamp(screenPos.x,     // 限制在 [minX, maxX]
+                                           minX,
+                                           maxX);
+
+                composition.ScreenPosition = screenPos;
+                cinemachineRotationComposer.Composition = composition;
             }
         }
     }

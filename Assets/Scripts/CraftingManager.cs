@@ -11,8 +11,8 @@ public class CraftingSlot {
 
 public class CraftingManager : MonoBehaviour
 {
-    public Transform craftingPartsButtonParent;// ©ñ«ö¶sªº®e¾¹
-    public Transform itemsButtonParent;// ©ñ«ö¶sªº®e¾¹
+    public Transform craftingPartsButtonParent;// ï¿½ï¿½ï¿½ï¿½sï¿½ï¿½ï¿½eï¿½ï¿½
+    public Transform itemsButtonParent;// ï¿½ï¿½ï¿½ï¿½sï¿½ï¿½ï¿½eï¿½ï¿½
     public ToggleGroup craftingPartsToggleGroup;
     public Transform weaponPreviewTransform;
     public GameObject weaponPreview;
@@ -31,40 +31,40 @@ public class CraftingManager : MonoBehaviour
     {
         if (craftingPartsToggleGroup.AnyTogglesOn())
         {
-            // ¥ý²MªÅ¥kÃäªºª««~¦Cªí
+            // ï¿½ï¿½ï¿½Mï¿½Å¥kï¿½äªºï¿½ï¿½ï¿½~ï¿½Cï¿½ï¿½
             ClearInventoryButton();
-            // ¥ý°O¦í¥Ø«e¿ï¨ì­þ­Ó¸Ë³Æ¼Ñ
+            // ï¿½ï¿½ï¿½Oï¿½ï¿½Ø«eï¿½ï¿½ï¿½ï¿½ï¿½Ó¸Ë³Æ¼ï¿½
             int slotIndex = GetSelectedSlotIndex();
 
-            // §â©Ò¦³¸Ë³Æ¼Ñ¤Wªº¡uRemove Equipment Button¡v¥ýÃö±¼
+            // ï¿½ï¿½Ò¦ï¿½ï¿½Ë³Æ¼Ñ¤Wï¿½ï¿½ï¿½uRemove Equipment Buttonï¿½vï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             for (int i = 0; i < craftingPartsButtonParent.childCount; i++)
             {
                 var removeBtn = InventoryManager.Instance.FindChild(craftingPartsButtonParent.GetChild(i).gameObject, "Remove Equipment Button");
                 if (removeBtn != null)
                     removeBtn.SetActive(false);
             }
-            // ÀË¬d³o­Ó¼Ñ²{¦b¬O¤£¬O¦³¸ËªF¦è
+            // ï¿½Ë¬dï¿½oï¿½Ó¼Ñ²{ï¿½bï¿½Oï¿½ï¿½ï¿½Oï¿½ï¿½ï¿½ËªFï¿½ï¿½
             bool slotHasEquipment = false;
             if (slotIndex >= 0 && slotIndex < craftingSlots.Count)
             {
                 slotHasEquipment = craftingSlots[slotIndex].item != null;
             }
-            // ¶}©l¥Í¦¨²Å¦X³o­ÓÃþ«¬ªºª««~«ö¶s
+            // ï¿½}ï¿½lï¿½Í¦ï¿½ï¿½Å¦Xï¿½oï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½~ï¿½ï¿½ï¿½s
             foreach (var inv in InventoryManager.Instance.inventory)
             {
-                // ¨Sª««~©Î«¬§O¤£¹ï´N¸õ¹L
+                // ï¿½Sï¿½ï¿½ï¿½~ï¿½Î«ï¿½ï¿½Oï¿½ï¿½ï¿½ï¿½Nï¿½ï¿½ï¿½L
                 if (inv == null || inv.item == null || inv.item.type != itemType)
                     continue;
 
-                // ¥Í¦¨«ö¶s
+                // ï¿½Í¦ï¿½ï¿½ï¿½ï¿½s
                 var button = Instantiate(buttonPrefab, itemsButtonParent);
 
-                // ¹Ï¥Ü
+                // ï¿½Ï¥ï¿½
                 var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
                 if (icon != null)
                     icon.sprite = inv.item.icon;
 
-                // ¦WºÙ
+                // ï¿½Wï¿½ï¿½
                 var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
                 if (label != null)
                     label.text = inv.item.itemName;
@@ -73,21 +73,21 @@ public class CraftingManager : MonoBehaviour
                 var btn = button.GetComponent<Toggle>();
                 if (btn != null)
                 {
-                    // ¦pªG³o­Ó¼Ñ¥»¨Ó´N¦³¸Ë³Æ¡A´N§â¨º­Ó¼Ñªº Remove Button ¥´¶}
+                    // ï¿½pï¿½Gï¿½oï¿½Ó¼Ñ¥ï¿½ï¿½Ó´Nï¿½ï¿½ï¿½Ë³Æ¡Aï¿½Nï¿½â¨ºï¿½Ó¼Ñªï¿½ Remove Button ï¿½ï¿½ï¿½}
                     if (slotHasEquipment && slotIndex >= 0)
                     {
                         var removeBtn = InventoryManager.Instance.FindChild(craftingPartsButtonParent.GetChild(slotIndex).gameObject, "Remove Equipment Button");
                         if (removeBtn != null)
                             removeBtn.SetActive(true);
                     }
-                    // ¬°¤FÁ×§K³¬¥]°ÝÃD¡A°µ¤@­Ó¥»¦aÅÜ¼Æ
+                    // ï¿½ï¿½ï¿½Fï¿½×§Kï¿½ï¿½ï¿½]ï¿½ï¿½ï¿½Dï¿½Aï¿½ï¿½ï¿½@ï¿½Ó¥ï¿½ï¿½aï¿½Ü¼ï¿½
                     ItemInstance capturedItem = inv;
                     btn.onValueChanged.AddListener(isOn =>
                     {
                         if (!isOn) return;
                         OnClickInventoryItem(capturedItem, btn);
                     });
-                    // ¦pªG³o­Óª««~¤w¸g¸Ë¦b¥ô¤@­Ó¼Ñ¤W¡A´N§â¥¦Âê¦í
+                    // ï¿½pï¿½Gï¿½oï¿½Óªï¿½ï¿½~ï¿½wï¿½gï¿½Ë¦bï¿½ï¿½@ï¿½Ó¼Ñ¤Wï¿½Aï¿½Nï¿½â¥¦ï¿½ï¿½ï¿½
                     foreach (var slot in craftingSlots)
                     {
                         if (slot != null && capturedItem == slot.item)
@@ -104,37 +104,37 @@ public class CraftingManager : MonoBehaviour
     {
         if (craftingPartsToggleGroup.AnyTogglesOn())
         {
-            // ¥ý²MªÅ¥kÃäªºª««~¦Cªí
+            // ï¿½ï¿½ï¿½Mï¿½Å¥kï¿½äªºï¿½ï¿½ï¿½~ï¿½Cï¿½ï¿½
             ClearInventoryButton();
-            // ¥ý°O¦í¥Ø«e¿ï¨ì­þ­Ó¸Ë³Æ¼Ñ
+            // ï¿½ï¿½ï¿½Oï¿½ï¿½Ø«eï¿½ï¿½ï¿½ï¿½ï¿½Ó¸Ë³Æ¼ï¿½
             int slotIndex = GetSelectedSlotIndex();
 
-            // §â©Ò¦³¸Ë³Æ¼Ñ¤Wªº¡uRemove Equipment Button¡v¥ýÃö±¼
+            // ï¿½ï¿½Ò¦ï¿½ï¿½Ë³Æ¼Ñ¤Wï¿½ï¿½ï¿½uRemove Equipment Buttonï¿½vï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             for (int i = 0; i < craftingPartsButtonParent.childCount; i++)
             {
                 var removeBtn = InventoryManager.Instance.FindChild(craftingPartsButtonParent.GetChild(i).gameObject, "Remove Equipment Button");
                 if (removeBtn != null)
                     removeBtn.SetActive(false);
             }
-            // ÀË¬d³o­Ó¼Ñ²{¦b¬O¤£¬O¦³¸ËªF¦è
+            // ï¿½Ë¬dï¿½oï¿½Ó¼Ñ²{ï¿½bï¿½Oï¿½ï¿½ï¿½Oï¿½ï¿½ï¿½ËªFï¿½ï¿½
             bool slotHasEquipment = false;
             if (slotIndex >= 0 && slotIndex < craftingSlots.Count)
             {
                 slotHasEquipment = craftingSlots[slotIndex].item != null;
             }
-            // ¶}©l¥Í¦¨²Å¦X³o­ÓÃþ«¬ªºª««~«ö¶s
+            // ï¿½}ï¿½lï¿½Í¦ï¿½ï¿½Å¦Xï¿½oï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½~ï¿½ï¿½ï¿½s
             foreach (var inv in InventoryManager.Instance.inventory)
             {
-                // ¨Sª««~©Î«¬§O¤£¹ï´N¸õ¹L
+                // ï¿½Sï¿½ï¿½ï¿½~ï¿½Î«ï¿½ï¿½Oï¿½ï¿½ï¿½ï¿½Nï¿½ï¿½ï¿½L
                 if (inv == null || inv.item == null || inv.item.type != itemType)
                     continue;
 
-                // ¦pªG¬OªZ¾¹¹s¥ó¡AÁÙ­nÀË¬d¤lÃþ«¬
+                // ï¿½pï¿½Gï¿½Oï¿½Zï¿½ï¿½ï¿½sï¿½ï¿½Aï¿½Ù­nï¿½Ë¬dï¿½lï¿½ï¿½ï¿½ï¿½
                 if (itemType == ItemType.WeaponPart)
                 {
                     if (inv.item is RangeWeaponPart rangeWeaponPart)
                     {
-                        // ¤£¦PÃþ«¬´N²¤¹L
+                        // ï¿½ï¿½ï¿½Pï¿½ï¿½ï¿½ï¿½ï¿½Nï¿½ï¿½ï¿½L
                         if (rangeWeaponPart.partType != weaponPartType)
                         {
                             continue;
@@ -142,19 +142,19 @@ public class CraftingManager : MonoBehaviour
                     }
                     else
                     {
-                        // ¤£¬O RangeWeaponPart ¤]²¤¹L
+                        // ï¿½ï¿½ï¿½O RangeWeaponPart ï¿½]ï¿½ï¿½ï¿½L
                         continue;
                     }
                 }
-                // ¥Í¦¨«ö¶s
+                // ï¿½Í¦ï¿½ï¿½ï¿½ï¿½s
                 var button = Instantiate(buttonPrefab, itemsButtonParent);
 
-                // ¹Ï¥Ü
+                // ï¿½Ï¥ï¿½
                 var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
                 if (icon != null)
                     icon.sprite = inv.item.icon;
 
-                // ¦WºÙ
+                // ï¿½Wï¿½ï¿½
                 var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
                 if (label != null)
                     label.text = inv.item.itemName;
@@ -163,21 +163,21 @@ public class CraftingManager : MonoBehaviour
                 var btn = button.GetComponent<Toggle>();
                 if (btn != null)
                 {
-                    // ¦pªG³o­Ó¼Ñ¥»¨Ó´N¦³¸Ë³Æ¡A´N§â¨º­Ó¼Ñªº Remove Button ¥´¶}
+                    // ï¿½pï¿½Gï¿½oï¿½Ó¼Ñ¥ï¿½ï¿½Ó´Nï¿½ï¿½ï¿½Ë³Æ¡Aï¿½Nï¿½â¨ºï¿½Ó¼Ñªï¿½ Remove Button ï¿½ï¿½ï¿½}
                     if (slotHasEquipment && slotIndex >= 0)
                     {
                         var removeBtn = InventoryManager.Instance.FindChild(craftingPartsButtonParent.GetChild(slotIndex).gameObject, "Remove Equipment Button");
                         if (removeBtn != null)
                             removeBtn.SetActive(true);
                     }
-                    // ¬°¤FÁ×§K³¬¥]°ÝÃD¡A°µ¤@­Ó¥»¦aÅÜ¼Æ
+                    // ï¿½ï¿½ï¿½Fï¿½×§Kï¿½ï¿½ï¿½]ï¿½ï¿½ï¿½Dï¿½Aï¿½ï¿½ï¿½@ï¿½Ó¥ï¿½ï¿½aï¿½Ü¼ï¿½
                     ItemInstance capturedItem = inv;
                     btn.onValueChanged.AddListener(isOn =>
                     {
                         if (!isOn) return;
                         OnClickInventoryItem(capturedItem, btn);
                     });
-                    // ¦pªG³o­Óª««~¤w¸g¸Ë¦b¥ô¤@­Ó¼Ñ¤W¡A´N§â¥¦Âê¦í
+                    // ï¿½pï¿½Gï¿½oï¿½Óªï¿½ï¿½~ï¿½wï¿½gï¿½Ë¦bï¿½ï¿½@ï¿½Ó¼Ñ¤Wï¿½Aï¿½Nï¿½â¥¦ï¿½ï¿½ï¿½
                     foreach (var slot in craftingSlots)
                     {
                         if (slot != null && capturedItem == slot.item)
@@ -195,7 +195,7 @@ public class CraftingManager : MonoBehaviour
     {
         if (item.item is RangeWeapon rw)
         {
-            // ¥ý²M±¼ÂÂªº¹wÄý¤ñ¸û¦w¥þ
+            // ï¿½ï¿½ï¿½Mï¿½ï¿½ï¿½Âªï¿½ï¿½wï¿½ï¿½ï¿½ï¿½ï¿½ï¿½wï¿½ï¿½
             if (weaponPreview != null)
             {
                 Destroy(weaponPreview);
@@ -214,13 +214,13 @@ public class CraftingManager : MonoBehaviour
                 if (rwp.partType != attachmentPoint.allowPart || attachmentPoint.pointTransform == null)
                     continue;
 
-                // ¥Î ScriptableObject ¸Ì¦sªº Transform ¦W¦r¡A¥h³õ´ºªº weaponPreview ¤W§ä
+                // ï¿½ï¿½ ScriptableObject ï¿½Ì¦sï¿½ï¿½ Transform ï¿½Wï¿½rï¿½Aï¿½hï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ weaponPreview ï¿½Wï¿½ï¿½
                 string slotName = attachmentPoint.pointTransform.name;
                 Transform parentInScene = FindChildRecursive(weaponPreview.transform, slotName);
 
                 if (parentInScene == null)
                 {
-                    Debug.LogWarning($"§ä¤£¨ì±¾ÂI {slotName}¡A½Ð½T»{ weaponPrefab ¤º¦³¦P¦W¤lª«¥ó¡C");
+                    //Debug.LogWarning($"ï¿½ä¤£ï¿½ì±¾ï¿½I {slotName}ï¿½Aï¿½Ð½Tï¿½{ weaponPrefab ï¿½ï¿½ï¿½ï¿½ï¿½Pï¿½Wï¿½lï¿½ï¿½ï¿½ï¿½C");
                     continue;
                 }
 
@@ -239,7 +239,7 @@ public class CraftingManager : MonoBehaviour
         for (int i = 0; i < craftingPartsButtonParent.childCount; i++)
         {
             var child = craftingPartsButtonParent.GetChild(i);
-            var t = child.GetComponentInChildren<Toggle>(true); // ¤¹³\±_ª¬/ÁôÂÃ
+            var t = child.GetComponentInChildren<Toggle>(true); // ï¿½ï¿½ï¿½\ï¿½_ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½
             if (t != null && t.isOn)
                 return i;
         }
