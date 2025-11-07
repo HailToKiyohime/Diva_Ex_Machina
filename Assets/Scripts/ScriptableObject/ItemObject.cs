@@ -17,7 +17,7 @@ public enum ItemType {
 
 public enum WeaponPartType
 {
-    Receiver,
+    Gun,
     Scope,
     Barrel,
     Blade,
