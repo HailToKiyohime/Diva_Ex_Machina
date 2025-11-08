@@ -35,6 +35,12 @@ public class CraftingManager : MonoBehaviour
     [Header("UI Button Prefab")]
     // 右側背包物品按鈕的預置物
     public GameObject buttonPrefab;
+    // 左側合成插槽按鈕的預置物
+    public GameObject craftingSlotPrefab;
+    public Sprite barrelIcon;
+    public Sprite scopeIcon;
+
+    public UIPageSwitch uiPageSwitch;
 
     // 給 UI 按鈕用的簡化呼叫：打開 Receiver 清單
     public void OpenReceiverInventory() => OpenRangeWeaponPartsInventory(ItemType.WeaponPart, WeaponPartType.Gun);
@@ -49,78 +55,73 @@ public class CraftingManager : MonoBehaviour
     // 打開「指定 ItemType」的背包清單 (目前主要給 RangeWeapon 用)
     public void OpenWeaponInventory(ItemType itemType)
     {
-        // 必須先選中一個合成插槽 (ToggleGroup 有東西被選到)
+        AssignRemovePartButtonListener();
+
         if (craftingPartsToggleGroup.AnyTogglesOn())
         {
-            // 先清掉右側所有舊的物品按鈕
             ClearInventoryButton();
 
-            // 找出目前選中的插槽 index
             int slotIndex = GetSelectedSlotIndex();
 
             // 先把所有合成插槽上的「Remove Equipment Button」關掉
             for (int i = 0; i < craftingPartsButtonParent.childCount; i++)
             {
-                var removeBtn = InventoryManager.Instance.FindChild(
+                var removeBtnGo = InventoryManager.Instance.FindChild(
                     craftingPartsButtonParent.GetChild(i).gameObject,
                     "Remove Equipment Button"
                 );
-                if (removeBtn != null)
-                    removeBtn.SetActive(false);
+                if (removeBtnGo != null)
+                    removeBtnGo.SetActive(false);
             }
 
             // 檢查現在選到的插槽是否已經有裝東西
             bool slotHasEquipment = false;
             if (slotIndex >= 0 && slotIndex < craftingSlots.Count)
             {
-                slotHasEquipment = craftingSlots[slotIndex].item.item != null;
+                var slot = craftingSlots[slotIndex];
+                if (slot != null && slot.item != null && slot.item.item != null)
+                    slotHasEquipment = true;
             }
 
-            // 掃描背包裡的所有物品
+            // 掃描背包
             foreach (var inv in InventoryManager.Instance.inventory)
             {
-                // 空格、沒 item、或類型不符就略過
                 if (inv == null || inv.item == null || inv.item.type != itemType)
                     continue;
 
-                // 產生一個 UI 按鈕到右側清單
                 var button = Instantiate(buttonPrefab, itemsButtonParent);
 
-                // 設定圖示
                 var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
                 if (icon != null)
                     icon.sprite = inv.item.icon;
 
-                // 設定名稱文字
                 var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
                 if (label != null)
                     label.text = inv.item.itemName;
 
-                // 取得 Toggle 組件
                 var btn = button.GetComponent<Toggle>();
                 if (btn != null)
                 {
-                    // 若目前插槽已經有裝備，打開該插槽的移除按鈕
-                    if (slotHasEquipment && slotIndex >= 0)
+                    // 插槽已有裝備 → 顯示對應的移除按鈕
+                    if (slotHasEquipment &&
+                        slotIndex >= 0 &&
+                        slotIndex < craftingPartsButtonParent.childCount)
                     {
-                        var removeBtn = InventoryManager.Instance.FindChild(
+                        var removeBtnGo = InventoryManager.Instance.FindChild(
                             craftingPartsButtonParent.GetChild(slotIndex).gameObject,
                             "Remove Equipment Button"
                         );
-                        if (removeBtn != null)
-                            removeBtn.SetActive(true);
+                        if (removeBtnGo != null)
+                            removeBtnGo.SetActive(true);
                     }
 
-                    // 用 local 變數捕捉，避免閉包都指向最後一個 inv
                     ItemInstance capturedItem = inv;
                     btn.onValueChanged.AddListener(isOn =>
                     {
-                        // 只處理勾選為 true 的瞬間
                         if (!isOn) return;
                         OnClickInventoryItem(capturedItem, btn);
                     });
 
-                    // 如果這個物品已經被放在某個 CraftingSlot，就讓這顆按鈕不能再按
                     foreach (var slot in craftingSlots)
                     {
                         if (slot != null && capturedItem == slot.item)
@@ -132,113 +133,109 @@ public class CraftingManager : MonoBehaviour
                 }
             }
         }
+        else
+        {
+            // 沒選插槽就關掉所有 Remove 按鈕
+            for (int i = 0; i < craftingPartsButtonParent.childCount; i++)
+            {
+                var removeBtnGo = InventoryManager.Instance.FindChild(
+                    craftingPartsButtonParent.GetChild(i).gameObject,
+                    "Remove Equipment Button"
+                );
+                if (removeBtnGo != null)
+                    removeBtnGo.SetActive(false);
+            }
+        }
     }
 
     // 打開「武器零件」的背包清單，會再用 weaponPartType 過濾
     public void OpenRangeWeaponPartsInventory(ItemType itemType, WeaponPartType weaponPartType)
     {
-        // 一樣必須先選中一個合成插槽
-        if (craftingPartsToggleGroup.AnyTogglesOn())
+        if (!craftingPartsToggleGroup.AnyTogglesOn())
+            return;
+
+        ClearInventoryButton();
+
+        int slotIndex = GetSelectedSlotIndex();
+
+        // 先關閉所有插槽上的移除按鈕
+        for (int i = 0; i < craftingPartsButtonParent.childCount; i++)
         {
-            // 清掉右側舊的按鈕
-            ClearInventoryButton();
+            var removeBtnGo = InventoryManager.Instance.FindChild(
+                craftingPartsButtonParent.GetChild(i).gameObject,
+                "Remove Equipment Button"
+            );
+            if (removeBtnGo != null)
+                removeBtnGo.SetActive(false);
+        }
 
-            // 找出目前選中的插槽 index
-            int slotIndex = GetSelectedSlotIndex();
+        // 檢查現在選中的插槽是否已經有裝備
+        bool slotHasEquipment = false;
+        if (slotIndex >= 0 && slotIndex < craftingSlots.Count)
+        {
+            var slot = craftingSlots[slotIndex];
+            if (slot != null && slot.item != null && slot.item.item != null)
+                slotHasEquipment = true;
+        }
 
-            // 先關閉所有插槽上的移除按鈕
-            for (int i = 0; i < craftingPartsButtonParent.childCount; i++)
+        // 掃描背包
+        foreach (var inv in InventoryManager.Instance.inventory)
+        {
+            if (inv == null || inv.item == null || inv.item.type != itemType)
+                continue;
+
+            if (itemType == ItemType.WeaponPart)
             {
-                var removeBtn = InventoryManager.Instance.FindChild(
-                    craftingPartsButtonParent.GetChild(i).gameObject,
-                    "Remove Equipment Button"
-                );
-                if (removeBtn != null)
-                    removeBtn.SetActive(false);
-            }
-
-            // 檢查現在選中的插槽是否已經有裝備
-            bool slotHasEquipment = false;
-            if (slotIndex >= 0 && slotIndex < craftingSlots.Count)
-            {
-                Debug.Log(craftingSlots[slotIndex].item.item);
-                slotHasEquipment = craftingSlots[slotIndex].item.item != null;
-            }
-
-            // 掃描背包
-            foreach (var inv in InventoryManager.Instance.inventory)
-            {
-                // 基本過濾：空 / 無物品 / 類型不對
-                if (inv == null || inv.item == null || inv.item.type != itemType)
-                    continue;
-
-                // 若要找的是 WeaponPart，再做進一步類型過濾
-                if (itemType == ItemType.WeaponPart)
+                if (inv.item is RangeWeaponPart rangeWeaponPart)
                 {
-                    if (inv.item is RangeWeaponPart rangeWeaponPart)
-                    {
-                        // 零件的 partType 不符合指定的 weaponPartType 就略過
-                        if (rangeWeaponPart.partType != weaponPartType)
-                        {
-                            continue;
-                        }
-                    }
-                    else
-                    {
-                        // 不是 RangeWeaponPart，直接略過
+                    if (rangeWeaponPart.partType != weaponPartType)
                         continue;
-                    }
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+            var button = Instantiate(buttonPrefab, itemsButtonParent);
+
+            var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
+            if (icon != null)
+                icon.sprite = inv.item.icon;
+
+            var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
+            if (label != null)
+                label.text = inv.item.itemName;
+
+            var btn = button.GetComponent<Toggle>();
+            if (btn != null)
+            {
+                // 插槽已有裝備 → 顯示 Remove 按鈕（listener 在 AssignRemovePartButtonListener 統一處理）
+                if (slotHasEquipment &&
+                    slotIndex >= 0 &&
+                    slotIndex < craftingPartsButtonParent.childCount)
+                {
+                    var removeBtnGo = InventoryManager.Instance.FindChild(
+                        craftingPartsButtonParent.GetChild(slotIndex).gameObject,
+                        "Remove Equipment Button"
+                    );
+                    if (removeBtnGo != null)
+                        removeBtnGo.SetActive(true);
                 }
 
-                // 建立 UI 按鈕
-                var button = Instantiate(buttonPrefab, itemsButtonParent);
-
-                // 設定圖示
-                var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
-                if (icon != null)
-                    icon.sprite = inv.item.icon;
-
-                // 設定名稱
-                var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
-                if (label != null)
-                    label.text = inv.item.itemName;
-
-                // Toggle 行為
-                var btn = button.GetComponent<Toggle>();
-                if (btn != null)
+                ItemInstance capturedItem = inv;
+                btn.onValueChanged.AddListener(isOn =>
                 {
-                    // 插槽已經有裝備時，顯示該插槽的移除按鈕
-                    if (slotHasEquipment && slotIndex >= 0)
-                    {
-                        var removeBtn = InventoryManager.Instance.FindChild(
-                            craftingPartsButtonParent.GetChild(slotIndex).gameObject,
-                            "Remove Equipment Button"
-                        );
-                        if (removeBtn != null)
-                            removeBtn.SetActive(true);
-                        removeBtn.GetComponent<Button>().onClick.AddListener(() =>
-                        {
-                            removePart();
-                            OpenRangeWeaponPartsInventory(itemType, weaponPartType);
-                        });
-                    }
+                    if (!isOn) return;
+                    OnClickInventoryItem(capturedItem, btn);
+                });
 
-                    // 捕捉當前 inv
-                    ItemInstance capturedItem = inv;
-                    btn.onValueChanged.AddListener(isOn =>
+                foreach (var slot in craftingSlots)
+                {
+                    if (slot != null && capturedItem == slot.item)
                     {
-                        if (!isOn) return;
-                        OnClickInventoryItem(capturedItem, btn);
-                    });
-
-                    // 物品已經在某個插槽使用中就鎖定按鈕
-                    foreach (var slot in craftingSlots)
-                    {
-                        if (slot != null && capturedItem == slot.item)
-                        {
-                            btn.interactable = false;
-                            break;
-                        }
+                        btn.interactable = false;
+                        break;
                     }
                 }
             }
@@ -248,16 +245,15 @@ public class CraftingManager : MonoBehaviour
     // 右側「背包物品按鈕」被勾選時的處理
     private void OnClickInventoryItem(ItemInstance item, Toggle btn)
     {
-        // 若點的是整把 RangeWeapon
+        // 整把武器
         if (item.item is RangeWeapon rw)
         {
-            // 刪掉舊的武器預覽
             if (weaponPreview != null)
-            {
                 Destroy(weaponPreview);
-            }
 
-            // 產生新的武器預覽並掛在 weaponPreviewTransform 底下
+            // 換新武器時先清掉舊的 craftingSlots
+            craftingSlots.Clear();
+
             GameObject weapon = Instantiate(rw.weaponPrefab, weaponPreviewTransform);
             weaponPreview = weapon;
             rangeWeapon = rw;
@@ -280,33 +276,48 @@ public class CraftingManager : MonoBehaviour
                     equipmentType = at.allowPart,
                     item = null
                 });
-
             }
-
+            CreateCraftingSlots();
         }
-        // 若點的是武器零件 RangeWeaponPart
+        // 武器零件
         else if (item.item is RangeWeaponPart rwp)
         {
-            // 沒有武器資料或沒有預覽實體就無法裝零件
             if (rangeWeapon == null || weaponPreview == null)
                 return;
 
-            // 逐一檢查這把武器定義好的所有掛點
             foreach (var attachmentPoint in craftingSlots)
             {
-                // 零件類型不相符，或掛點沒指定 Transform，直接略過
-                if (rwp.partType != attachmentPoint.equipmentType || attachmentPoint.attachmentPointTransform == null)
+                if (rwp.partType != attachmentPoint.equipmentType ||
+                    attachmentPoint.attachmentPointTransform == null)
                     continue;
 
-                // 在掛點底下實體化零件 prefab，產生組裝效果
                 GameObject part = Instantiate(rwp.rangeWeaponPartPrefab, attachmentPoint.attachmentPointTransform);
                 attachmentPoint.assembledPart = part;
-
-                // 記錄這個插槽目前使用的物品
                 attachmentPoint.item = item;
-
             }
         }
+
+        // 更新 Remove 按鈕顯示
+        int slotIndex = GetSelectedSlotIndex();
+        if (slotIndex >= 0 &&
+            slotIndex < craftingSlots.Count &&
+            slotIndex < craftingPartsButtonParent.childCount)
+        {
+            var slot = craftingSlots[slotIndex];
+            bool slotHasEquipment = (slot != null && slot.item != null && slot.item.item != null);
+
+            if (slotHasEquipment)
+            {
+                var removeBtnGo = InventoryManager.Instance.FindChild(
+                    craftingPartsButtonParent.GetChild(slotIndex).gameObject,
+                    "Remove Equipment Button"
+                );
+                if (removeBtnGo != null)
+                    removeBtnGo.SetActive(true);
+            }
+        }
+
+        // 這個物品已被使用，不允許再點
         btn.interactable = false;
     }
 
@@ -349,16 +360,84 @@ public class CraftingManager : MonoBehaviour
     public void removePart()
     {
         int index = GetSelectedSlotIndex();
-        if (index >= 0 && index < craftingSlots.Count)
+        if (index < 0 || index >= craftingSlots.Count)
+            return;
+
+        if (index == 0) // 移除整把武器
+        {
+            foreach (var slot in craftingSlots)
+            {
+                if (slot.assembledPart != null)
+                    Destroy(slot.assembledPart);
+            }
+            craftingSlots.Clear();
+            weaponPreview = null;
+            rangeWeapon = null;
+            OpenRangeWeaponInventory();
+        }
+        else
         {
             var slot = craftingSlots[index];
             if (slot.assembledPart != null)
-            {
                 Destroy(slot.assembledPart);
-                slot.assembledPart = null;
-                slot.item = null;
+            slot.assembledPart = null;
+            slot.item = null;
+            OpenRangeWeaponPartsInventory(ItemType.WeaponPart, slot.equipmentType);
+        }
+    }
+    public void AssignRemovePartButtonListener()
+    {
+        foreach (Transform slotButton in craftingPartsButtonParent)
+        {
+            var removeBtnGo = InventoryManager.Instance.FindChild(
+                slotButton.gameObject,
+                "Remove Equipment Button"
+            );
+            if (removeBtnGo != null)
+            {
+                var button = removeBtnGo.GetComponent<Button>();
+                if (button != null)
+                {
+                    button.onClick.RemoveAllListeners();
+                    button.onClick.AddListener(removePart);
+                }
             }
         }
-
     }
+    public void CreateCraftingSlots()
+    {
+        if (craftingSlots.Count > 1)
+        {
+            for (int i = 1; i < craftingSlots.Count; i++)
+            {
+                var slot = craftingSlots[i];
+                var slotButton = Instantiate(craftingSlotPrefab, craftingPartsButtonParent);
+                Image icon = FindChildRecursive(slotButton.transform, "Slot Icon")?.GetComponent<Image>();
+                if (icon != null)
+                {
+                    Debug.Log("Setting icon for slot: " + slot.equipmentType);
+                    if (slot.equipmentType == WeaponPartType.Barrel)
+                        icon.sprite = barrelIcon;
+                    else if (slot.equipmentType == WeaponPartType.Scope)
+                        icon.sprite = scopeIcon;
+                }
+                var btn = slotButton.GetComponent<Toggle>();
+                if (btn != null)
+                {
+                    btn.group = craftingPartsToggleGroup;
+                    uiPageSwitch.toggles.Add(btn);
+                    btn.onValueChanged.AddListener(isOn =>
+                    {
+                        if (isOn)
+                        {
+                            // 當這個插槽被選中時，打開對應的背包清單
+                            OpenRangeWeaponPartsInventory(ItemType.WeaponPart, slot.equipmentType);
+                        }
+                    });
+                }
+            }
+            uiPageSwitch.UpdateToggles();
+        }
+    }
+
 }

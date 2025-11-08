@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -6,8 +7,20 @@ public class UIPageSwitch : MonoBehaviour
     public Color normalColor;
     public Color selectedColor;
     public GameObject[] pages;
-    public Toggle[] toggles;
+    public List<Toggle> toggles;
     private void Start()
+    {
+        UpdateToggles();
+    }
+    public void SwitchPage(int pageIndex)
+    {
+        foreach (var page in pages)
+        {
+            page.SetActive(false);
+        }
+        pages[pageIndex].SetActive(true);
+    }
+    public void UpdateToggles()
     {
         foreach (var toggle in toggles)
         {
@@ -33,13 +46,5 @@ public class UIPageSwitch : MonoBehaviour
                 }
             });
         }
-    }
-    public void SwitchPage(int pageIndex)
-    {
-        foreach (var page in pages)
-        {
-            page.SetActive(false);
-        }
-        pages[pageIndex].SetActive(true);
     }
 }
