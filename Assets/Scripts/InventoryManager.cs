@@ -1,9 +1,10 @@
-﻿using UnityEngine;
+﻿using System;
 using System.Collections.Generic;
-using System;
-using UnityEngine.UI;
+using System.Net.Mail;
 using TMPro;
+using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 [System.Serializable]
 public class ItemInstance
@@ -15,8 +16,15 @@ public class ItemInstance
 public class RangeWeaponInstance : ItemInstance
 {
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
-    public ItemObject[] attachment;
+    public List<PartInstance> attachment;
     public Transform muzzlePoint;
+    // 用來存不同 shader 的顏色
+    [SerializeField]
+    public List<Color> colors = new List<Color>();
+
+    // 可選：記錄此裝備用的 shader 名稱，方便還原
+    [SerializeField]
+    public string shaderName;
 }
 [System.Serializable]
 public class ArmorInstance : ItemInstance
@@ -31,6 +39,19 @@ public class ArmorInstance : ItemInstance
     [SerializeField]
     public string shaderName;
 }
+[System.Serializable]
+public class PartInstance : ItemInstance
+{
+    public WeaponPartType partType;
+    public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
+    // 用來存不同 shader 的顏色
+    [SerializeField]
+    public List<Color> colors = new List<Color>();
+    // 可選：記錄此裝備用的 shader 名稱，方便還原
+    [SerializeField]
+    public string shaderName;
+}
+
 
 public class InventoryManager : MonoBehaviour
 {
@@ -44,8 +65,11 @@ public class InventoryManager : MonoBehaviour
     public Transform inventoryButtonParent;// 放按鈕的容器
     [Header("Color Block/ Inventory Block")]
     public GameObject inventoryBlock;
-    public GameObject colorBlock;
+    public GameObject characterColorBlock;
     public GameObject statBlock;
+
+    [Header("Color Panel")]
+    public ColorPicker characterEquipmentColorPicker;
     [Header("Button Toggle Group")]
     public ToggleGroup inventoryToggleGroup;
 
@@ -116,18 +140,106 @@ public class InventoryManager : MonoBehaviour
         }
         else if (item is RangeWeapon rw)
         {
+            var attachmentPoints = new List<PartInstance>();
+            foreach (var part in rw.attachmentPoints)
+            {
+                attachmentPoints.Add(
+                    new PartInstance
+                    {
+                        item = null,
+                        amount = 0,
+                        partType = part.allowPart
+                    }
+
+                );
+            }
             var inst = new RangeWeaponInstance
             {
                 item = item,
                 amount = 1,
-                attachment = new ItemObject[rw.attachmentPoints.Count],
+                attachment = attachmentPoints,
                 muzzlePoint = rw.GetMuzzlePoint()
             };
+
+            var mr = rw.meshRenderer;
+            if (mr && mr.sharedMaterial)
+            {
+                var mat = mr.sharedMaterial;
+                var shader = mat.shader;
+                inst.shaderName = shader.name;
+
+                // 根據 shader 名稱決定要存幾個顏色
+                if (shader.name.Contains("Mix 3"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                }
+                else if (shader.name.Contains("Mix 4"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                    inst.colors.Add(mat.GetColor("_Layer3Color"));
+                }
+                else if (shader.name.Contains("Mix 5"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    for (int i = 1; i < 5; i++)
+                        inst.colors.Add(mat.GetColor($"_Layer{i}Color"));
+                }
+            }
+
             foreach (EquipmentBuff buff in rw.buffs)
             {
                 inst.buffs.Add(buff);
             }
             var pickedBuff = rw.GetRandomBuff();
+            if (pickedBuff != null)
+                inst.buffs.Add(pickedBuff.buff);
+            inventory.Add(inst);
+        }
+        else if (item is RangeWeaponPart rwp)
+        {
+            var inst = new PartInstance
+            {
+                item = item,
+                amount = 1,
+                partType = rwp.partType
+            };
+            var mr = rwp.meshRenderer;
+            if (mr && mr.sharedMaterial)
+            {
+                var mat = mr.sharedMaterial;
+                var shader = mat.shader;
+                inst.shaderName = shader.name;
+
+                // 根據 shader 名稱決定要存幾個顏色
+                if (shader.name.Contains("Mix 3"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                }
+                else if (shader.name.Contains("Mix 4"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                    inst.colors.Add(mat.GetColor("_Layer3Color"));
+                }
+                else if (shader.name.Contains("Mix 5"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    for (int i = 1; i < 5; i++)
+                        inst.colors.Add(mat.GetColor($"_Layer{i}Color"));
+                }
+            }
+            foreach (EquipmentBuff buff in rwp.buffs)
+            {
+                inst.buffs.Add(buff);
+            }
+            var pickedBuff = rwp.GetRandomBuff();
             if (pickedBuff != null)
                 inst.buffs.Add(pickedBuff.buff);
             inventory.Add(inst);
@@ -142,6 +254,59 @@ public class InventoryManager : MonoBehaviour
             inventory.Add(inst);
         }
     }
+    public void RemoveItemFromInventory(ItemInstance itemInstance)
+    {
+        if (itemInstance == null) return;
+
+        int idx = inventory.IndexOf(itemInstance);
+        if (idx >= 0)
+            inventory.RemoveAt(idx);
+    }
+
+    public void AddCraftedRangeWeaponToInventory(
+        RangeWeaponInstance baseWeaponInstance,
+        List<PartInstance> rangeWeaponParts
+    )
+    {
+        if (baseWeaponInstance == null)
+        {
+            Debug.LogWarning("AddCraftedRangeWeaponToInventory: baseWeaponInstance is null");
+            return;
+        }
+
+        // 複製一份新的 RangeWeaponInstance，避免直接用原本那個
+        var newInst = new RangeWeaponInstance
+        {
+            item = baseWeaponInstance.item,
+            amount = 1,
+            // 複製基底武器的 buff、顏色、muzzlePoint、shaderName 等
+            buffs = new List<EquipmentBuff>(baseWeaponInstance.buffs),
+            attachment = new List<PartInstance>(),
+            muzzlePoint = baseWeaponInstance.muzzlePoint,
+            shaderName = baseWeaponInstance.shaderName,
+            colors = new List<Color>(baseWeaponInstance.colors)
+        };
+
+        // 把零件裝到 newInst 上，也可以順便把零件 buff 加進武器 buff
+
+        if (rangeWeaponParts != null)
+        {
+            foreach (var part in rangeWeaponParts)
+            {
+                if (part == null) continue;
+
+                newInst.attachment.Add(part);
+                /*
+                if (part.buffs != null)
+                    newInst.buffs.AddRange(part.buffs);*/
+            }
+        }
+
+        // 真正加入背包
+        inventory.Add(newInst);
+        Debug.Log($"Forged new ranged weapon. Inventory count = {inventory.Count}");
+    }
+
 
     public void OpenWeaponInventory() => OpenPartsInventory(ItemType.Weapon);
     public void OpenHeadArmorInventory() => OpenPartsInventory(ItemType.HeadArmor);
@@ -156,8 +321,8 @@ public class InventoryManager : MonoBehaviour
 
     public void OpenPartsInventory(ItemType itemType)
     {
-        Debug.Log("colorBlock.activeSelf: " + colorBlock.activeSelf);
-        if (colorBlock.activeSelf != true)
+        Debug.Log("colorBlock.activeSelf: " + characterColorBlock.activeSelf);
+        if (characterColorBlock.activeSelf != true)
         {
             Debug.Log("inventoryToggleGroup.AnyTogglesOn(): "+ inventoryToggleGroup.AnyTogglesOn());
             if (inventoryToggleGroup.AnyTogglesOn())
@@ -261,11 +426,11 @@ public class InventoryManager : MonoBehaviour
         {
             if (!inventoryToggleGroup.AnyTogglesOn())
             {
-                ColorPicker.Instance.targetGameObject = null;
-                ColorPicker.Instance.targetMaterials = new List<Material>();
-                ColorPicker.Instance.currentMaterialIndex = -1;
-                ColorPicker.Instance.currentTextureIndex = -1;
-                ColorPicker.Instance.ClearnButton();
+                characterEquipmentColorPicker.targetGameObject = null;
+                characterEquipmentColorPicker.targetMaterials = new List<Material>();
+                characterEquipmentColorPicker.currentMaterialIndex = -1;
+                characterEquipmentColorPicker.currentTextureIndex = -1;
+                characterEquipmentColorPicker.ClearnButton();
             }
         }
     }
@@ -326,7 +491,7 @@ public class InventoryManager : MonoBehaviour
         spriteImage.sprite = null;
         spriteImage.color = new Color(1, 1, 1, 0);
         OpenInventoryPage();
-        if (colorBlock.activeSelf)
+        if (characterColorBlock.activeSelf)
         {
             SelectPartToColor(index);
         }
@@ -350,39 +515,39 @@ public class InventoryManager : MonoBehaviour
         {
             return;
         }
-        if (!colorBlock.activeSelf) return;
+        if (!characterColorBlock.activeSelf) return;
 
         var go = slots[index].equipedItem;
         if (!go)
         {
-            ColorPicker.Instance.targetGameObject = null;
-            ColorPicker.Instance.targetMaterials = new List<Material>();
-            ColorPicker.Instance.currentMaterialIndex = -1;
-            ColorPicker.Instance.currentTextureIndex = -1;
-            ColorPicker.Instance.ClearnButton();
+            characterEquipmentColorPicker.targetGameObject = null;
+            characterEquipmentColorPicker.targetMaterials = new List<Material>();
+            characterEquipmentColorPicker.currentMaterialIndex = -1;
+            characterEquipmentColorPicker.currentTextureIndex = -1;
+            characterEquipmentColorPicker.ClearnButton();
         }
         else
         {
-            ColorPicker.Instance.targetGameObject = go;
-            ColorPicker.Instance.AddTargetMaterialsToList();
-            ColorPicker.Instance.CreateButtons();
+            characterEquipmentColorPicker.targetGameObject = go;
+            characterEquipmentColorPicker.AddTargetMaterialsToList();
+            characterEquipmentColorPicker.CreateButtons();
         }
     }
     public void SelectPartToColor(int equipmentSlotsIndex)
     {
-        if (EquipmentManager.Instance.equipmentSlots[equipmentSlotsIndex].equipedItem != null && colorBlock.activeSelf == true)
+        if (EquipmentManager.Instance.equipmentSlots[equipmentSlotsIndex].equipedItem != null && characterColorBlock.activeSelf == true)
         {
-            ColorPicker.Instance.targetGameObject = EquipmentManager.Instance.equipmentSlots[equipmentSlotsIndex].equipedItem;
-            ColorPicker.Instance.AddTargetMaterialsToList();
-            ColorPicker.Instance.CreateButtons();
+            characterEquipmentColorPicker.targetGameObject = EquipmentManager.Instance.equipmentSlots[equipmentSlotsIndex].equipedItem;
+            characterEquipmentColorPicker.AddTargetMaterialsToList();
+            characterEquipmentColorPicker.CreateButtons();
         }
-        else if(EquipmentManager.Instance.equipmentSlots[equipmentSlotsIndex].equipedItem == null && colorBlock.activeSelf == true)
+        else if(EquipmentManager.Instance.equipmentSlots[equipmentSlotsIndex].equipedItem == null && characterColorBlock.activeSelf == true)
         {
-            ColorPicker.Instance.targetGameObject = null;
-            ColorPicker.Instance.targetMaterials = new List<Material>();
-            ColorPicker.Instance.currentMaterialIndex = -1;
-            ColorPicker.Instance.currentTextureIndex = -1;
-            ColorPicker.Instance.ClearnButton();
+            characterEquipmentColorPicker.targetGameObject = null;
+            characterEquipmentColorPicker.targetMaterials = new List<Material>();
+            characterEquipmentColorPicker.currentMaterialIndex = -1;
+            characterEquipmentColorPicker.currentTextureIndex = -1;
+            characterEquipmentColorPicker.ClearnButton();
         }
     }
 

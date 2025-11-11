@@ -17,6 +17,7 @@ public class EquipmentManager : MonoBehaviour
     public static EquipmentManager Instance { get; private set; }
     public Transform equipmentPage;
     [SerializeField] public List<EquipmentSlot> equipmentSlots = new();
+
     void Awake()
     {
         // If an instance already exists and it's not this one, destroy this new instance

@@ -5,8 +5,6 @@ using UnityEngine.UI;
 public class ColorPicker : MonoBehaviour
 {
 
-    public static ColorPicker Instance; // Singleton instance
-
     public GameObject targetGameObject;
     public List<Material> targetMaterials;
     public int currentMaterialIndex = -1;
@@ -36,20 +34,6 @@ public class ColorPicker : MonoBehaviour
     private bool draggingColorArea = false;
     private float currentHue = 0f; // current hue value (0 to 1)
 
-    void Awake()
-    {
-
-        // Implement the singleton.
-        if (Instance == null)
-        {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
-
-    }
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -372,9 +356,17 @@ public class ColorPicker : MonoBehaviour
     public void AddTargetMaterialsToList()
     {
         targetMaterials.Clear(); // ¡ö ¥[³o¦æ
-        targetMaterials.Add(targetGameObject.GetComponent<SkinnedMeshRenderer>().materials[0]);
-        foreach (Transform child in targetGameObject.transform)
-            targetMaterials.Add(child.GetComponent<SkinnedMeshRenderer>().materials[0]);
+        if (targetGameObject.GetComponent<SkinnedMeshRenderer>())
+        {
+            targetMaterials.Add(targetGameObject.GetComponent<SkinnedMeshRenderer>().materials[0]);
+            foreach (Transform child in targetGameObject.transform)
+                targetMaterials.Add(child.GetComponent<SkinnedMeshRenderer>().materials[0]);
+        }else if (targetGameObject.GetComponent<MeshRenderer>())
+        {
+            targetMaterials.Add(targetGameObject.GetComponent<MeshRenderer>().materials[0]);
+            foreach (Transform child in targetGameObject.transform)
+                targetMaterials.Add(child.GetComponent<MeshRenderer>().materials[0]);
+        }
     }
 
     public void WriteColorBackToArmorInstance(Color color, int materialIndex, int textureIndex)

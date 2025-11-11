@@ -10,15 +10,22 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3e5af43e8791caa418ac62aba760a20c, type: 3}
-  m_Name: Scope
+  m_Name: Scope 1
   m_EditorClassIdentifier: Assembly-CSharp::RangeWeaponPart
   itemName: Scope
   type: 9
   icon: {fileID: 0}
   maxStack: 1
   dropPrefab: {fileID: 0}
-  rangeWeaponPartPrefab: {fileID: 919132149155446097, guid: a357b8119092e7b4db395a746f8d93a2, type: 3}
+  rangeWeaponPartPrefab: {fileID: 9096270882145384013, guid: 78a553cd527c352419381ccddb9c66d1, type: 3}
   partType: 1
   muzzlePoint: {fileID: 0}
-  buffs: []
-  randomBuffs: []
+  buffs:
+  - attribute: 0
+    value: 3
+  randomBuffs:
+  - buff:
+      attribute: 0
+      value: 5
+    weight: 1
+  meshRenderer: {fileID: 7294862023860328344, guid: 78a553cd527c352419381ccddb9c66d1, type: 3}

@@ -10,6 +10,7 @@ public class RangeWeaponPart : ItemObject
     public Transform muzzlePoint;
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
     public List<RandomBuff> randomBuffs = new List<RandomBuff>();
+    public MeshRenderer meshRenderer;
 
     public RandomBuff GetRandomBuff()
     {

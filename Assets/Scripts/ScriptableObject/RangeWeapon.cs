@@ -16,7 +16,7 @@ public class RangeWeapon : ItemObject
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
     public List<RandomBuff> randomBuffs = new List<RandomBuff>();
     public List<AttachmentPoint> attachmentPoints = new List<AttachmentPoint>();
-
+    public MeshRenderer meshRenderer;
     public RandomBuff GetRandomBuff()
     {
         if (randomBuffs == null || randomBuffs.Count == 0)

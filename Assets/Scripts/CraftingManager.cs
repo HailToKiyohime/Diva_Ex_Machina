@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Net.Mail;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -17,6 +18,8 @@ public class CraftingSlot
 
 public class CraftingManager : MonoBehaviour
 {
+    public static CraftingManager Instance { get; private set; }
+
     // 左側「合成零件插槽按鈕」們的父物件 (Receiver / Scope / Barrel)
     public Transform craftingPartsButtonParent;
     // 右側「背包物品按鈕」們的父物件
@@ -41,6 +44,20 @@ public class CraftingManager : MonoBehaviour
     public Sprite scopeIcon;
 
     public UIPageSwitch uiPageSwitch;
+
+    public ColorPicker weaponPartColorPicker;
+    public GameObject weaponColorBlock;
+    void Awake()
+    {
+        // If an instance already exists and it's not this one, destroy this new instance
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return; // Exit to prevent further execution of this Awake method
+        }
+        // Otherwise, set this instance as the Singleton
+        Instance = this;
+    }
 
     // 給 UI 按鈕用的簡化呼叫：打開 Receiver 清單
     public void OpenReceiverInventory() => OpenRangeWeaponPartsInventory(ItemType.WeaponPart, WeaponPartType.Gun);
@@ -421,23 +438,185 @@ public class CraftingManager : MonoBehaviour
                     else if (slot.equipmentType == WeaponPartType.Scope)
                         icon.sprite = scopeIcon;
                 }
+
                 var btn = slotButton.GetComponent<Toggle>();
                 if (btn != null)
                 {
                     btn.group = craftingPartsToggleGroup;
                     uiPageSwitch.toggles.Add(btn);
+
+                    // 這兩行是關鍵：用 local copy 固定住當前迴圈的值
+                    int slotIndex = i;
+                    var capturedSlot = slot;
+
                     btn.onValueChanged.AddListener(isOn =>
                     {
-                        if (isOn)
-                        {
-                            // 當這個插槽被選中時，打開對應的背包清單
-                            OpenRangeWeaponPartsInventory(ItemType.WeaponPart, slot.equipmentType);
-                        }
+                        if (!isOn) return;
+
+                        // 用固定好的 capturedSlot / slotIndex
+                        OpenRangeWeaponPartsInventory(ItemType.WeaponPart, capturedSlot.equipmentType);
+                        SelectWeaponPartToColor(slotIndex);
                     });
                 }
             }
             uiPageSwitch.UpdateToggles();
         }
+    }
+    public void SelectWeaponPartToColor(int equipmentSlotsIndex)
+    {
+        // List 本身是不是 null
+        if (craftingSlots == null)
+        {
+            Debug.LogWarning("SelectWeaponPartToColor: craftingSlots is null");
+            return;
+        }
+
+        // 這裡才是關鍵：index 是否在 0 ~ Count-1 範圍內
+        if (equipmentSlotsIndex < 0 || equipmentSlotsIndex >= craftingSlots.Count)
+        {
+            Debug.LogWarning(
+                $"SelectWeaponPartToColor: index out of range. index={equipmentSlotsIndex}, count={craftingSlots.Count}"
+            );
+            return;
+        }
+
+        var slot = craftingSlots[equipmentSlotsIndex];
+
+        // 顏色區塊沒開就不用做事
+        if (!weaponColorBlock.activeSelf)
+            return;
+
+        if (slot != null && slot.assembledPart != null)
+        {
+            weaponPartColorPicker.targetGameObject = slot.assembledPart;
+            weaponPartColorPicker.AddTargetMaterialsToList();
+            weaponPartColorPicker.CreateButtons();
+        }
+        else
+        {
+            weaponPartColorPicker.targetGameObject = null;
+            weaponPartColorPicker.targetMaterials = new List<Material>();
+            weaponPartColorPicker.currentMaterialIndex = -1;
+            weaponPartColorPicker.currentTextureIndex = -1;
+            weaponPartColorPicker.ClearnButton();
+        }
+    }
+    public void OpenColorPage()
+    {
+        int index = GetSelectedSlotIndex();
+        // 把所有裝備槽上的「Remove Equipment Button」先關掉
+        for (int i = 0; i < craftingPartsButtonParent.childCount; i++)
+        {
+            var removeBtn = FindChild(craftingPartsButtonParent.GetChild(i).gameObject, "Remove Equipment Button");
+            if (removeBtn != null)
+                removeBtn.SetActive(false);
+        }
+        var slots = craftingSlots;
+        if (index < 0 || index >= slots.Count) // 先驗證索引範圍
+        {
+            return;
+        }
+        if (!weaponColorBlock.activeSelf) return;
+
+        var go = slots[index].assembledPart;
+        if (!go)
+        {
+            weaponPartColorPicker.targetGameObject = null;
+            weaponPartColorPicker.targetMaterials = new List<Material>();
+            weaponPartColorPicker.currentMaterialIndex = -1;
+            weaponPartColorPicker.currentTextureIndex = -1;
+            weaponPartColorPicker.ClearnButton();
+        }
+        else
+        {
+            weaponPartColorPicker.targetGameObject = go;
+            weaponPartColorPicker.AddTargetMaterialsToList();
+            weaponPartColorPicker.CreateButtons();
+        }
+    }
+
+    public GameObject FindChild(GameObject parentObject, string targetName)
+    {
+        foreach (Transform childTransform in parentObject.transform)
+        {
+            if (childTransform.gameObject.name == targetName)
+            {
+                return childTransform.gameObject; // Found the grandchild
+            }
+
+            // Recursively search in the child's children (grandchild's children, etc.)
+            GameObject foundGrandchild = FindChild(childTransform.gameObject, targetName);
+            if (foundGrandchild != null)
+            {
+                return foundGrandchild;
+            }
+        }
+        return null; // Grandchild not found in this branch
+    }
+    public void Forge()
+    {
+        Debug.Log("Forge: start");
+
+        // 檢查有沒有任何 slot
+        if (craftingSlots == null || craftingSlots.Count == 0)
+        {
+            Debug.LogWarning("Forge: craftingSlots is empty");
+            return;
+        }
+
+        // 槽 0 是整把武器
+        var baseSlot = craftingSlots[0];
+        if (baseSlot == null || baseSlot.item == null)
+        {
+            Debug.LogWarning("Forge: base slot has no item");
+            return;
+        }
+
+        if (!(baseSlot.item is RangeWeaponInstance weaponInstance))
+        {
+            Debug.LogWarning($"Forge: base slot item is not RangeWeaponInstance, actual={baseSlot.item.GetType().Name}");
+            return;
+        }
+
+        // 收集零件
+        var rangeWeaponPartInstances = new List<PartInstance>();
+
+        if (craftingSlots.Count > 1)
+        {
+            for (int i = 1; i < craftingSlots.Count; i++)
+            {
+                var slot = craftingSlots[i];
+                if (slot == null || slot.item == null)
+                    continue;
+
+                if (slot.item is PartInstance pi)
+                {
+                    rangeWeaponPartInstances.Add(pi);
+                }
+                else
+                {
+                    Debug.LogWarning($"Forge: slot[{i}] item is not PartInstance, actual={slot.item.GetType().Name}");
+                }
+            }
+        }
+
+        if (rangeWeaponPartInstances.Count == 0)
+        {
+            Debug.LogWarning("Forge: no parts selected, cannot forge");
+            return;
+        }
+
+        // 1) 生成鍛造後的新武器，加入背包
+        InventoryManager.Instance.AddCraftedRangeWeaponToInventory(weaponInstance, rangeWeaponPartInstances);
+
+        // 2) 消耗掉原本的 blueprint 武器 + 零件
+        InventoryManager.Instance.RemoveItemFromInventory(baseSlot.item);
+        foreach (var part in rangeWeaponPartInstances)
+        {
+            InventoryManager.Instance.RemoveItemFromInventory(part);
+        }
+
+        Debug.Log("Forge: success");
     }
 
 }
