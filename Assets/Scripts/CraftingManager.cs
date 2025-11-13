@@ -637,6 +637,7 @@ public class CraftingManager : MonoBehaviour
             return;
         }
 
+
         // 1) 生成鍛造後的新武器，加入背包
         InventoryManager.Instance.AddCraftedRangeWeaponToInventory(weaponInstance, rangeWeaponPartInstances);
 
@@ -657,6 +658,10 @@ public class CraftingManager : MonoBehaviour
         {
             Destroy(craftingPartsButtonParent.GetChild(i).gameObject);
         }
+        Image spriteImage = InventoryManager.Instance.FindChild(
+        craftingPartsButtonParent.GetChild(0).gameObject, "Item Icon").GetComponent<Image>();
+        spriteImage.sprite = null;
+        spriteImage.color = new Color(1, 1, 1, 0);
         craftingSlots.Clear();
     }
 }
