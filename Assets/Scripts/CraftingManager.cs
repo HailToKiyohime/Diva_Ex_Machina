@@ -162,6 +162,10 @@ public class CraftingManager : MonoBehaviour
                 if (removeBtnGo != null)
                     removeBtnGo.SetActive(false);
             }
+            foreach (Transform child in itemsButtonParent)
+            {
+                Destroy(child.gameObject);
+            }
         }
     }
 
@@ -313,7 +317,10 @@ public class CraftingManager : MonoBehaviour
                 attachmentPoint.item = item;
             }
         }
-
+        Image spriteImage = InventoryManager.Instance.FindChild(
+        craftingPartsButtonParent.GetChild(GetSelectedSlotIndex()).gameObject,"Item Icon").GetComponent<Image>();
+        spriteImage.sprite = item.item.icon;
+        spriteImage.color = new Color(1, 1, 1, 1);
         // 更新 Remove 按鈕顯示
         int slotIndex = GetSelectedSlotIndex();
         if (slotIndex >= 0 &&
@@ -387,6 +394,10 @@ public class CraftingManager : MonoBehaviour
                 if (slot.assembledPart != null)
                     Destroy(slot.assembledPart);
             }
+            for(int i =1; i < craftingPartsButtonParent.childCount; i++)
+            {
+                Destroy(craftingPartsButtonParent.GetChild(i).gameObject);
+            }
             craftingSlots.Clear();
             weaponPreview = null;
             rangeWeapon = null;
@@ -401,6 +412,10 @@ public class CraftingManager : MonoBehaviour
             slot.item = null;
             OpenRangeWeaponPartsInventory(ItemType.WeaponPart, slot.equipmentType);
         }
+        Image spriteImage = InventoryManager.Instance.FindChild(
+        craftingPartsButtonParent.GetChild(GetSelectedSlotIndex()).gameObject,"Item Icon").GetComponent<Image>();
+        spriteImage.sprite = null;
+        spriteImage.color = new Color(1, 1, 1, 0);
     }
     public void AssignRemovePartButtonListener()
     {
@@ -451,7 +466,23 @@ public class CraftingManager : MonoBehaviour
 
                     btn.onValueChanged.AddListener(isOn =>
                     {
-                        if (!isOn) return;
+                        if (!isOn)
+                        {
+                            // 先關閉所有插槽上的移除按鈕
+                            for (int i = 0; i < craftingPartsButtonParent.childCount; i++)
+                            {
+                                var removeBtnGo = InventoryManager.Instance.FindChild(
+                                    craftingPartsButtonParent.GetChild(i).gameObject,
+                                    "Remove Equipment Button"
+                                );
+                                if (removeBtnGo != null)
+                                    removeBtnGo.SetActive(false);
+
+                                ClearInventoryButton();
+                            }
+
+                            return;
+                        }
 
                         // 用固定好的 capturedSlot / slotIndex
                         OpenRangeWeaponPartsInventory(ItemType.WeaponPart, capturedSlot.equipmentType);
@@ -615,8 +646,17 @@ public class CraftingManager : MonoBehaviour
         {
             InventoryManager.Instance.RemoveItemFromInventory(part);
         }
-
+        Destroy(weaponPreview);
+        weaponPreview = null;
+        CleanCraftingSlots();
         Debug.Log("Forge: success");
     }
-
+    public void CleanCraftingSlots()
+    {
+        for (int i = craftingPartsButtonParent.childCount - 1; i > 0; i--)
+        {
+            Destroy(craftingPartsButtonParent.GetChild(i).gameObject);
+        }
+        craftingSlots.Clear();
+    }
 }

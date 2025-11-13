@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RangeWeaponPart
   itemName: Scope
   type: 9
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: a2993ee848f5b4c4b8643fca0f535424, type: 3}
   maxStack: 1
   dropPrefab: {fileID: 0}
   rangeWeaponPartPrefab: {fileID: 9096270882145384013, guid: 78a553cd527c352419381ccddb9c66d1, type: 3}

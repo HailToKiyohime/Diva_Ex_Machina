@@ -308,7 +308,7 @@ public class InventoryManager : MonoBehaviour
     }
 
 
-    public void OpenWeaponInventory() => OpenPartsInventory(ItemType.Weapon);
+    public void OpenWeaponInventory() => OpenPartsInventory(ItemType.RangeWeapon);
     public void OpenHeadArmorInventory() => OpenPartsInventory(ItemType.HeadArmor);
     public void OpenChestArmorInventory() => OpenPartsInventory(ItemType.ChestArmor);
     public void OpenLeftHandInventory() => OpenPartsInventory(ItemType.LeftHandArmor);
@@ -442,29 +442,59 @@ public class InventoryManager : MonoBehaviour
     private void OnClickInventoryItem(ItemInstance item, Toggle btn)
     {
         Debug.Log("Working");
-        if (EquipmentManager.Instance.TryEquipFromInventory(item))
+        if (item is RangeWeaponInstance rw)
         {
-            // 解鎖同一清單中的其他按鈕
-            foreach (var t in itemsButtonParent.GetComponentsInChildren<Toggle>(true))
+            Debug.Log("inventoryButtonParent.GetChild(GetSelectedSlotIndex()):"+ inventoryButtonParent.GetChild(GetSelectedSlotIndex()));
+            Transform mountPoint = inventoryButtonParent.GetChild(GetSelectedSlotIndex()).GetComponentInChildren<WeaponTransform>().weaponTransform;
+            if (EquipmentManager.Instance.TryEquipWeaponFromInventory(item, mountPoint))
             {
-                if (t != btn)
+                // 解鎖同一清單中的其他按鈕
+                foreach (var t in itemsButtonParent.GetComponentsInChildren<Toggle>(true))
                 {
-                    t.interactable = true;
-                    t.isOn = false;
+                    if (t != btn)
+                    {
+                        t.interactable = true;
+                        t.isOn = false;
+                    }
                 }
-            }
+                Image spriteImage = FindChild(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Item Icon").GetComponent<Image>();
+                spriteImage.sprite = item.item.icon;
+                spriteImage.color = new Color(1, 1, 1, 1);
+                FindChild(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Remove Equipment Button").SetActive(true);
+                // 鎖住當前已裝備的按鈕
+                btn.interactable = false;
 
-            Image spriteImage = FindChild(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Item Icon").GetComponent<Image>();
-            spriteImage.sprite = item.item.icon;
-            spriteImage.color = new Color(1,1,1,1);
-            FindChild(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Remove Equipment Button").SetActive(true);
-            // 鎖住當前已裝備的按鈕
-            btn.interactable = false;
-        }
-        else
-        {
-            // 失敗就還原選取
-            btn.isOn = false;
+            }
+            else
+            {
+                // 失敗就還原選取
+                btn.isOn = false;
+            }
+        } else {
+            if (EquipmentManager.Instance.TryEquipFromInventory(item))
+            {
+                // 解鎖同一清單中的其他按鈕
+                foreach (var t in itemsButtonParent.GetComponentsInChildren<Toggle>(true))
+                {
+                    if (t != btn)
+                    {
+                        t.interactable = true;
+                        t.isOn = false;
+                    }
+                }
+
+                Image spriteImage = FindChild(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Item Icon").GetComponent<Image>();
+                spriteImage.sprite = item.item.icon;
+                spriteImage.color = new Color(1, 1, 1, 1);
+                FindChild(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Remove Equipment Button").SetActive(true);
+                // 鎖住當前已裝備的按鈕
+                btn.interactable = false;
+            }
+            else
+            {
+                // 失敗就還原選取
+                btn.isOn = false;
+            }
         }
     }
 

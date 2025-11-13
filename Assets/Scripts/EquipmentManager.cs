@@ -1,6 +1,8 @@
-using UnityEngine;
-using System.Collections.Generic;
 using System;
+using System.Collections.Generic;
+using System.Drawing;
+using UnityEngine;
+using static Unity.Burst.Intrinsics.Arm;
 
 [System.Serializable]
 public class EquipmentSlot
@@ -90,6 +92,56 @@ public class EquipmentManager : MonoBehaviour
         }
         return false; // 找不到對應槽
     }
+    public bool TryEquipWeaponFromInventory(ItemInstance item, Transform mountPoint)
+    {
+        if (item == null || item.item == null) return false;
+
+        for (int i = 0; i < equipmentSlots.Count; i++)
+        {
+            var slot = equipmentSlots[i];
+            if (slot.equipmentType != item.item.type) continue;
+
+            if (slot.equipedItem) Destroy(slot.equipedItem);
+
+            if (item is RangeWeaponInstance rwi && rwi.item is RangeWeapon rw)
+            {
+                // 1) 主武器掛在 mountPoint（場景物件）
+                slot.equipedItem = Instantiate(rw.weaponPrefab, mountPoint, false);
+                slot.equipedItem.transform.localRotation = Quaternion.Euler(new Vector3 (-90,90,0));
+                slot.item = item;
+
+                // 2) 附件掛在「主武器實例」上的同名掛點
+                foreach (var attach in rwi.attachment)
+                {
+                    if (attach?.item is not RangeWeaponPart rwp) continue;
+
+                    // 在定義的 attachmentPoints 中找對應 partType
+                    foreach (var ap in rw.attachmentPoints)
+                    {
+                        if (ap.allowPart != attach.partType) continue;
+
+                        // 到「實例」上用名字找掛點
+                        var target = FindChildRecursive(slot.equipedItem.transform, ap.pointTransform.name);
+                        if (target == null)
+                        {
+                            Debug.LogWarning($"Equip: cannot find mount '{ap.pointTransform.name}' on weapon instance");
+                            continue;
+                        }
+
+                        var part = Instantiate(rwp.rangeWeaponPartPrefab, target, false);
+                        part.transform.localPosition = Vector3.zero;
+                        part.transform.localRotation = Quaternion.identity;
+                        part.transform.localScale = Vector3.one;
+                    }
+                }
+
+                Debug.Log("Equipped weapon: " + rw.itemName);
+                return true;
+            }
+            return false;
+        }
+        return false;
+    }
 
     public void CleanEquipmentSlot(int equipmentSlotsIndex)
     {
@@ -98,4 +150,15 @@ public class EquipmentManager : MonoBehaviour
         slot.equipedItem = null; 
         slot.item = null;
     }
+    private static Transform FindChildRecursive(Transform root, string name)
+    {
+        if (root.name == name) return root;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            var c = FindChildRecursive(root.GetChild(i), name);
+            if (c) return c;
+        }
+        return null;
+    }
 }
+
