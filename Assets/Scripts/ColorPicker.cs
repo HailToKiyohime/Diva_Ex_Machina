@@ -104,21 +104,24 @@ public class ColorPicker : MonoBehaviour
     {
         if (targetGameObject == null) return;
 
+        // 先清空舊按鈕
         ClearnButton();
 
-        for(int x = 0; x < targetMaterials.Count; x++)
+        // 依 shader 產生細節用按鈕
+        for (int x = 0; x < targetMaterials.Count; x++)
         {
             string shaderName = targetMaterials[x].shader.name;
             Debug.Log("shaderName:" + shaderName);
+
             if (shaderName.Contains("Mix 3"))
             {
                 for (int i = 0; i < 3; i++)
                 {
-                    Debug.Log("i:" + i);
                     var button = Instantiate(buttonPrefab, colorDetailButtonParent);
                     var label = button.transform.Find("Detail Index")?.GetComponent<TMPro.TMP_Text>();
                     int num = x + i + 1;
                     if (label) label.text = "" + num;
+
                     var btn = button.GetComponent<Toggle>();
                     if (btn != null)
                     {
@@ -154,11 +157,11 @@ public class ColorPicker : MonoBehaviour
             {
                 for (int i = 0; i < 4; i++)
                 {
-                    Debug.Log("i:" + i);
                     var button = Instantiate(buttonPrefab, colorDetailButtonParent);
                     var label = button.transform.Find("Detail Index")?.GetComponent<TMPro.TMP_Text>();
                     int num = x + i + 1;
                     if (label) label.text = "" + num;
+
                     var btn = button.GetComponent<Toggle>();
                     if (btn != null)
                     {
@@ -194,11 +197,11 @@ public class ColorPicker : MonoBehaviour
             {
                 for (int i = 0; i < 5; i++)
                 {
-                    Debug.Log("i:" + i);
                     var button2 = Instantiate(buttonPrefab, colorDetailButtonParent);
                     var label = button2.transform.Find("Detail Index")?.GetComponent<TMPro.TMP_Text>();
                     int num = x + i + 1;
                     if (label) label.text = "" + num;
+
                     var btn = button2.GetComponent<Toggle>();
                     if (btn != null)
                     {
@@ -231,12 +234,26 @@ public class ColorPicker : MonoBehaviour
                 }
             }
         }
+
+        // ★ 在這裡自動勾第一顆按鈕
+        if (colorDetailButtonParent.childCount > 0)
+        {
+            var firstToggle = colorDetailButtonParent.GetChild(0).GetComponent<Toggle>();
+            if (firstToggle != null)
+            {
+                firstToggle.isOn = true;   // 會觸發 onValueChanged → SelectDetalPart()
+            }
+        }
     }
 
     public void ClearnButton()
     {
         for (int i = colorDetailButtonParent.childCount - 1; i >= 0; i--)
             Destroy(colorDetailButtonParent.GetChild(i).gameObject);
+
+        // 確保不再觸發舊按鈕的選取狀態
+        if (toggleGroup != null)
+            toggleGroup.SetAllTogglesOff();
     }
 
     public void SelectDetalPart(int materialIndex, int textureIndex)

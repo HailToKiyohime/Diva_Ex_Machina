@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Net.Mail;
 using UnityEngine;
 using UnityEngine.UI;
-
+using TMPro;
 // 單一合成插槽資料
 [System.Serializable]
 public class CraftingSlot
@@ -47,6 +47,8 @@ public class CraftingManager : MonoBehaviour
 
     public ColorPicker weaponPartColorPicker;
     public GameObject weaponColorBlock;
+
+    public TMP_InputField newWeaponName;
     void Awake()
     {
         // If an instance already exists and it's not this one, destroy this new instance
@@ -74,7 +76,7 @@ public class CraftingManager : MonoBehaviour
     {
         AssignRemovePartButtonListener();
 
-        if (craftingPartsToggleGroup.AnyTogglesOn())
+        if (craftingPartsToggleGroup.AnyTogglesOn() && weaponColorBlock.activeSelf == false)
         {
             ClearInventoryButton();
 
@@ -114,7 +116,26 @@ public class CraftingManager : MonoBehaviour
 
                 var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
                 if (label != null)
-                    label.text = inv.item.itemName;
+                {
+                    if (itemType == ItemType.RangeWeapon)
+                    {
+                        if (inv is RangeWeaponInstance rwi)
+                        {
+                            Debug.Log(" rwi.newWeaponName = " + rwi.newWeaponName);
+
+                            string displayName = inv.item.itemName;   // 先用 ScriptableObject 的名字當預設
+
+                            if (!string.IsNullOrEmpty(rwi.newWeaponName))
+                                displayName = rwi.newWeaponName;      // 只有真的改過名才覆蓋
+
+                            label.text = displayName;
+                        }
+                    }
+                    else
+                    {
+                        label.text = inv.item.itemName;
+                    }
+                }
 
                 var btn = button.GetComponent<Toggle>();
                 if (btn != null)
@@ -172,91 +193,106 @@ public class CraftingManager : MonoBehaviour
     // 打開「武器零件」的背包清單，會再用 weaponPartType 過濾
     public void OpenRangeWeaponPartsInventory(ItemType itemType, WeaponPartType weaponPartType)
     {
-        if (!craftingPartsToggleGroup.AnyTogglesOn())
-            return;
-
-        ClearInventoryButton();
-
-        int slotIndex = GetSelectedSlotIndex();
-
-        // 先關閉所有插槽上的移除按鈕
-        for (int i = 0; i < craftingPartsButtonParent.childCount; i++)
+        if (craftingPartsToggleGroup.AnyTogglesOn() && weaponColorBlock.activeSelf == false)
         {
-            var removeBtnGo = InventoryManager.Instance.FindChild(
-                craftingPartsButtonParent.GetChild(i).gameObject,
-                "Remove Equipment Button"
-            );
-            if (removeBtnGo != null)
-                removeBtnGo.SetActive(false);
-        }
+            ClearInventoryButton();
 
-        // 檢查現在選中的插槽是否已經有裝備
-        bool slotHasEquipment = false;
-        if (slotIndex >= 0 && slotIndex < craftingSlots.Count)
-        {
-            var slot = craftingSlots[slotIndex];
-            if (slot != null && slot.item != null && slot.item.item != null)
-                slotHasEquipment = true;
-        }
+            int slotIndex = GetSelectedSlotIndex();
 
-        // 掃描背包
-        foreach (var inv in InventoryManager.Instance.inventory)
-        {
-            if (inv == null || inv.item == null || inv.item.type != itemType)
-                continue;
-
-            if (itemType == ItemType.WeaponPart)
+            // 先關閉所有插槽上的移除按鈕
+            for (int i = 0; i < craftingPartsButtonParent.childCount; i++)
             {
-                if (inv.item is RangeWeaponPart rangeWeaponPart)
-                {
-                    if (rangeWeaponPart.partType != weaponPartType)
-                        continue;
-                }
-                else
-                {
-                    continue;
-                }
+                var removeBtnGo = InventoryManager.Instance.FindChild(
+                    craftingPartsButtonParent.GetChild(i).gameObject,
+                    "Remove Equipment Button"
+                );
+                if (removeBtnGo != null)
+                    removeBtnGo.SetActive(false);
             }
 
-            var button = Instantiate(buttonPrefab, itemsButtonParent);
-
-            var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
-            if (icon != null)
-                icon.sprite = inv.item.icon;
-
-            var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
-            if (label != null)
-                label.text = inv.item.itemName;
-
-            var btn = button.GetComponent<Toggle>();
-            if (btn != null)
+            // 檢查現在選中的插槽是否已經有裝備
+            bool slotHasEquipment = false;
+            if (slotIndex >= 0 && slotIndex < craftingSlots.Count)
             {
-                // 插槽已有裝備 → 顯示 Remove 按鈕（listener 在 AssignRemovePartButtonListener 統一處理）
-                if (slotHasEquipment &&
-                    slotIndex >= 0 &&
-                    slotIndex < craftingPartsButtonParent.childCount)
+                var slot = craftingSlots[slotIndex];
+                if (slot != null && slot.item != null && slot.item.item != null)
+                    slotHasEquipment = true;
+            }
+
+            // 掃描背包
+            foreach (var inv in InventoryManager.Instance.inventory)
+            {
+                if (inv == null || inv.item == null || inv.item.type != itemType)
+                    continue;
+
+                if (itemType == ItemType.WeaponPart)
                 {
-                    var removeBtnGo = InventoryManager.Instance.FindChild(
-                        craftingPartsButtonParent.GetChild(slotIndex).gameObject,
-                        "Remove Equipment Button"
-                    );
-                    if (removeBtnGo != null)
-                        removeBtnGo.SetActive(true);
+                    if (inv.item is RangeWeaponPart rangeWeaponPart)
+                    {
+                        if (rangeWeaponPart.partType != weaponPartType)
+                            continue;
+                    }
+                    else
+                    {
+                        continue;
+                    }
                 }
 
-                ItemInstance capturedItem = inv;
-                btn.onValueChanged.AddListener(isOn =>
-                {
-                    if (!isOn) return;
-                    OnClickInventoryItem(capturedItem, btn);
-                });
+                var button = Instantiate(buttonPrefab, itemsButtonParent);
 
-                foreach (var slot in craftingSlots)
+                var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
+                if (icon != null)
+                    icon.sprite = inv.item.icon;
+
+                var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
+                if (label != null)
                 {
-                    if (slot != null && capturedItem == slot.item)
+                    if (inv is RangeWeaponInstance rwi)
                     {
-                        btn.interactable = false;
-                        break;
+                        Debug.Log(" rwi.newWeaponName = " + rwi.newWeaponName);
+
+                        string displayName = inv.item.itemName;   // 先用 ScriptableObject 的名字當預設
+
+                        if (!string.IsNullOrEmpty(rwi.newWeaponName))
+                            displayName = rwi.newWeaponName;      // 只有真的改過名才覆蓋
+
+                        label.text = displayName;
+                    }
+                    else
+                    {
+                        label.text = inv.item.itemName;
+                    }
+                }
+                var btn = button.GetComponent<Toggle>();
+                if (btn != null)
+                {
+                    // 插槽已有裝備 → 顯示 Remove 按鈕（listener 在 AssignRemovePartButtonListener 統一處理）
+                    if (slotHasEquipment &&
+                        slotIndex >= 0 &&
+                        slotIndex < craftingPartsButtonParent.childCount)
+                    {
+                        var removeBtnGo = InventoryManager.Instance.FindChild(
+                            craftingPartsButtonParent.GetChild(slotIndex).gameObject,
+                            "Remove Equipment Button"
+                        );
+                        if (removeBtnGo != null)
+                            removeBtnGo.SetActive(true);
+                    }
+
+                    ItemInstance capturedItem = inv;
+                    btn.onValueChanged.AddListener(isOn =>
+                    {
+                        if (!isOn) return;
+                        OnClickInventoryItem(capturedItem, btn);
+                    });
+
+                    foreach (var slot in craftingSlots)
+                    {
+                        if (slot != null && capturedItem == slot.item)
+                        {
+                            btn.interactable = false;
+                            break;
+                        }
                     }
                 }
             }
@@ -269,16 +305,18 @@ public class CraftingManager : MonoBehaviour
         // 整把武器
         if (item.item is RangeWeapon rw)
         {
+            // 先清掉舊預覽與舊插槽（避免重複產生 part slot）
             if (weaponPreview != null)
                 Destroy(weaponPreview);
 
-            // 換新武器時先清掉舊的 craftingSlots
-            craftingSlots.Clear();
+            CleanCraftingSlots();   // 清左側 UI + craftingSlots
 
+            // 建立新的武器預覽
             GameObject weapon = Instantiate(rw.weaponPrefab, weaponPreviewTransform);
             weaponPreview = weapon;
             rangeWeapon = rw;
 
+            // 槽 0：整把武器本體
             craftingSlots.Add(new CraftingSlot
             {
                 assembledPart = weapon,
@@ -287,6 +325,7 @@ public class CraftingManager : MonoBehaviour
                 item = item
             });
 
+            // 之後的槽：各個掛點
             foreach (var at in rw.attachmentPoints)
             {
                 string slotName = at.pointTransform.name;
@@ -298,7 +337,19 @@ public class CraftingManager : MonoBehaviour
                     item = null
                 });
             }
+
+            // 依照新的 craftingSlots 重新產生左側插槽按鈕
             CreateCraftingSlots();
+
+            // 保證右側只有一把武器被視為「選中」
+            foreach (var t in itemsButtonParent.GetComponentsInChildren<Toggle>(true))
+            {
+                if (t != btn)
+                {
+                    t.isOn = false;       // 關掉其他武器的勾選狀態
+                    t.interactable = true;
+                }
+            }
         }
         // 武器零件
         else if (item.item is RangeWeaponPart rwp)
@@ -317,10 +368,19 @@ public class CraftingManager : MonoBehaviour
                 attachmentPoint.item = item;
             }
         }
-        Image spriteImage = InventoryManager.Instance.FindChild(
-        craftingPartsButtonParent.GetChild(GetSelectedSlotIndex()).gameObject,"Item Icon").GetComponent<Image>();
-        spriteImage.sprite = item.item.icon;
-        spriteImage.color = new Color(1, 1, 1, 1);
+
+        // 更新左側插槽圖示
+        int selectedIndex = GetSelectedSlotIndex();
+        if (selectedIndex >= 0 && selectedIndex < craftingPartsButtonParent.childCount)
+        {
+            Image spriteImage = InventoryManager.Instance
+                .FindChild(craftingPartsButtonParent.GetChild(selectedIndex).gameObject, "Item Icon")
+                .GetComponent<Image>();
+
+            spriteImage.sprite = item.item.icon;
+            spriteImage.color = new Color(1, 1, 1, 1);
+        }
+
         // 更新 Remove 按鈕顯示
         int slotIndex = GetSelectedSlotIndex();
         if (slotIndex >= 0 &&
@@ -344,7 +404,6 @@ public class CraftingManager : MonoBehaviour
         // 這個物品已被使用，不允許再點
         btn.interactable = false;
     }
-
     // 清空右側背包按鈕列表
     public void ClearInventoryButton()
     {
@@ -480,8 +539,6 @@ public class CraftingManager : MonoBehaviour
 
                                 ClearInventoryButton();
                             }
-
-                            return;
                         }
 
                         // 用固定好的 capturedSlot / slotIndex
@@ -517,8 +574,9 @@ public class CraftingManager : MonoBehaviour
         if (!weaponColorBlock.activeSelf)
             return;
 
-        if (slot != null && slot.assembledPart != null)
+        if (slot != null && slot.assembledPart != null && craftingPartsToggleGroup.AnyTogglesOn())
         {
+            Debug.Log("SelectWeaponPartToColor: setting targetGameObject");
             weaponPartColorPicker.targetGameObject = slot.assembledPart;
             weaponPartColorPicker.AddTargetMaterialsToList();
             weaponPartColorPicker.CreateButtons();
@@ -609,7 +667,20 @@ public class CraftingManager : MonoBehaviour
             return;
         }
 
-        // 收集零件
+        // ★ 先把「預覽武器本體」上改好的顏色，回寫到 RangeWeaponInstance
+        if (baseSlot.assembledPart != null)
+        {
+            string baseShaderName;
+            var baseColors = ExtractColorsFromGameObject(baseSlot.assembledPart, out baseShaderName);
+
+            if (baseColors.Count > 0)
+            {
+                weaponInstance.colors = baseColors;
+                weaponInstance.shaderName = baseShaderName;
+            }
+        }
+
+        // 收集零件（同時同步每個零件的顏色）
         var rangeWeaponPartInstances = new List<PartInstance>();
 
         if (craftingSlots.Count > 1)
@@ -622,6 +693,19 @@ public class CraftingManager : MonoBehaviour
 
                 if (slot.item is PartInstance pi)
                 {
+                    // ★ 從 slot.assembledPart 讀顏色，寫回 PartInstance
+                    if (slot.assembledPart != null)
+                    {
+                        string partShaderName;
+                        var partColors = ExtractColorsFromGameObject(slot.assembledPart, out partShaderName);
+
+                        if (partColors.Count > 0)
+                        {
+                            pi.colors = partColors;
+                            pi.shaderName = partShaderName;
+                        }
+                    }
+
                     rangeWeaponPartInstances.Add(pi);
                 }
                 else
@@ -631,14 +715,20 @@ public class CraftingManager : MonoBehaviour
             }
         }
 
+        if (newWeaponName.text != "")
+        {
+            Debug.Log("Forge: setting new weapon name to " + newWeaponName.text);
+            weaponInstance.newWeaponName = newWeaponName.text;
+        }
+
         if (rangeWeaponPartInstances.Count == 0)
         {
             Debug.LogWarning("Forge: no parts selected, cannot forge");
             return;
         }
 
-
         // 1) 生成鍛造後的新武器，加入背包
+        //    weaponInstance.colors / 每個 PartInstance.colors 已在上面同步好
         InventoryManager.Instance.AddCraftedRangeWeaponToInventory(weaponInstance, rangeWeaponPartInstances);
 
         // 2) 消耗掉原本的 blueprint 武器 + 零件
@@ -647,9 +737,15 @@ public class CraftingManager : MonoBehaviour
         {
             InventoryManager.Instance.RemoveItemFromInventory(part);
         }
-        Destroy(weaponPreview);
-        weaponPreview = null;
+
+        // 清畫面
+        if (weaponPreview != null)
+        {
+            Destroy(weaponPreview);
+            weaponPreview = null;
+        }
         CleanCraftingSlots();
+
         Debug.Log("Forge: success");
     }
     public void CleanCraftingSlots()
@@ -664,4 +760,51 @@ public class CraftingManager : MonoBehaviour
         spriteImage.color = new Color(1, 1, 1, 0);
         craftingSlots.Clear();
     }
+
+    // 從實際場景中的 GameObject 抽出顏色與 shader 名稱
+    private List<Color> ExtractColorsFromGameObject(GameObject go, out string shaderName)
+    {
+        shaderName = null;
+        var colors = new List<Color>();
+
+        if (!go) return colors;
+
+        // 找一個 Renderer（MeshRenderer / SkinnedMeshRenderer 都可以）
+        var renderer = go.GetComponentInChildren<Renderer>();
+        if (!renderer) return colors;
+
+        // 用 instance material，而不是 sharedMaterial
+        var mat = renderer.material;
+        if (!mat || mat.shader == null) return colors;
+
+        shaderName = mat.shader.name;
+
+        // 根據 shader 名稱讀取顏色欄位
+        if (shaderName.Contains("Mix 3"))
+        {
+            if (mat.HasProperty("_BaseColor")) colors.Add(mat.GetColor("_BaseColor"));
+            if (mat.HasProperty("_Layer1Color")) colors.Add(mat.GetColor("_Layer1Color"));
+            if (mat.HasProperty("_Layer2Color")) colors.Add(mat.GetColor("_Layer2Color"));
+        }
+        else if (shaderName.Contains("Mix 4"))
+        {
+            if (mat.HasProperty("_BaseColor")) colors.Add(mat.GetColor("_BaseColor"));
+            if (mat.HasProperty("_Layer1Color")) colors.Add(mat.GetColor("_Layer1Color"));
+            if (mat.HasProperty("_Layer2Color")) colors.Add(mat.GetColor("_Layer2Color"));
+            if (mat.HasProperty("_Layer3Color")) colors.Add(mat.GetColor("_Layer3Color"));
+        }
+        else if (shaderName.Contains("Mix 5"))
+        {
+            if (mat.HasProperty("_BaseColor")) colors.Add(mat.GetColor("_BaseColor"));
+            for (int i = 1; i < 5; i++)
+            {
+                string prop = $"_Layer{i}Color";
+                if (mat.HasProperty(prop))
+                    colors.Add(mat.GetColor(prop));
+            }
+        }
+
+        return colors;
+    }
+
 }

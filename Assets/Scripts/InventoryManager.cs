@@ -15,6 +15,7 @@ public class ItemInstance
 [System.Serializable]
 public class RangeWeaponInstance : ItemInstance
 {
+    public string newWeaponName;// 用來存鍛造後的新名稱
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
     public List<PartInstance> attachment;
     public Transform muzzlePoint;
@@ -264,9 +265,9 @@ public class InventoryManager : MonoBehaviour
     }
 
     public void AddCraftedRangeWeaponToInventory(
-        RangeWeaponInstance baseWeaponInstance,
-        List<PartInstance> rangeWeaponParts
-    )
+       RangeWeaponInstance baseWeaponInstance,
+       List<PartInstance> rangeWeaponParts
+   )
     {
         if (baseWeaponInstance == null)
         {
@@ -279,26 +280,36 @@ public class InventoryManager : MonoBehaviour
         {
             item = baseWeaponInstance.item,
             amount = 1,
+
+            // ★ 把新名字一起複製進去
+            newWeaponName = baseWeaponInstance.newWeaponName,
+
             // 複製基底武器的 buff、顏色、muzzlePoint、shaderName 等
             buffs = new List<EquipmentBuff>(baseWeaponInstance.buffs),
             attachment = new List<PartInstance>(),
             muzzlePoint = baseWeaponInstance.muzzlePoint,
             shaderName = baseWeaponInstance.shaderName,
-            colors = new List<Color>(baseWeaponInstance.colors)
+            colors = (baseWeaponInstance.colors != null)
+                ? new List<Color>(baseWeaponInstance.colors)
+                : new List<Color>()
         };
 
         // 把零件裝到 newInst 上，也可以順便把零件 buff 加進武器 buff
-
         if (rangeWeaponParts != null)
         {
             foreach (var part in rangeWeaponParts)
             {
                 if (part == null) continue;
 
+                // 這裡直接用引用；part.colors 已在 Forge() 裡同步過顏色
                 newInst.attachment.Add(part);
+
                 /*
+                如果之後要把零件 buff 灌進武器 buff，
+                再把這段打開即可。
                 if (part.buffs != null)
-                    newInst.buffs.AddRange(part.buffs);*/
+                    newInst.buffs.AddRange(part.buffs);
+                */
             }
         }
 
@@ -306,6 +317,7 @@ public class InventoryManager : MonoBehaviour
         inventory.Add(newInst);
         Debug.Log($"Forged new ranged weapon. Inventory count = {inventory.Count}");
     }
+
 
 
     public void OpenWeaponInventory() => OpenPartsInventory(ItemType.RangeWeapon);
@@ -369,7 +381,23 @@ public class InventoryManager : MonoBehaviour
                     // 名稱
                     var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
                     if (label != null)
-                        label.text = inv.item.itemName;
+                    {
+                        if (inv is RangeWeaponInstance rwi)
+                        {
+                            Debug.Log(" rwi.newWeaponName = " + rwi.newWeaponName);
+
+                            string displayName = inv.item.itemName;   // 先用 ScriptableObject 的名字當預設
+
+                            if (!string.IsNullOrEmpty(rwi.newWeaponName))
+                                displayName = rwi.newWeaponName;      // 只有真的改過名才覆蓋
+
+                            label.text = displayName;
+                        }
+                        else
+                        {
+                            label.text = inv.item.itemName;
+                        }
+                    }
 
                     // Toggle
                     var btn = button.GetComponent<Toggle>();
@@ -444,9 +472,26 @@ public class InventoryManager : MonoBehaviour
         Debug.Log("Working");
         if (item is RangeWeaponInstance rw)
         {
-            Debug.Log("inventoryButtonParent.GetChild(GetSelectedSlotIndex()):"+ inventoryButtonParent.GetChild(GetSelectedSlotIndex()));
-            Transform mountPoint = inventoryButtonParent.GetChild(GetSelectedSlotIndex()).GetComponentInChildren<WeaponTransform>().weaponTransform;
-            if (EquipmentManager.Instance.TryEquipWeaponFromInventory(item, mountPoint))
+            int slotIndex = GetSelectedSlotIndex();
+            if (slotIndex < 0)
+            {
+                Debug.LogWarning("OnClickInventoryItem (weapon): no equipment slot selected");
+                btn.isOn = false;
+                return;
+            }
+
+            var slotButton = inventoryButtonParent.GetChild(slotIndex);
+            var weaponTransform = slotButton.GetComponentInChildren<WeaponTransform>();
+            if (weaponTransform == null || weaponTransform.weaponTransform == null)
+            {
+                Debug.LogWarning($"OnClickInventoryItem (weapon): WeaponTransform missing on slot {slotIndex}");
+                btn.isOn = false;
+                return;
+            }
+
+            Transform mountPoint = weaponTransform.weaponTransform;
+
+            if (EquipmentManager.Instance.TryEquipWeaponFromInventory(item, mountPoint, slotIndex))
             {
                 // 解鎖同一清單中的其他按鈕
                 foreach (var t in itemsButtonParent.GetComponentsInChildren<Toggle>(true))
@@ -457,23 +502,29 @@ public class InventoryManager : MonoBehaviour
                         t.isOn = false;
                     }
                 }
-                Image spriteImage = FindChild(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Item Icon").GetComponent<Image>();
+
+                Image spriteImage =
+                    FindChild(inventoryButtonParent.GetChild(slotIndex).gameObject, "Item Icon")
+                    .GetComponent<Image>();
                 spriteImage.sprite = item.item.icon;
                 spriteImage.color = new Color(1, 1, 1, 1);
-                FindChild(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Remove Equipment Button").SetActive(true);
+
+                FindChild(inventoryButtonParent.GetChild(slotIndex).gameObject, "Remove Equipment Button")
+                    .SetActive(true);
+
                 // 鎖住當前已裝備的按鈕
                 btn.interactable = false;
-
             }
             else
             {
-                // 失敗就還原選取
                 btn.isOn = false;
             }
-        } else {
+        }
+        else
+        {
+            // 原本 Armor / 其他裝備邏輯不變
             if (EquipmentManager.Instance.TryEquipFromInventory(item))
             {
-                // 解鎖同一清單中的其他按鈕
                 foreach (var t in itemsButtonParent.GetComponentsInChildren<Toggle>(true))
                 {
                     if (t != btn)
@@ -483,16 +534,18 @@ public class InventoryManager : MonoBehaviour
                     }
                 }
 
-                Image spriteImage = FindChild(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Item Icon").GetComponent<Image>();
+                Image spriteImage =
+                    FindChild(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Item Icon")
+                    .GetComponent<Image>();
                 spriteImage.sprite = item.item.icon;
                 spriteImage.color = new Color(1, 1, 1, 1);
-                FindChild(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Remove Equipment Button").SetActive(true);
-                // 鎖住當前已裝備的按鈕
+                FindChild(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Remove Equipment Button")
+                    .SetActive(true);
+
                 btn.interactable = false;
             }
             else
             {
-                // 失敗就還原選取
                 btn.isOn = false;
             }
         }
