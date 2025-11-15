@@ -49,6 +49,7 @@ public class CraftingManager : MonoBehaviour
     public GameObject weaponColorBlock;
 
     public TMP_InputField newWeaponName;
+
     void Awake()
     {
         // If an instance already exists and it's not this one, destroy this new instance
@@ -108,64 +109,123 @@ public class CraftingManager : MonoBehaviour
                 if (inv == null || inv.item == null || inv.item.type != itemType)
                     continue;
 
-                var button = Instantiate(buttonPrefab, itemsButtonParent);
-
-                var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
-                if (icon != null)
-                    icon.sprite = inv.item.icon;
-
-                var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
-                if (label != null)
+                if (inv is RangeWeaponInstance rwi)
                 {
-                    if (itemType == ItemType.RangeWeapon)
+                    bool isForgedWeapon = false;
+                    foreach (var attachmentItem in rwi.attachment)
                     {
-                        if (inv is RangeWeaponInstance rwi)
+                        Debug.Log("attachmentItem = " + attachmentItem.item);
+                        if (attachmentItem.item != null)
                         {
-                            Debug.Log(" rwi.newWeaponName = " + rwi.newWeaponName);
-
-                            string displayName = inv.item.itemName;   // 先用 ScriptableObject 的名字當預設
-
-                            if (!string.IsNullOrEmpty(rwi.newWeaponName))
-                                displayName = rwi.newWeaponName;      // 只有真的改過名才覆蓋
-
-                            label.text = displayName;
+                            isForgedWeapon = true;
                         }
                     }
-                    else
+                    if(!isForgedWeapon)
+                    {
+                        var button = Instantiate(buttonPrefab, itemsButtonParent);
+
+                        var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
+                        if (icon != null)
+                            icon.sprite = inv.item.icon;
+
+                        var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
+                        if (label != null)
+                        {
+                            if (itemType == ItemType.RangeWeapon)
+                            {
+                                Debug.Log(" rwi.newWeaponName = " + rwi.newWeaponName);
+
+                                string displayName = inv.item.itemName;   // 先用 ScriptableObject 的名字當預設
+
+                                if (!string.IsNullOrEmpty(rwi.newWeaponName))
+                                    displayName = rwi.newWeaponName;      // 只有真的改過名才覆蓋
+
+                                label.text = displayName;
+                            }
+                            else
+                            {
+                                label.text = inv.item.itemName;
+                            }
+                        }
+
+                        var btn = button.GetComponent<Toggle>();
+                        if (btn != null)
+                        {
+                            // 插槽已有裝備 → 顯示對應的移除按鈕
+                            if (slotHasEquipment &&
+                                slotIndex >= 0 &&
+                                slotIndex < craftingPartsButtonParent.childCount)
+                            {
+                                var removeBtnGo = InventoryManager.Instance.FindChild(
+                                    craftingPartsButtonParent.GetChild(slotIndex).gameObject,
+                                    "Remove Equipment Button"
+                                );
+                                if (removeBtnGo != null)
+                                    removeBtnGo.SetActive(true);
+                            }
+
+                            ItemInstance capturedItem = inv;
+                            btn.onValueChanged.AddListener(isOn =>
+                            {
+                                if (!isOn) return;
+                                OnClickInventoryItem(capturedItem, btn);
+                            });
+
+                            foreach (var slot in craftingSlots)
+                            {
+                                if (slot != null && capturedItem == slot.item)
+                                {
+                                    btn.interactable = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    var button = Instantiate(buttonPrefab, itemsButtonParent);
+
+                    var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
+                    if (icon != null)
+                        icon.sprite = inv.item.icon;
+
+                    var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
+                    if (label != null)
                     {
                         label.text = inv.item.itemName;
                     }
-                }
 
-                var btn = button.GetComponent<Toggle>();
-                if (btn != null)
-                {
-                    // 插槽已有裝備 → 顯示對應的移除按鈕
-                    if (slotHasEquipment &&
-                        slotIndex >= 0 &&
-                        slotIndex < craftingPartsButtonParent.childCount)
+                    var btn = button.GetComponent<Toggle>();
+                    if (btn != null)
                     {
-                        var removeBtnGo = InventoryManager.Instance.FindChild(
-                            craftingPartsButtonParent.GetChild(slotIndex).gameObject,
-                            "Remove Equipment Button"
-                        );
-                        if (removeBtnGo != null)
-                            removeBtnGo.SetActive(true);
-                    }
-
-                    ItemInstance capturedItem = inv;
-                    btn.onValueChanged.AddListener(isOn =>
-                    {
-                        if (!isOn) return;
-                        OnClickInventoryItem(capturedItem, btn);
-                    });
-
-                    foreach (var slot in craftingSlots)
-                    {
-                        if (slot != null && capturedItem == slot.item)
+                        // 插槽已有裝備 → 顯示對應的移除按鈕
+                        if (slotHasEquipment &&
+                            slotIndex >= 0 &&
+                            slotIndex < craftingPartsButtonParent.childCount)
                         {
-                            btn.interactable = false;
-                            break;
+                            var removeBtnGo = InventoryManager.Instance.FindChild(
+                                craftingPartsButtonParent.GetChild(slotIndex).gameObject,
+                                "Remove Equipment Button"
+                            );
+                            if (removeBtnGo != null)
+                                removeBtnGo.SetActive(true);
+                        }
+
+                        ItemInstance capturedItem = inv;
+                        btn.onValueChanged.AddListener(isOn =>
+                        {
+                            if (!isOn) return;
+                            OnClickInventoryItem(capturedItem, btn);
+                        });
+
+                        foreach (var slot in craftingSlots)
+                        {
+                            if (slot != null && capturedItem == slot.item)
+                            {
+                                btn.interactable = false;
+                                break;
+                            }
                         }
                     }
                 }
@@ -324,7 +384,17 @@ public class CraftingManager : MonoBehaviour
                 equipmentType = WeaponPartType.Gun,
                 item = item
             });
-
+            if (item is RangeWeaponInstance rwi)
+            {
+                if (!string.IsNullOrEmpty(rwi.newWeaponName))
+                {
+                    newWeaponName.text = rwi.newWeaponName;      // 只有真的改過名才覆蓋
+                }
+                else
+                {
+                    newWeaponName.text = item.item.itemName;
+                }
+            }
             // 之後的槽：各個掛點
             foreach (var at in rw.attachmentPoints)
             {
