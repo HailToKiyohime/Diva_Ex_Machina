@@ -308,10 +308,23 @@ public class CraftingManager : MonoBehaviour
                 if (rwp.partType != attachmentPoint.equipmentType ||
                     attachmentPoint.attachmentPointTransform == null)
                     continue;
+                if (attachmentPoint.assembledPart != null)
+                {
+                    Destroy(attachmentPoint.assembledPart);
+                }
 
                 GameObject part = Instantiate(rwp.rangeWeaponPartPrefab, attachmentPoint.attachmentPointTransform);
                 attachmentPoint.assembledPart = part;
                 attachmentPoint.item = item;
+            }
+            // 右側只留下這把武器為選中
+            foreach (var t in itemsButtonParent.GetComponentsInChildren<Toggle>(true))
+            {
+                if (t != btn)
+                {
+                    t.isOn = false;
+                    t.interactable = true;
+                }
             }
         }
 
