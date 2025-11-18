@@ -514,7 +514,13 @@ public class InventoryManager : MonoBehaviour
                 inventoryBlock.SetActive(false);
                 // 其他兩個 Block 可視需求加上 .SetActive(false)
                 // characterColorBlock.SetActive(false);
-
+                // 把所有裝備槽上的「Remove Equipment Button」先關掉
+                for (int i = 0; i < inventoryButtonParent.childCount; i++)
+                {
+                    var removeBtn = FindChild(inventoryButtonParent.GetChild(i).gameObject, "Remove Equipment Button");
+                    if (removeBtn != null)
+                        removeBtn.SetActive(false);
+                }
                 // 記得更新 currentPage
                 currentPage = statBlock;
                 pageSwitch.pages[0] = currentPage;

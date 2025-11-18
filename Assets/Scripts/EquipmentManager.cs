@@ -86,6 +86,8 @@ public class EquipmentManager : MonoBehaviour
                         }
                     }
                 }
+                // ★ 裝備成功後重算屬性
+                PlayerStats.Instance?.RecalculateFromEquipment();
                 return true; // 成功後立即回傳
             }
             return false; // 類型吻合但不是 Armor（或缺Renderer）
@@ -210,6 +212,7 @@ public class EquipmentManager : MonoBehaviour
             }
         }
 
+        PlayerStats.Instance?.RecalculateFromEquipment();
         Debug.Log($"Equipped weapon '{rw.itemName}' to slot index {slotIndex}");
         return true;
     }
@@ -221,6 +224,7 @@ public class EquipmentManager : MonoBehaviour
         Destroy(slot.equipedItem);
         slot.equipedItem = null; 
         slot.item = null;
+        PlayerStats.Instance?.RecalculateFromEquipment();
     }
     private static Transform FindChildRecursive(Transform root, string name)
     {
