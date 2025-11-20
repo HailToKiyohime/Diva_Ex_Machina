@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RangeWeapon
   itemName: Gun 2
   type: 8
-  icon: {fileID: 21300000, guid: e2932d6de4473b2419b95cf050f20dbb, type: 3}
+  icon: {fileID: 21300000, guid: 065f9fd66e491bb48879d8666c74b38f, type: 3}
   maxStack: 1
   dropPrefab: {fileID: 0}
   weaponPrefab: {fileID: 401324664704972914, guid: 4895dc18a95f9194eb80bb47d531ac9d, type: 3}

@@ -562,6 +562,18 @@ public class CraftingManager : MonoBehaviour
             weaponPartColorPicker.targetGameObject = go;
             weaponPartColorPicker.AddTargetMaterialsToList();
             weaponPartColorPicker.CreateButtons();
+
+            if (slots[index].item is RangeWeaponInstance rwi)
+            {
+                // 可選：用材質當作 fallback
+                var renderer = go.GetComponentInChildren<Renderer>();
+                if (renderer != null)
+                {
+                    var mat = renderer.material;
+                    if (mat != null && mat.HasProperty("_BaseColor"))
+                        weaponPartColorPicker.CursorToColor(mat.GetColor("_BaseColor"));
+                }
+            }
         }
     }
 

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEditor.TerrainTools;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -35,7 +36,7 @@ public class ColorPicker : MonoBehaviour
     private float currentHue = 0f; // current hue value (0 to 1)
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    void Awake()
     {
         // Create and assign the hue bar texture.
         hueTexture = new Texture2D(hueTextureWidth, hueTextureHeight);
@@ -138,6 +139,18 @@ public class ColorPicker : MonoBehaviour
                                 cb.pressedColor = selectedColor;
                                 btn.colors = cb;
                                 SelectDetalPart(materialIdx, textureIdx);
+
+                                // 依 textureIndex 決定要讀哪個顏色 property
+                                var mat = targetMaterials[materialIdx];
+                                string propName = textureIdx == 0
+                                    ? "_BaseColor"
+                                    : $"_Layer{textureIdx}Color";
+
+                                Color c = Color.white;
+                                if (mat != null && mat.HasProperty(propName))
+                                    c = mat.GetColor(propName);
+
+                                CursorToColor(c);
                             }
                             else
                             {
@@ -178,6 +191,17 @@ public class ColorPicker : MonoBehaviour
                                 cb.pressedColor = selectedColor;
                                 btn.colors = cb;
                                 SelectDetalPart(materialIdx, textureIdx);
+                                // 依 textureIndex 決定要讀哪個顏色 property
+                                var mat = targetMaterials[materialIdx];
+                                string propName = textureIdx == 0
+                                    ? "_BaseColor"
+                                    : $"_Layer{textureIdx}Color";
+
+                                Color c = Color.white;
+                                if (mat != null && mat.HasProperty(propName))
+                                    c = mat.GetColor(propName);
+
+                                CursorToColor(c);
                             }
                             else
                             {
@@ -218,6 +242,17 @@ public class ColorPicker : MonoBehaviour
                                 cb.pressedColor = selectedColor;
                                 btn.colors = cb;
                                 SelectDetalPart(materialIdx, textureIdx);
+                                // 依 textureIndex 決定要讀哪個顏色 property
+                                var mat = targetMaterials[materialIdx];
+                                string propName = textureIdx == 0
+                                    ? "_BaseColor"
+                                    : $"_Layer{textureIdx}Color";
+
+                                Color c = Color.white;
+                                if (mat != null && mat.HasProperty(propName))
+                                    c = mat.GetColor(propName);
+
+                                CursorToColor(c);
                             }
                             else
                             {
@@ -332,6 +367,7 @@ public class ColorPicker : MonoBehaviour
 
         // Update the HEX color code.
         UpdateHexColorFromCursor();
+        ChangeTargetMaterialColor(UpdateHexColorFromCursor(), currentMaterialIndex, currentTextureIndex);
     }
     // Updates the color area cursor position based on the mouse, clamped to the area.
     void UpdateColorCursor()
@@ -434,5 +470,26 @@ public class ColorPicker : MonoBehaviour
 
         // 回寫
         ai.colors[textureIndex] = color;
+    }
+
+    public void CursorToColor(Color targetColor)
+    {
+        // 轉換目標顏色到 HSV
+        Color.RGBToHSV(targetColor, out float h, out float s, out float v);
+        currentHue = h;
+        // 更新 Hue Cursor 位置
+        Rect hueRect = hueBar.rectTransform.rect;
+        float hueX = hueRect.xMin + h * hueRect.width;
+        Vector2 hueCursorPos = hueCursor.anchoredPosition;
+        hueCursorPos.x = hueX;
+        hueCursor.anchoredPosition = hueCursorPos;
+        // 重新生成 Color Texture
+        GenerateColorTexture();
+        colorTexture.Apply();
+        // 更新 Color Cursor 位置
+        Rect colorRect = colorArea.rectTransform.rect;
+        float colorX = colorRect.xMin + s * colorRect.width;
+        float colorY = colorRect.yMin + v * colorRect.height;
+        colorCursor.anchoredPosition = new Vector2(colorX, colorY);
     }
 }
