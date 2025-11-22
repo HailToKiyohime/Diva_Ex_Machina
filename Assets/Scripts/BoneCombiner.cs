@@ -46,6 +46,7 @@ public class BoneCombiner : MonoBehaviour
     {
         if (!prefab || !originalSkinnedMeshRenderer || !rootBone) return null;
 
+        Debug.Log("InstantiateMesh");
         var inst = Instantiate(prefab, transform);
         inst.updateWhenOffscreen = true;                 // 改實例，不改prefab
         inst.bones = originalSkinnedMeshRenderer.bones;  // 綁到玩家骨架

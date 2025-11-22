@@ -45,14 +45,19 @@ public class EquipmentManager : MonoBehaviour
             // 清掉舊實例
             if (slot.equipedItem) Destroy(slot.equipedItem);
 
+            Debug.Log($"TryEquipFromInventory: found matching slot {i} for item {item.item.itemName}");
             // 裝甲：生成並綁骨
             if (item.item is Armor armor && armor.skinnedMeshRenderer)
             {
+                Debug.Log($"TryEquipFromInventory: equipping armor {armor.itemName} to slot {i}");
                 slot.equipedItem = BoneCombiner.Instance.InstantiateMesh(armor.skinnedMeshRenderer);
+                Debug.Log($"TryEquipFromInventory: BoneCombiner instantiated mesh for {armor.itemName}");
                 if (!slot.equipedItem)
                 {
+                    Debug.LogWarning("TryEquipFromInventory: BoneCombiner failed to instantiate mesh");
                     return false; // 實例化失敗時不要當作成功
                 }
+                Debug.Log($"TryEquipFromInventory: equipped armor instance created for {armor.itemName}");
                 slot.item = item;
 
                 // 若有存色彩，這裡套回去（可選）
@@ -86,6 +91,7 @@ public class EquipmentManager : MonoBehaviour
                         }
                     }
                 }
+                Debug.Log($"TryEquipFromInventory: armor {armor.itemName} equipped to slot {i}");
                 // ★ 裝備成功後重算屬性
                 PlayerStats.Instance?.RecalculateFromEquipment();
                 return true; // 成功後立即回傳
