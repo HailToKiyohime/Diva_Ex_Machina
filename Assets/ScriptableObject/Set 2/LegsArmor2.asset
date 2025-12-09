@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 713e8101e72f9564bb08c5fb592812d6, type: 3}
+  m_Name: LegsArmor2
+  m_EditorClassIdentifier: Assembly-CSharp::Armor
+  itemName: Emerald Storm_LG
+  type: 6
+  icon: {fileID: 21300000, guid: b90771b2b8a19b2489af3ecdcb22b37e, type: 3}
+  maxStack: 0
+  dropPrefab: {fileID: 0}
+  skinnedMeshRenderer: {fileID: 6439124259945334815, guid: d76c45fb41593944da45ceeff9efcbef, type: 3}
+  buffs: []
+  randomBuffs: []

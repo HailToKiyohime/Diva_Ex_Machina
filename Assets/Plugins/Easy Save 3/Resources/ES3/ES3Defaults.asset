@@ -38,6 +38,9 @@ MonoBehaviour:
     - Assembly-CSharp
     - Assembly-CSharp-firstpass
     - GiantGrey.TileWorldCreator
+    - PotaToon.Runtime
+    - SadnessMonday.BetterPhysics
+    - SadnessMonday.BetterPhysics.Samples
     showAdvancedSettings: 0
   addMgrToSceneAutomatically: 0
   autoUpdateReferences: 1

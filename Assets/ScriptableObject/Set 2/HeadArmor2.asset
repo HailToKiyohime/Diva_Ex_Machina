@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 713e8101e72f9564bb08c5fb592812d6, type: 3}
+  m_Name: HeadArmor2
+  m_EditorClassIdentifier: Assembly-CSharp::Armor
+  itemName: Emerald Storm_HD
+  type: 1
+  icon: {fileID: 21300000, guid: 804ff736075de6a45b1bf5f00e9702d6, type: 3}
+  maxStack: 0
+  dropPrefab: {fileID: 0}
+  skinnedMeshRenderer: {fileID: 4454883854556030567, guid: 9c5936e467ae8104fb82c4f4047d1976, type: 3}
+  buffs: []
+  randomBuffs: []

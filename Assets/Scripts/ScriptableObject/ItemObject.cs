@@ -25,21 +25,6 @@ public enum WeaponPartType
     Actuators
 }
 
-public enum Attributes
-{
-    //Damage Type
-    PhysicalDamage,
-    ExplosionDamage,
-    EnergyDamage,
-    ColdDamage,
-    //Defence Type
-    PhysicalDefense,
-    ExplosionDefense,
-    EnergyDefense,
-    ColdDefense,
-    //Critical Attack
-
-}
 
 [CreateAssetMenu(fileName = "New Item", menuName = "Inventory/Item")]
 public class ItemObject : ScriptableObject

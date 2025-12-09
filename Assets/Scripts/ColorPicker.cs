@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEditor.TerrainTools;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;  
 
 public class ColorPicker : MonoBehaviour
 {
@@ -491,5 +492,44 @@ public class ColorPicker : MonoBehaviour
         float colorX = colorRect.xMin + s * colorRect.width;
         float colorY = colorRect.yMin + v * colorRect.height;
         colorCursor.anchoredPosition = new Vector2(colorX, colorY);
+    }
+
+    public void ApplyCurrentColorToImage(Image buttonImage)
+    {
+        if (buttonImage == null)
+        {
+            Debug.LogWarning("ColorPicker.ApplyCurrentColorToImage: buttonImage is null.");
+            return;
+        }
+
+        Color currentColor = UpdateHexColorFromCursor();
+        buttonImage.color = currentColor;
+
+        var btn = buttonImage.GetComponent<AdvancedButton>();
+        if (btn != null)
+        {
+            ColorBlock cb = btn.colors;
+            cb.normalColor = currentColor;
+            cb.highlightedColor = currentColor;
+            cb.pressedColor = currentColor;
+            cb.selectedColor = currentColor;
+            btn.colors = cb;
+        }
+    }
+
+    public void SetCurrentColorFromImage(Image buttonImage)
+    {
+        if (buttonImage == null)
+        {
+            Debug.LogWarning("ColorPicker.SetCurrentColorFromImage: buttonImage is null.");
+            return;
+        }
+
+        // 讀出按鈕現在的顏色
+        Color buttonColor = buttonImage.color;
+
+        // 用這個顏色移動 HueBar / ColorArea 游標
+        CursorToColor(buttonColor);
+        ChangeTargetMaterialColor(UpdateHexColorFromCursor(), currentMaterialIndex, currentTextureIndex);
     }
 }

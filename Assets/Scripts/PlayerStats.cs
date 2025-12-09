@@ -1,6 +1,37 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+
+public enum Attributes
+{
+    //Damage Type
+    PhysicalDamage,
+    ExplosionDamage,
+    EnergyDamage,
+    ColdDamage,
+    //Defence Type
+    PhysicalDefense,
+    ExplosionDefense,
+    EnergyDefense,
+    ColdDefense,
+    //Energy
+    MaxEnergy,
+    EnergyRegen,
+    DashEnergyCost,
+    FlyEnergyCost,
+    //Critical Attack
+    CriticalChance,
+    CriticalMultiplier,
+    //Movement
+    SprintSpeed,
+    DashSpeed,
+    //Jump
+    JumpHeight,
+    FlyForce,
+    //Health
+    MaxHealth,
+}
+
 [System.Serializable]
 public class WeaponStats
 {
@@ -37,6 +68,26 @@ public class PlayerStats : MonoBehaviour
 {
     public static PlayerStats Instance { get; private set; }
 
+    //Buff之前全身基礎屬性 
+    public float basePhysicalDamage = 0f;
+    public float baseExplosionDamage = 0f;
+    public float baseEnergyDamage = 0f;
+    public float baseColdDamage = 0f;
+    public float basePhysicalDefense = 0f;
+    public float baseExplosionDefense = 0f;
+    public float baseEnergyDefense = 0f;
+    public float baseColdDefense = 0f;
+    public float baseCriticalChance = 0.05f;
+    public float baseCriticalMultiplier = 1.5f;
+    public float baseMaxEnergy = 1000f;
+    public float baseEnergyRegen = 50f;
+    public float baseDashEnergyCost = 350f;
+    public float baseFlyEnergyCost = 30f;
+    public float baseSprintSpeed = 20f;
+    public float baseDashSpeed = 40f;
+    public float baseJumpHeight = 2f;
+    public float baseFlyForce = 10f;
+    public float baseMaxHealth = 1000f;
     // === 全身基礎屬性（只加「非手部裝甲」 + 武器的通用加成） ===
     public float physicalDamage;
     public float explosionDamage;
@@ -46,7 +97,23 @@ public class PlayerStats : MonoBehaviour
     public float explosionDefense;
     public float energyDefense;
     public float coldDefense;
-    public float criticalAttack;
+    public float criticalChance;
+    public float criticalMultiplier;
+    // Energy
+    public float maxEnergy;
+    public float energyRegen;
+    public float currentEnergy;
+    public float dashEnergyCost;
+    public float flyEnergyCost;
+    // Movement
+    public float sprintSpeed;
+    public float dashSpeed;
+    // Jump
+    public float jumpHeight;
+    public float flyForce;
+    //Health
+    public float maxHealth;
+
 
     [Header("手部武器狀態（只在執行時使用）")]
     public WeaponStats leftHand = new WeaponStats();
@@ -65,23 +132,39 @@ public class PlayerStats : MonoBehaviour
             return;
         }
         Instance = this;
+        ResetState();
     }
 
     /// <summary>
     /// 依照目前所有 equipmentSlots 重新計算玩家數值
     /// </summary>
-    public void RecalculateFromEquipment()
+    public void ResetState()
     {
         // 1. 清空全身屬性
-        physicalDamage = 0f;
-        explosionDamage = 0f;
-        energyDamage = 0f;
-        coldDamage = 0f;
-        physicalDefense = 0f;
-        explosionDefense = 0f;
-        energyDefense = 0f;
-        coldDefense = 0f;
-        criticalAttack = 0f;
+        physicalDamage = basePhysicalDamage;
+        explosionDamage = baseExplosionDamage;
+        energyDamage = baseEnergyDamage;
+        coldDamage = baseColdDamage;
+        physicalDefense = basePhysicalDefense;
+        explosionDefense = baseExplosionDefense;
+        energyDefense = baseEnergyDefense;
+        coldDefense = baseColdDefense;
+        criticalChance = baseCriticalChance;
+        criticalMultiplier = baseCriticalMultiplier;
+        maxEnergy = baseMaxEnergy;
+        energyRegen = baseEnergyRegen;
+        dashEnergyCost = baseDashEnergyCost;
+        flyEnergyCost = baseFlyEnergyCost;
+        sprintSpeed = baseSprintSpeed;
+        dashSpeed = baseDashSpeed;
+        jumpHeight = baseJumpHeight;
+        flyForce = baseFlyForce;
+        maxHealth = baseMaxHealth;
+    }
+    public void RecalculateFromEquipment()
+    {
+        ResetState();
+
 
         // 2. 清空左右手武器狀態
         leftHand.Reset();
@@ -92,15 +175,12 @@ public class PlayerStats : MonoBehaviour
             return;
 
         List<EquipmentSlot> slots = EquipmentManager.Instance.equipmentSlots;
-
         for (int i = 0; i < slots.Count; i++)
         {
             var slot = slots[i];
             if (slot == null || slot.item == null)
                 continue;
-
             var inst = slot.item;
-
             // ===== 裝甲 =====
             if (inst is ArmorInstance armorInst)
             {
@@ -122,105 +202,58 @@ public class PlayerStats : MonoBehaviour
                     ApplyBuffListToGlobal(armorInst.buffs);
                 }
             }
-            // ===== 遠程武器 =====
-            else if (inst is RangeWeaponInstance weaponInst)
+            void AddBuffListToWeapon(WeaponStats target, List<EquipmentBuff> buffs)
             {
-                // 判斷這把武器裝在左手還是右手（靠 slot index）
-                if (i == leftWeaponSlotIndex)
-                {
-                    leftHand.weapon = weaponInst;
-                    CollectWeaponBuffsForHand(leftHand, weaponInst);
-                }
-                else if (i == rightWeaponSlotIndex)
-                {
-                    rightHand.weapon = weaponInst;
-                    CollectWeaponBuffsForHand(rightHand, weaponInst);
-                }
+                if (buffs == null) return;
+                target.buffs.AddRange(buffs);
+            }
 
-                // 武器本身和零件的 Buff 照舊加到全身屬性
-                ApplyBuffListToGlobal(weaponInst.buffs);
-
-                if (weaponInst.attachment != null)
+            // ======= local function: 全身屬性累積 =======
+            void ApplyBuffListToGlobal(List<EquipmentBuff> buffs)
+            {
+                if (buffs == null) return;
+                foreach (var buff in buffs)
                 {
-                    foreach (var part in weaponInst.attachment)
-                    {
-                        if (part == null) continue;
-                        ApplyBuffListToGlobal(part.buffs);
-                    }
+                    ApplyBuffToGlobal(buff);
                 }
             }
-        }
 
-        // ======= local function: 全身屬性累積 =======
-        void ApplyBuffListToGlobal(List<EquipmentBuff> buffs)
-        {
-            if (buffs == null) return;
-            foreach (var buff in buffs)
+            void ApplyBuffToGlobal(EquipmentBuff buff)
             {
-                ApplyBuffToGlobal(buff);
-            }
-        }
-
-        void ApplyBuffToGlobal(EquipmentBuff buff)
-        {
-            switch (buff.attribute)
-            {
-                // Damage
-                case Attributes.PhysicalDamage:
-                    physicalDamage += buff.value;
-                    break;
-                case Attributes.ExplosionDamage:
-                    explosionDamage += buff.value;
-                    break;
-                case Attributes.EnergyDamage:
-                    energyDamage += buff.value;
-                    break;
-                case Attributes.ColdDamage:
-                    coldDamage += buff.value;
-                    break;
-
-                // Defense
-                case Attributes.PhysicalDefense:
-                    physicalDefense += buff.value;
-                    break;
-                case Attributes.ExplosionDefense:
-                    explosionDefense += buff.value;
-                    break;
-                case Attributes.EnergyDefense:
-                    energyDefense += buff.value;
-                    break;
-                case Attributes.ColdDefense:
-                    coldDefense += buff.value;
-                    break;
-
-                // 之後如果在 Attributes 補 CriticalAttack、RecoilControl、MeleeDamage 等
-                // 可以在這裡加 case，或只用 per-hand 的 WeaponStats 存就好
-                default:
-                    break;
-            }
-        }
-
-        // ======= local function: 把 Buff 丟進某一隻手的 WeaponStats =======
-        void AddBuffListToWeapon(WeaponStats target, List<EquipmentBuff> buffs)
-        {
-            if (buffs == null) return;
-            target.buffs.AddRange(buffs);
-        }
-
-        void CollectWeaponBuffsForHand(WeaponStats target, RangeWeaponInstance weapon)
-        {
-            if (weapon == null) return;
-
-            // 武器本體 Buff
-            AddBuffListToWeapon(target, weapon.buffs);
-
-            // 零件 Buff
-            if (weapon.attachment != null)
-            {
-                foreach (var part in weapon.attachment)
+                switch (buff.attribute)
                 {
-                    if (part == null) continue;
-                    AddBuffListToWeapon(target, part.buffs);
+                    // Damage
+                    case Attributes.PhysicalDamage:
+                        physicalDamage += buff.value;
+                        break;
+                    case Attributes.ExplosionDamage:
+                        explosionDamage += buff.value;
+                        break;
+                    case Attributes.EnergyDamage:
+                        energyDamage += buff.value;
+                        break;
+                    case Attributes.ColdDamage:
+                        coldDamage += buff.value;
+                        break;
+
+                    // Defense
+                    case Attributes.PhysicalDefense:
+                        physicalDefense += buff.value;
+                        break;
+                    case Attributes.ExplosionDefense:
+                        explosionDefense += buff.value;
+                        break;
+                    case Attributes.EnergyDefense:
+                        energyDefense += buff.value;
+                        break;
+                    case Attributes.ColdDefense:
+                        coldDefense += buff.value;
+                        break;
+
+                    // 之後如果在 Attributes 補 CriticalAttack、RecoilControl、MeleeDamage 等
+                    // 可以在這裡加 case，或只用 per-hand 的 WeaponStats 存就好
+                    default:
+                        break;
                 }
             }
         }

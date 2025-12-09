@@ -82,7 +82,7 @@ AvatarMask:
   - m_Path: root/root.x/c_thigh_b.r
     m_Weight: 0
   - m_Path: root/root.x/spine_01.x
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x

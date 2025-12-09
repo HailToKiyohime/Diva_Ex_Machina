@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 713e8101e72f9564bb08c5fb592812d6, type: 3}
+  m_Name: WaistArmor2
+  m_EditorClassIdentifier: Assembly-CSharp::Armor
+  itemName: Emerald Storm_WA
+  type: 5
+  icon: {fileID: 21300000, guid: 086cbe7fdae9b9c46881036fc4563661, type: 3}
+  maxStack: 0
+  dropPrefab: {fileID: 0}
+  skinnedMeshRenderer: {fileID: 3540713315817644649, guid: a27e37b37d043ee45b404857de6bde5d, type: 3}
+  buffs: []
+  randomBuffs: []
