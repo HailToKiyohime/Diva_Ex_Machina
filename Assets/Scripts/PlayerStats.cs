@@ -30,6 +30,8 @@ public enum Attributes
     FlyForce,
     //Health
     MaxHealth,
+    //Aiming
+    AimingDistance,
 }
 
 [System.Serializable]
@@ -64,57 +66,83 @@ public class WeaponStats
     }
 }
 
+[System.Serializable]
+public class BaseStats
+{
+    [Header("Base Damage")]
+    public float physicalDamage = 0f;
+    public float explosionDamage = 0f;
+    public float energyDamage = 0f;
+    public float coldDamage = 0f;
+
+    [Header("Base Defense")]
+    public float physicalDefense = 0f;
+    public float explosionDefense = 0f;
+    public float energyDefense = 0f;
+    public float coldDefense = 0f;
+
+    [Header("Base Critical")]
+    public float criticalChance = 0.05f;
+    public float criticalMultiplier = 1.5f;
+
+    [Header("Base Energy")]
+    public float maxEnergy = 1000f;
+    public float energyRegen = 50f;
+    public float dashEnergyCost = 350f;
+    public float flyEnergyCost = 30f;
+
+    [Header("Base Movement")]
+    public float sprintSpeed = 20f;
+    public float dashSpeed = 40f;
+
+    [Header("Base Jump / Fly")]
+    public float jumpHeight = 2f;
+    public float flyForce = 10f;
+
+    [Header("Base Health")]
+    public float maxHealth = 1000f;
+    [Header("Base Aiming")]
+    public float aimingDistance = 100f;
+}
+
+
 public class PlayerStats : MonoBehaviour
 {
     public static PlayerStats Instance { get; private set; }
 
     //Buff之前全身基礎屬性 
-    public float basePhysicalDamage = 0f;
-    public float baseExplosionDamage = 0f;
-    public float baseEnergyDamage = 0f;
-    public float baseColdDamage = 0f;
-    public float basePhysicalDefense = 0f;
-    public float baseExplosionDefense = 0f;
-    public float baseEnergyDefense = 0f;
-    public float baseColdDefense = 0f;
-    public float baseCriticalChance = 0.05f;
-    public float baseCriticalMultiplier = 1.5f;
-    public float baseMaxEnergy = 1000f;
-    public float baseEnergyRegen = 50f;
-    public float baseDashEnergyCost = 350f;
-    public float baseFlyEnergyCost = 30f;
-    public float baseSprintSpeed = 20f;
-    public float baseDashSpeed = 40f;
-    public float baseJumpHeight = 2f;
-    public float baseFlyForce = 10f;
-    public float baseMaxHealth = 1000f;
+    [Header("Base Stats (Foldout)")]
+    public BaseStats baseStats = new BaseStats();
     // === 全身基礎屬性（只加「非手部裝甲」 + 武器的通用加成） ===
+    [Header("Damage")]
     public float physicalDamage;
     public float explosionDamage;
     public float energyDamage;
     public float coldDamage;
+    [Header("Defense")]
     public float physicalDefense;
     public float explosionDefense;
     public float energyDefense;
     public float coldDefense;
+    [Header("Critical")]
     public float criticalChance;
     public float criticalMultiplier;
-    // Energy
+    [Header("Energy")]
     public float maxEnergy;
     public float energyRegen;
     public float currentEnergy;
     public float dashEnergyCost;
     public float flyEnergyCost;
-    // Movement
+    [Header("Movement")]
     public float sprintSpeed;
     public float dashSpeed;
-    // Jump
+    [Header("Jump / Fly")]
     public float jumpHeight;
     public float flyForce;
-    //Health
+    [Header("Health")]
     public float maxHealth;
-
-
+    [Header("Aiming")]
+    public float aimingDistance;
     [Header("手部武器狀態（只在執行時使用）")]
     public WeaponStats leftHand = new WeaponStats();
     public WeaponStats rightHand = new WeaponStats();
@@ -140,26 +168,32 @@ public class PlayerStats : MonoBehaviour
     /// </summary>
     public void ResetState()
     {
-        // 1. 清空全身屬性
-        physicalDamage = basePhysicalDamage;
-        explosionDamage = baseExplosionDamage;
-        energyDamage = baseEnergyDamage;
-        coldDamage = baseColdDamage;
-        physicalDefense = basePhysicalDefense;
-        explosionDefense = baseExplosionDefense;
-        energyDefense = baseEnergyDefense;
-        coldDefense = baseColdDefense;
-        criticalChance = baseCriticalChance;
-        criticalMultiplier = baseCriticalMultiplier;
-        maxEnergy = baseMaxEnergy;
-        energyRegen = baseEnergyRegen;
-        dashEnergyCost = baseDashEnergyCost;
-        flyEnergyCost = baseFlyEnergyCost;
-        sprintSpeed = baseSprintSpeed;
-        dashSpeed = baseDashSpeed;
-        jumpHeight = baseJumpHeight;
-        flyForce = baseFlyForce;
-        maxHealth = baseMaxHealth;
+        // 1. 清空全身屬性，從 baseStats 讀入
+        physicalDamage = baseStats.physicalDamage;
+        explosionDamage = baseStats.explosionDamage;
+        energyDamage = baseStats.energyDamage;
+        coldDamage = baseStats.coldDamage;
+
+        physicalDefense = baseStats.physicalDefense;
+        explosionDefense = baseStats.explosionDefense;
+        energyDefense = baseStats.energyDefense;
+        coldDefense = baseStats.coldDefense;
+
+        criticalChance = baseStats.criticalChance;
+        criticalMultiplier = baseStats.criticalMultiplier;
+
+        maxEnergy = baseStats.maxEnergy;
+        energyRegen = baseStats.energyRegen;
+        dashEnergyCost = baseStats.dashEnergyCost;
+        flyEnergyCost = baseStats.flyEnergyCost;
+
+        sprintSpeed = baseStats.sprintSpeed;
+        dashSpeed = baseStats.dashSpeed;
+
+        jumpHeight = baseStats.jumpHeight;
+        flyForce = baseStats.flyForce;
+
+        maxHealth = baseStats.maxHealth;
     }
     public void RecalculateFromEquipment()
     {
