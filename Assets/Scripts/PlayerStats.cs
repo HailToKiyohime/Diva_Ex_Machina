@@ -236,60 +236,70 @@ public class PlayerStats : MonoBehaviour
                     ApplyBuffListToGlobal(armorInst.buffs);
                 }
             }
-            void AddBuffListToWeapon(WeaponStats target, List<EquipmentBuff> buffs)
+            else if (inst is RangeWeaponInstance rangeWeaponInst && i == leftWeaponSlotIndex)
             {
-                if (buffs == null) return;
-                target.buffs.AddRange(buffs);
+                leftHand.weapon = rangeWeaponInst;
+                AddBuffListToWeapon(leftHand, rangeWeaponInst.buffs);
             }
-
-            // ======= local function: 全身屬性累積 =======
-            void ApplyBuffListToGlobal(List<EquipmentBuff> buffs)
+            else if (inst is RangeWeaponInstance rangeWeaponInst2 && i == rightWeaponSlotIndex)
             {
-                if (buffs == null) return;
-                foreach (var buff in buffs)
-                {
-                    ApplyBuffToGlobal(buff);
-                }
+                rightHand.weapon = rangeWeaponInst2;
+                AddBuffListToWeapon(rightHand, rangeWeaponInst2.buffs);
             }
+        }
+    }
+    void AddBuffListToWeapon(WeaponStats target, List<EquipmentBuff> buffs)
+    {
+        if (buffs == null) return;
+        target.buffs.AddRange(buffs);
+    }
 
-            void ApplyBuffToGlobal(EquipmentBuff buff)
-            {
-                switch (buff.attribute)
-                {
-                    // Damage
-                    case Attributes.PhysicalDamage:
-                        physicalDamage += buff.value;
-                        break;
-                    case Attributes.ExplosionDamage:
-                        explosionDamage += buff.value;
-                        break;
-                    case Attributes.EnergyDamage:
-                        energyDamage += buff.value;
-                        break;
-                    case Attributes.ColdDamage:
-                        coldDamage += buff.value;
-                        break;
+    // ======= local function: 全身屬性累積 =======
+    void ApplyBuffListToGlobal(List<EquipmentBuff> buffs)
+    {
+        if (buffs == null) return;
+        foreach (var buff in buffs)
+        {
+            ApplyBuffToGlobal(buff);
+        }
+    }
 
-                    // Defense
-                    case Attributes.PhysicalDefense:
-                        physicalDefense += buff.value;
-                        break;
-                    case Attributes.ExplosionDefense:
-                        explosionDefense += buff.value;
-                        break;
-                    case Attributes.EnergyDefense:
-                        energyDefense += buff.value;
-                        break;
-                    case Attributes.ColdDefense:
-                        coldDefense += buff.value;
-                        break;
+    void ApplyBuffToGlobal(EquipmentBuff buff)
+    {
+        switch (buff.attribute)
+        {
+            // Damage
+            case Attributes.PhysicalDamage:
+                physicalDamage += buff.value;
+                break;
+            case Attributes.ExplosionDamage:
+                explosionDamage += buff.value;
+                break;
+            case Attributes.EnergyDamage:
+                energyDamage += buff.value;
+                break;
+            case Attributes.ColdDamage:
+                coldDamage += buff.value;
+                break;
 
-                    // 之後如果在 Attributes 補 CriticalAttack、RecoilControl、MeleeDamage 等
-                    // 可以在這裡加 case，或只用 per-hand 的 WeaponStats 存就好
-                    default:
-                        break;
-                }
-            }
+            // Defense
+            case Attributes.PhysicalDefense:
+                physicalDefense += buff.value;
+                break;
+            case Attributes.ExplosionDefense:
+                explosionDefense += buff.value;
+                break;
+            case Attributes.EnergyDefense:
+                energyDefense += buff.value;
+                break;
+            case Attributes.ColdDefense:
+                coldDefense += buff.value;
+                break;
+
+            // 之後如果在 Attributes 補 CriticalAttack、RecoilControl、MeleeDamage 等
+            // 可以在這裡加 case，或只用 per-hand 的 WeaponStats 存就好
+            default:
+                break;
         }
     }
 }

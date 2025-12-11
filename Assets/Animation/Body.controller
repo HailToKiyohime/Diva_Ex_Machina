@@ -328,21 +328,9 @@ AnimatorController:
     m_SyncedLayerAffectsTiming: 0
     m_Controller: {fileID: 9100000}
   - serializedVersion: 5
-    m_Name: Dual_Wielding_Gun_Left
-    m_StateMachine: {fileID: 8268737884705416547}
-    m_Mask: {fileID: 31900000, guid: 53e8b115ba935b64ea0043eacf201d7d, type: 2}
-    m_Motions: []
-    m_Behaviours: []
-    m_BlendingMode: 0
-    m_SyncedLayerIndex: -1
-    m_DefaultWeight: 1
-    m_IKPass: 0
-    m_SyncedLayerAffectsTiming: 0
-    m_Controller: {fileID: 9100000}
-  - serializedVersion: 5
-    m_Name: Dual_Wielding_Gun_Right
-    m_StateMachine: {fileID: -4178243180246401839}
-    m_Mask: {fileID: 31900000, guid: c01ee8be76958d5489dc7c74840da2ab, type: 2}
+    m_Name: Wielding_Gun_Left
+    m_StateMachine: {fileID: 1184593004080760164}
+    m_Mask: {fileID: 31900000, guid: c0c9901a7c6c4424cafdd229fa90e825, type: 2}
     m_Motions: []
     m_Behaviours: []
     m_BlendingMode: 0
@@ -364,9 +352,21 @@ AnimatorController:
     m_SyncedLayerAffectsTiming: 0
     m_Controller: {fileID: 9100000}
   - serializedVersion: 5
-    m_Name: Wielding_Gun_Left
-    m_StateMachine: {fileID: 1184593004080760164}
-    m_Mask: {fileID: 31900000, guid: c0c9901a7c6c4424cafdd229fa90e825, type: 2}
+    m_Name: Dual_Wielding_Gun_Left
+    m_StateMachine: {fileID: 8268737884705416547}
+    m_Mask: {fileID: 31900000, guid: 53e8b115ba935b64ea0043eacf201d7d, type: 2}
+    m_Motions: []
+    m_Behaviours: []
+    m_BlendingMode: 0
+    m_SyncedLayerIndex: -1
+    m_DefaultWeight: 0
+    m_IKPass: 0
+    m_SyncedLayerAffectsTiming: 0
+    m_Controller: {fileID: 9100000}
+  - serializedVersion: 5
+    m_Name: Dual_Wielding_Gun_Right
+    m_StateMachine: {fileID: -4178243180246401839}
+    m_Mask: {fileID: 31900000, guid: c01ee8be76958d5489dc7c74840da2ab, type: 2}
     m_Motions: []
     m_Behaviours: []
     m_BlendingMode: 0
@@ -393,7 +393,7 @@ BlendTree:
     m_Mirror: 0
   - serializedVersion: 2
     m_Motion: {fileID: 8622540379759327331, guid: 67d6367891c41fe4dbad4971d289c46a, type: 3}
-    m_Threshold: 0.25
+    m_Threshold: 0.1875
     m_Position: {x: -1, y: 0}
     m_TimeScale: 1
     m_CycleOffset: 0
@@ -401,7 +401,7 @@ BlendTree:
     m_Mirror: 0
   - serializedVersion: 2
     m_Motion: {fileID: 4524237963075707630, guid: 67d6367891c41fe4dbad4971d289c46a, type: 3}
-    m_Threshold: 0.5
+    m_Threshold: 0.375
     m_Position: {x: 0, y: 1}
     m_TimeScale: 1
     m_CycleOffset: 0
@@ -409,7 +409,7 @@ BlendTree:
     m_Mirror: 0
   - serializedVersion: 2
     m_Motion: {fileID: 6374341566147172262, guid: 67d6367891c41fe4dbad4971d289c46a, type: 3}
-    m_Threshold: 0.75
+    m_Threshold: 0.5625
     m_Position: {x: 0, y: -1}
     m_TimeScale: 1
     m_CycleOffset: 0
@@ -417,7 +417,7 @@ BlendTree:
     m_Mirror: 0
   - serializedVersion: 2
     m_Motion: {fileID: 2464539178247361173, guid: 67d6367891c41fe4dbad4971d289c46a, type: 3}
-    m_Threshold: 1
+    m_Threshold: 0.75
     m_Position: {x: 0, y: 0}
     m_TimeScale: 1
     m_CycleOffset: 0
@@ -426,7 +426,7 @@ BlendTree:
   m_BlendParameter: x
   m_BlendParameterY: y
   m_MinThreshold: 0
-  m_MaxThreshold: 1
+  m_MaxThreshold: 0.75
   m_UseAutomaticThresholds: 1
   m_NormalizedBlendValues: 0
   m_BlendType: 2

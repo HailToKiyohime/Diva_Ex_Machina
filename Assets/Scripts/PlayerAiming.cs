@@ -4,7 +4,7 @@ using UnityEngine.UI;
 using Unity.Cinemachine;
 public class PlayerAiming : MonoBehaviour
 {
-    public PlayerAiming Instance { get; private set; }
+    public static PlayerAiming Instance { get; private set; }
     [Header("Crosshair")]
     [SerializeField] private Image AimAreaImage;
     [SerializeField] private Image crosshairImage;
@@ -18,18 +18,18 @@ public class PlayerAiming : MonoBehaviour
     public float BottomClamp = -30f;
     [Header("Aiming Settings")]
     private Vector2 screenCenter;
-    [SerializeField] private bool lockOn = false;
+    [SerializeField] public bool lockOn = false;
     [SerializeField] private Ray ray;
     [SerializeField] private float targetDistance;
     [SerializeField] private Vector3 targetDirection = Vector3.zero;
-    [SerializeField] private Transform aimingPoint;
-    [SerializeField] private Transform playerTransform;
+    [SerializeField] public Transform aimingPoint;
     [SerializeField] private float centerLerpSpeed = 10f;
     [SerializeField] private float crosshairTiltLerp = 12f;
     [SerializeField] private float resetTiltLerp = 8f;
     [Header("UI Speeds")]
     [SerializeField] private float crosshairLerpSpeed = 30f;
-
+    [Header("Cursor Settings")]
+    [SerializeField] private bool cursorLocked = true;
     void Awake()
     {
         if (Instance != null && Instance != this)
@@ -42,8 +42,6 @@ public class PlayerAiming : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
         mainCam = mainCam != null ? mainCam : Camera.main;
         // ªì©l ray + yaw
         ray = mainCam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
@@ -54,7 +52,18 @@ public class PlayerAiming : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        float mouseX = Input.GetAxis("Mouse X");
+        if (cursorLocked)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+        else
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+
+            float mouseX = Input.GetAxis("Mouse X");
         float mouseY = Input.GetAxis("Mouse Y");
         if (Mathf.Abs(mouseX) > 0.001f || Mathf.Abs(mouseY) > 0.001f)
         {
@@ -100,7 +109,7 @@ public class PlayerAiming : MonoBehaviour
         bool isVisible = false;
         if (closestEnemy)
         {
-            targetDirection = (closestEnemy.transform.position - transform.position).normalized;
+            targetDirection = (closestEnemy.transform.position - playerOrientation.transform.position).normalized;
             Renderer r = closestEnemy.GetComponentInChildren<Renderer>();
             if (r) isVisible = r.isVisible;
         }
@@ -110,11 +119,11 @@ public class PlayerAiming : MonoBehaviour
             closestProximity = Mathf.Infinity;
         }
         targetDistance = closestEnemy
-            ? Vector3.Distance(transform.position, closestEnemy.transform.position)
+            ? Vector3.Distance(playerOrientation.transform.position, closestEnemy.transform.position)
             : Mathf.Infinity;
         float pixelRadius = GetLockAreaPixelRadius();
         bool isInsideLockArea = closestProximity < pixelRadius;
-        if (isInsideLockArea && targetDistance < 30 && isVisible)
+        if (isInsideLockArea && targetDistance < 50 && isVisible)
         {
             DriveCrosshairTo(closestScreenPoint, true);
             if (aimingPoint) aimingPoint.position = closestEnemy.transform.position;
@@ -124,8 +133,8 @@ public class PlayerAiming : MonoBehaviour
         {
             ray = mainCam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
             SmoothResetCrosshairToCenter();
-            if (aimingPoint && playerTransform)
-                aimingPoint.position = playerTransform.position + (playerTransform.forward * 10f);
+            if (aimingPoint && playerOrientation.transform)
+                aimingPoint.position = playerOrientation.transform.position + (playerOrientation.transform.forward * 10f);
             lockOn = false;
         }
     }
