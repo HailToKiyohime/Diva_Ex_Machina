@@ -175,7 +175,9 @@ public class InventoryManager : MonoBehaviour
                 item = item,
                 amount = 1,
                 attachment = attachmentPoints,
-                muzzlePoint = rw.GetMuzzlePoint()
+                muzzlePoint = rw.weaponPrefab != null
+                                ? rw.weaponPrefab.transform.Find("MuzzlePoint")
+                                : null,
             };
 
             if (rw.meshRenderer)

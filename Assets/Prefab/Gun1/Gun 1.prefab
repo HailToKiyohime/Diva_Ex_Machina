@@ -1,5 +1,36 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1608914528420571420
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 373226415372086183}
+  m_Layer: 0
+  m_Name: MuzzlePoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &373226415372086183
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1608914528420571420}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 2.1316287e-14, w: 1}
+  m_LocalPosition: {x: -4.6202508e-10, y: 0.07723897, z: 0.11137562}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3597859513656984754}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &3919419578294575961
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -66,6 +97,14 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: c6a1fdef2d106b8439d10a059a49367d, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 373226415372086183}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: c6a1fdef2d106b8439d10a059a49367d, type: 3}
+--- !u!4 &3597859513656984754 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: c6a1fdef2d106b8439d10a059a49367d, type: 3}
+  m_PrefabInstance: {fileID: 3919419578294575961}
+  m_PrefabAsset: {fileID: 0}

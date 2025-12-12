@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using static Unity.Burst.Intrinsics.Arm;
 
@@ -134,6 +135,11 @@ public class EquipmentManager : MonoBehaviour
         slot.equipedItem = Instantiate(rw.weaponPrefab, mountPoint, false);
         slot.equipedItem.transform.localRotation = Quaternion.Euler(new Vector3(-90, 90, 0));
         slot.item = item;
+        if (FindChildRecursive(slot.equipedItem.transform, "MuzzlePoint") != null)
+        {
+            rwi.muzzlePoint = FindChildRecursive(slot.equipedItem.transform, "MuzzlePoint");
+        }
+
 
         // 1-1) 把 RangeWeaponInstance 上存的顏色套回去
         if (rwi.colors != null && rwi.colors.Count > 0 && !string.IsNullOrEmpty(rwi.shaderName))
@@ -186,6 +192,10 @@ public class EquipmentManager : MonoBehaviour
                     part.transform.localPosition = Vector3.zero;
                     part.transform.localRotation = Quaternion.identity;
                     part.transform.localScale = Vector3.one;
+                    if (FindChildRecursive(part.transform, "MuzzlePoint")!=null)
+                    {
+                        rwi.muzzlePoint = FindChildRecursive(part.transform, "MuzzlePoint");
+                    }
 
                     if (attach.colors != null && attach.colors.Count > 0 && !string.IsNullOrEmpty(attach.shaderName))
                     {

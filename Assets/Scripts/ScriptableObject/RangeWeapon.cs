@@ -35,18 +35,6 @@ public class RangeWeapon : ItemObject
         }
         return randomBuffs[randomBuffs.Count - 1];
     }
-    public Transform GetMuzzlePoint()
-    {
-        var weapon = weaponPrefab.transform.Find("MuzzlePoint");
-        if (weapon != null)
-        {
-            return weapon;
-        }
-        else
-        {
-            return null;
-        }
-    }
 
 
 }
