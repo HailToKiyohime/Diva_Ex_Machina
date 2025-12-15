@@ -64,6 +64,10 @@ public class InventoryManager : MonoBehaviour
     public GameObject buttonPrefab;
     public Transform itemsButtonParent;// 放按鈕的容器
     public Transform inventoryButtonParent;// 放按鈕的容器
+    [Header("UI Button Image")]
+    public Sprite scopeIconImage;
+    public Sprite barrelIconImage;
+    public Sprite gunIconImage;
     [Header("Color Block/ Inventory Block")]
     public GameObject inventoryBlock;
     public GameObject characterColorBlock;
@@ -73,6 +77,7 @@ public class InventoryManager : MonoBehaviour
     public ColorPicker characterEquipmentColorPicker;
     [Header("Button Toggle Group")]
     public ToggleGroup inventoryToggleGroup;
+    public ToggleGroup WeaponPartsColorToggleGroup;
 
     private GameObject currentPage;
     [SerializeField]
@@ -80,6 +85,13 @@ public class InventoryManager : MonoBehaviour
 
     // 紀錄每個 Toggle 對應的物品
     private Dictionary<Toggle, ItemInstance> toggleItemMap = new();
+
+    //parts buttons parent
+    public Transform partsButtonParent;
+    //parts button prefab
+    public GameObject partButtonPrefab;
+    public Color selectedColor;
+    public Color normalColor;
 
     void Awake()
     {
@@ -723,39 +735,163 @@ public class InventoryManager : MonoBehaviour
     {
         int index = GetSelectedSlotIndex();
 
-        // 把所有裝備槽上的「Remove Equipment Button」先關掉
+        // 0) 顏色頁沒開就不處理
+        if (!characterColorBlock.activeSelf) return;
+
+        // 1) 先清掉舊的 parts buttons
+        CleanPartButtons();
+
+        // 2) 先把所有裝備槽的 Remove Equipment Button 關掉（保持你原本邏輯）
         for (int i = 0; i < inventoryButtonParent.childCount; i++)
         {
             var removeBtn = FindChild(inventoryButtonParent.GetChild(i).gameObject, "Remove Equipment Button");
-            if (removeBtn != null)
-                removeBtn.SetActive(false);
+            if (removeBtn != null) removeBtn.SetActive(false);
         }
 
-        // 嘗試開顏色頁面前的條件檢查：EquipSlot 是否存在、索引是否在範圍內
         var slots = EquipmentManager.Instance.equipmentSlots;
         if (index < 0 || index >= slots.Count)
+        {
+            ClearColorPickerState();
+            return;
+        }
+
+        var slot = slots[index];
+        var equippedGO = slot.equipedItem;
+
+        // 3) 沒裝備：清空 ColorPicker
+        if (!equippedGO)
+        {
+            ClearColorPickerState();
+            return;
+        }
+
+        // 4) 先預設把「目前槽位裝備本體」設為 target（非武器也適用）
+        SelectPartToColor(equippedGO);
+
+        // 5) 只有 RangeWeapon 才生成零件按鈕
+        if (slot.item is not RangeWeaponInstance rwi || rwi.item is not RangeWeapon rw)
             return;
 
-        // 如果顏色面板目前沒開，就直接不處理
-        if (!characterColorBlock.activeSelf) return;
+        if (partsButtonParent == null || partButtonPrefab == null || WeaponPartsColorToggleGroup == null)
+            return;
 
-        // 取得該槽目前裝備的物件
-        var go = slots[index].equipedItem;
-        if (!go)
+        // --- Local helper：建立一顆 Part Toggle ---
+        Toggle CreatePartToggle(Sprite iconSprite, GameObject targetPart, bool defaultOn)
         {
-            // 若沒裝備則清空 ColorPicker 的所有設定
-            characterEquipmentColorPicker.targetGameObject = null;
-            characterEquipmentColorPicker.targetMaterials = new List<Material>();
-            characterEquipmentColorPicker.currentMaterialIndex = -1;
-            characterEquipmentColorPicker.currentTextureIndex = -1;
-            characterEquipmentColorPicker.ClearnButton();
+            var goBtn = Instantiate(partButtonPrefab, partsButtonParent);
+            var tgl = goBtn.GetComponent<Toggle>();
+            if (tgl == null) return null;
+
+            tgl.group = WeaponPartsColorToggleGroup;
+
+            // icon
+            var icon = goBtn.transform.Find("Part Icon")?.GetComponent<UnityEngine.UI.Image>();
+            if (icon != null) icon.sprite = iconSprite;
+
+            // 如果找不到對應零件，直接禁用避免點了沒反應
+            tgl.interactable = (targetPart != null);
+
+            // 先套正常色
+            ApplyToggleColors(tgl, false);
+
+            // 綁事件：選中就切 target
+            tgl.onValueChanged.AddListener(isOn =>
+            {
+                ApplyToggleColors(tgl, isOn);
+                if (!isOn) return;
+
+                if (targetPart != null)
+                    SelectPartToColor(targetPart);
+            });
+
+            // 最後才設定初始 isOn（確保事件與顏色能跑）
+            tgl.isOn = defaultOn;
+            return tgl;
         }
-        else
+
+        // 6) 先建立「Gun 本體」按鈕（預設選中）
+        CreatePartToggle(gunIconImage, equippedGO, true);
+
+        // 7) 再為每個已裝上的 attachment 建立按鈕
+        if (rwi.attachment == null) return;
+
+        foreach (var attach in rwi.attachment)
         {
-            // 若有裝備，則設定 ColorPicker 的目標物件並刷新按鈕
-            characterEquipmentColorPicker.targetGameObject = go;
-            characterEquipmentColorPicker.AddTargetMaterialsToList();
-            characterEquipmentColorPicker.CreateButtons();
+            if (attach?.item == null) continue;
+
+            WeaponPartType partType = attach.partType;
+
+            // 用 partType -> 找掛點名 -> 找實例掛點 -> 抓掛點底下的零件物件
+            var partGO = FindEquippedPartGO(equippedGO, rw, partType);
+
+            // icon
+            var iconSprite = GetPartIcon(partType);
+
+            CreatePartToggle(iconSprite, partGO, false);
+        }
+    }
+    private void ClearColorPickerState()
+    {
+        characterEquipmentColorPicker.targetGameObject = null;
+        characterEquipmentColorPicker.targetMaterials = new List<Material>();
+        characterEquipmentColorPicker.currentMaterialIndex = -1;
+        characterEquipmentColorPicker.currentTextureIndex = -1;
+        characterEquipmentColorPicker.ClearnButton();
+    }
+
+    private void ApplyToggleColors(Toggle tgl, bool isOn)
+    {
+        if (tgl == null) return;
+
+        var cb = tgl.colors;
+        var c = isOn ? selectedColor : normalColor;
+        cb.normalColor = c;
+        cb.selectedColor = c;
+        cb.highlightedColor = c;
+        cb.pressedColor = c;
+        tgl.colors = cb;
+    }
+
+    private Sprite GetPartIcon(WeaponPartType partType)
+    {
+        if (partType == WeaponPartType.Barrel) return barrelIconImage;
+        if (partType == WeaponPartType.Scope) return scopeIconImage;
+        return null; // 主人想加其他 partType icon 就在這裡擴充
+    }
+
+    private GameObject FindEquippedPartGO(GameObject weaponRoot, RangeWeapon rw, WeaponPartType partType)
+    {
+        if (weaponRoot == null || rw == null) return null;
+
+        // 1) 由 partType 找到掛點名稱（跟 EquipmentManager 裝備流程一致）:contentReference[oaicite:2]{index=2}
+        string mountName = null;
+        foreach (var ap in rw.attachmentPoints)
+        {
+            if (ap.allowPart != partType) continue;
+            if (ap.pointTransform == null) continue;
+            mountName = ap.pointTransform.name;
+            break;
+        }
+
+        if (string.IsNullOrEmpty(mountName)) return null;
+
+        // 2) 在武器實例上找同名掛點（你 InventoryManager 的 FindChild 是遞迴找 name）:contentReference[oaicite:3]{index=3}
+        var mountGO = FindChild(weaponRoot, mountName);
+        if (mountGO == null) return null;
+
+        // 3) 掛點底下第一個 child 就是那個零件 prefab（你的裝備流程也是 Instantiate 到掛點底下）:contentReference[oaicite:4]{index=4}
+        if (mountGO.transform.childCount <= 0) return null;
+
+        return mountGO.transform.GetChild(0).gameObject;
+    }
+
+    public void CleanPartButtons()
+    {
+        if (partsButtonParent == null) return;
+
+        for (int i = partsButtonParent.childCount - 1; i >= 0; i--)
+        {
+            Destroy(partsButtonParent.GetChild(i).gameObject);
         }
     }
 
@@ -770,6 +906,31 @@ public class InventoryManager : MonoBehaviour
                 return;
 
             var go = slots[equipmentSlotsIndex].equipedItem;
+            if (go != null)
+            {
+                characterEquipmentColorPicker.targetGameObject = go;
+                characterEquipmentColorPicker.AddTargetMaterialsToList();
+                characterEquipmentColorPicker.CreateButtons();
+            }
+            else
+            {
+                characterEquipmentColorPicker.targetGameObject = null;
+                characterEquipmentColorPicker.targetMaterials = new List<Material>();
+                characterEquipmentColorPicker.currentMaterialIndex = -1;
+                characterEquipmentColorPicker.currentTextureIndex = -1;
+                characterEquipmentColorPicker.ClearnButton();
+            }
+        }
+    }
+
+    public void SelectPartToColor(GameObject part)
+    {
+        if (characterColorBlock.activeSelf == true)
+        {
+
+            var slots = EquipmentManager.Instance.equipmentSlots;
+
+            var go = part;
             if (go != null)
             {
                 characterEquipmentColorPicker.targetGameObject = go;

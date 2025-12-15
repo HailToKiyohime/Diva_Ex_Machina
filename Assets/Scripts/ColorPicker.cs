@@ -413,14 +413,14 @@ public class ColorPicker : MonoBehaviour
         if (targetGameObject.GetComponent<SkinnedMeshRenderer>())
         {
             targetMaterials.Add(targetGameObject.GetComponent<SkinnedMeshRenderer>().materials[0]);
-            foreach (Transform child in targetGameObject.transform)
-                targetMaterials.Add(child.GetComponent<SkinnedMeshRenderer>().materials[0]);
         }else if (targetGameObject.GetComponent<MeshRenderer>())
         {
             targetMaterials.Add(targetGameObject.GetComponent<MeshRenderer>().materials[0]);
-            foreach (Transform child in targetGameObject.transform)
-                targetMaterials.Add(child.GetComponent<MeshRenderer>().materials[0]);
         }
+    }
+    public void AddMaterialsToList()
+    {
+
     }
 
     public void WriteColorBackToArmorInstance(Color color, int materialIndex, int textureIndex)

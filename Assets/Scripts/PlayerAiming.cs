@@ -22,6 +22,7 @@ public class PlayerAiming : MonoBehaviour
     [SerializeField] private Ray ray;
     [SerializeField] private float targetDistance;
     [SerializeField] private Vector3 targetDirection = Vector3.zero;
+    [SerializeField] private Transform currentLockedTarget;
     [SerializeField] public Transform aimingPoint;
     [SerializeField] private float centerLerpSpeed = 10f;
     [SerializeField] private float crosshairTiltLerp = 12f;
@@ -30,6 +31,8 @@ public class PlayerAiming : MonoBehaviour
     [SerializeField] private float crosshairLerpSpeed = 30f;
     [Header("Cursor Settings")]
     [SerializeField] private bool cursorLocked = true;
+
+    [SerializeField] private Rigidbody currentTargetRb;
     void Awake()
     {
         if (Instance != null && Instance != this)
@@ -52,9 +55,7 @@ public class PlayerAiming : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-
-
-            float mouseX = Input.GetAxis("Mouse X");
+        float mouseX = Input.GetAxis("Mouse X");
         float mouseY = Input.GetAxis("Mouse Y");
         if (Mathf.Abs(mouseX) > 0.001f || Mathf.Abs(mouseY) > 0.001f)
         {
@@ -101,6 +102,7 @@ public class PlayerAiming : MonoBehaviour
         if (closestEnemy)
         {
             targetDirection = (closestEnemy.transform.position - playerOrientation.transform.position).normalized;
+            currentTargetRb = closestEnemy.GetComponentInParent<Rigidbody>();
             Renderer r = closestEnemy.GetComponentInChildren<Renderer>();
             if (r) isVisible = r.isVisible;
         }
@@ -156,7 +158,7 @@ public class PlayerAiming : MonoBehaviour
         t.position = Vector2.Lerp(t.position, screenCenter, Time.deltaTime * centerLerpSpeed);
         crosshairImage.color = new Color32(53, 53, 53, 152);
     }
- 
+
     private float GetLockAreaPixelRadius()
     {
         if (!AimAreaImage) return 0f;
@@ -165,5 +167,7 @@ public class PlayerAiming : MonoBehaviour
         rt.GetWorldCorners(corners);
         return Vector3.Distance(corners[0], corners[3]) * 0.5f;
     }
+    public Rigidbody GetTargetRigidbody() => currentTargetRb;
 
+    public Ray GetRay() => ray;
 }

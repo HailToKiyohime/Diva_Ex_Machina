@@ -1,6 +1,6 @@
-using System.Collections.Generic;
+ï»¿using System.Collections.Generic;
 using UnityEngine;
-
+using System; // åŠ åœ¨æª”æ¡ˆæœ€ä¸Šé¢
 
 public enum Attributes
 {
@@ -14,6 +14,16 @@ public enum Attributes
     ExplosionDefense,
     EnergyDefense,
     ColdDefense,
+    //Range Weapon Specific
+    reloadTime,
+    bulletPerShot,
+    roundPerTap,
+    timeBetweenShooting,
+    timeBetweenShots,
+    spread,
+    magazineSize,
+    bulletSpeed,
+    FiringMode,//0:Single, 1:Auto, 2:Charge
     //Energy
     MaxEnergy,
     EnergyRegen,
@@ -34,16 +44,22 @@ public enum Attributes
     AimingDistance,
 }
 
+public enum AnimationType
+{
+    Bipedal,
+    Hover,
+}
+
 [System.Serializable]
 public class WeaponStats
 {
-    // ¥Ø«e³o°¦¤â®³ªºªZ¾¹¡]¦pªG¨S¦³´N null¡^
+    // ç›®å‰é€™éš»æ‰‹æ‹¿çš„æ­¦å™¨ï¼ˆå¦‚æœæ²’æœ‰å°± nullï¼‰
     public RangeWeaponInstance weapon;
 
-    // ¥Ø«e³o°¦¤â¬ïªº¤â¥Ò¡]LeftHandArmor / RightHandArmor¡^
+    // ç›®å‰é€™éš»æ‰‹ç©¿çš„æ‰‹ç”²ï¼ˆLeftHandArmor / RightHandArmorï¼‰
     public ArmorInstance handArmor;
 
-    // ³o°¦¤â¡uÁ`¦@¡v¦Y¨ìªº Buff¡]ªZ¾¹¥»Åé + ªZ¾¹¹s¥ó + ¤â¥Ò¡^
+    // é€™éš»æ‰‹ã€Œç¸½å…±ã€åƒåˆ°çš„ Buffï¼ˆæ­¦å™¨æœ¬é«” + æ­¦å™¨é›¶ä»¶ + æ‰‹ç”²ï¼‰
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
 
     public void Reset()
@@ -53,7 +69,7 @@ public class WeaponStats
         buffs.Clear();
     }
 
-    // ¤§«á¦pªG­n¬d¬Y¤@ºØÄİ©Ê¡]¨Ò¦p RecoilControl¡^¥i¥H¥Î³o­Ó
+    // ä¹‹å¾Œå¦‚æœè¦æŸ¥æŸä¸€ç¨®å±¬æ€§ï¼ˆä¾‹å¦‚ RecoilControlï¼‰å¯ä»¥ç”¨é€™å€‹
     public float GetAttribute(Attributes attr)
     {
         float total = 0f;
@@ -69,11 +85,6 @@ public class WeaponStats
 [System.Serializable]
 public class BaseStats
 {
-    [Header("Base Damage")]
-    public float physicalDamage = 0f;
-    public float explosionDamage = 0f;
-    public float energyDamage = 0f;
-    public float coldDamage = 0f;
 
     [Header("Base Defense")]
     public float physicalDefense = 0f;
@@ -108,22 +119,29 @@ public class BaseStats
 
 public class PlayerStats : MonoBehaviour
 {
+    public event Action<VisualChange> OnLegVisualChanged;
+    public event Action OnHandWeaponDataChanged;
     public static PlayerStats Instance { get; private set; }
 
-    //Buff¤§«e¥ş¨­°òÂ¦Äİ©Ê 
+    //Buffä¹‹å‰å…¨èº«åŸºç¤å±¬æ€§ 
     [Header("Base Stats (Foldout)")]
     public BaseStats baseStats = new BaseStats();
-    // === ¥ş¨­°òÂ¦Äİ©Ê¡]¥u¥[¡u«D¤â³¡¸Ë¥Ò¡v + ªZ¾¹ªº³q¥Î¥[¦¨¡^ ===
-    [Header("Damage")]
-    public float physicalDamage;
-    public float explosionDamage;
-    public float energyDamage;
-    public float coldDamage;
+    // === å…¨èº«åŸºç¤å±¬æ€§ï¼ˆåªåŠ ã€Œéæ‰‹éƒ¨è£ç”²ã€ + æ­¦å™¨çš„é€šç”¨åŠ æˆï¼‰ ===
     [Header("Defense")]
     public float physicalDefense;
     public float explosionDefense;
     public float energyDefense;
     public float coldDefense;
+    [Header("RangeWeapon")]
+    public float reloadTime;
+    public float bulletPerShot;
+    public float roundPerTap;
+    public float timeBetweenShooting;
+    public float timeBetweenShots;
+    public float spread;
+    public float magazineSize;
+    public float bulletSpeed;
+    public int firingMode; //0:Single, 1:Auto, 2:Charge
     [Header("Critical")]
     public float criticalChance;
     public float criticalMultiplier;
@@ -143,12 +161,12 @@ public class PlayerStats : MonoBehaviour
     public float maxHealth;
     [Header("Aiming")]
     public float aimingDistance;
-    [Header("¤â³¡ªZ¾¹ª¬ºA¡]¥u¦b°õ¦æ®É¨Ï¥Î¡^")]
+    [Header("æ‰‹éƒ¨æ­¦å™¨ç‹€æ…‹ï¼ˆåªåœ¨åŸ·è¡Œæ™‚ä½¿ç”¨ï¼‰")]
     public WeaponStats leftHand = new WeaponStats();
     public WeaponStats rightHand = new WeaponStats();
 
-    [Header("equipmentSlots ¤¤¥ª¥k¤âªZ¾¹¼Ñªº index")]
-    // ½Ğ¦b Inspector ¸Ì¹ïÀ³¨ì EquipmentManager.equipmentSlots ªº¶¶§Ç
+    [Header("equipmentSlots ä¸­å·¦å³æ‰‹æ­¦å™¨æ§½çš„ index")]
+    // è«‹åœ¨ Inspector è£¡å°æ‡‰åˆ° EquipmentManager.equipmentSlots çš„é †åº
     public int leftWeaponSlotIndex = -1;
     public int rightWeaponSlotIndex = -1;
 
@@ -160,19 +178,22 @@ public class PlayerStats : MonoBehaviour
             return;
         }
         Instance = this;
+
         ResetState();
+
+        // âœ… é–‹å ´ä¿è­‰æ¸…ç©ºå·¦å³æ‰‹ç‹€æ…‹ï¼ˆé¿å…æ®˜ç•™å¼•ç”¨ï¼‰
+        leftHand.Reset();
+        rightHand.Reset();
+
+        // (å¯é¸) è®“ç›£è½è€…ç«‹åˆ»åˆ·æ–°ä¸€æ¬¡
+        OnHandWeaponDataChanged?.Invoke();
     }
 
     /// <summary>
-    /// ¨Ì·Ó¥Ø«e©Ò¦³ equipmentSlots ­«·s­pºâª±®a¼Æ­È
+    /// ä¾ç…§ç›®å‰æ‰€æœ‰ equipmentSlots é‡æ–°è¨ˆç®—ç©å®¶æ•¸å€¼
     /// </summary>
     public void ResetState()
     {
-        // 1. ²MªÅ¥ş¨­Äİ©Ê¡A±q baseStats Åª¤J
-        physicalDamage = baseStats.physicalDamage;
-        explosionDamage = baseStats.explosionDamage;
-        energyDamage = baseStats.energyDamage;
-        coldDamage = baseStats.coldDamage;
 
         physicalDefense = baseStats.physicalDefense;
         explosionDefense = baseStats.explosionDefense;
@@ -200,10 +221,13 @@ public class PlayerStats : MonoBehaviour
         ResetState();
 
 
-        // 2. ²MªÅ¥ª¥k¤âªZ¾¹ª¬ºA
+        // 2. æ¸…ç©ºå·¦å³æ‰‹æ­¦å™¨ç‹€æ…‹
         leftHand.Reset();
         rightHand.Reset();
 
+        // reset è…¿ç”²è¦–è¦º
+        CurrentLegVisual.heightOffset = 0f;
+        CurrentLegVisual.animationType = AnimationType.Bipedal;
         if (EquipmentManager.Instance == null ||
             EquipmentManager.Instance.equipmentSlots == null)
             return;
@@ -215,22 +239,28 @@ public class PlayerStats : MonoBehaviour
             if (slot == null || slot.item == null)
                 continue;
             var inst = slot.item;
-            // ===== ¸Ë¥Ò =====
+            // ===== è£ç”² =====
             if (inst is ArmorInstance armorInst)
             {
-                // ¥ª¤â¤â¥Ò ¡÷ ¥u¼vÅT leftHand¡A¤£¶i¤J¥ş¨­ base stats
+                // â˜…æŠ“è…¿ç”² VisualChangeï¼ˆLegArmor æ˜¯ Armor çš„å­é¡ :contentReference[oaicite:5]{index=5}ï¼‰
+                if (slot.equipmentType == ItemType.LegsArmor && armorInst.item is LegArmor leg && leg.visualChange != null)
+                {
+                    CurrentLegVisual.heightOffset = leg.visualChange.heightOffset;
+                    CurrentLegVisual.animationType = leg.visualChange.animationType;
+                }
+                // å·¦æ‰‹æ‰‹ç”² â†’ åªå½±éŸ¿ leftHandï¼Œä¸é€²å…¥å…¨èº« base stats
                 if (slot.equipmentType == ItemType.LeftHandArmor)
                 {
                     leftHand.handArmor = armorInst;
                     AddBuffListToWeapon(leftHand, armorInst.buffs);
                 }
-                // ¥k¤â¤â¥Ò ¡÷ ¥u¼vÅT rightHand¡A¤£¶i¤J¥ş¨­ base stats
+                // å³æ‰‹æ‰‹ç”² â†’ åªå½±éŸ¿ rightHandï¼Œä¸é€²å…¥å…¨èº« base stats
                 else if (slot.equipmentType == ItemType.RightHandArmor)
                 {
                     rightHand.handArmor = armorInst;
                     AddBuffListToWeapon(rightHand, armorInst.buffs);
                 }
-                // ¨ä¥L¸Ë¥Ò¡]ÀY¡B¯İ¡B¸y¡B»L¡B¼Q®g­I¥]...) ¡÷ ¥[¨ì¥ş¨­Äİ©Ê
+                // å…¶ä»–è£ç”²ï¼ˆé ­ã€èƒ¸ã€è…°ã€è…¿ã€å™´å°„èƒŒåŒ…...) â†’ åŠ åˆ°å…¨èº«å±¬æ€§
                 else
                 {
                     ApplyBuffListToGlobal(armorInst.buffs);
@@ -247,6 +277,8 @@ public class PlayerStats : MonoBehaviour
                 AddBuffListToWeapon(rightHand, rangeWeaponInst2.buffs);
             }
         }
+        OnLegVisualChanged?.Invoke(CurrentLegVisual);
+        OnHandWeaponDataChanged?.Invoke();
     }
     void AddBuffListToWeapon(WeaponStats target, List<EquipmentBuff> buffs)
     {
@@ -254,7 +286,7 @@ public class PlayerStats : MonoBehaviour
         target.buffs.AddRange(buffs);
     }
 
-    // ======= local function: ¥ş¨­Äİ©Ê²Ö¿n =======
+    // ======= local function: å…¨èº«å±¬æ€§ç´¯ç© =======
     void ApplyBuffListToGlobal(List<EquipmentBuff> buffs)
     {
         if (buffs == null) return;
@@ -268,20 +300,6 @@ public class PlayerStats : MonoBehaviour
     {
         switch (buff.attribute)
         {
-            // Damage
-            case Attributes.PhysicalDamage:
-                physicalDamage += buff.value;
-                break;
-            case Attributes.ExplosionDamage:
-                explosionDamage += buff.value;
-                break;
-            case Attributes.EnergyDamage:
-                energyDamage += buff.value;
-                break;
-            case Attributes.ColdDamage:
-                coldDamage += buff.value;
-                break;
-
             // Defense
             case Attributes.PhysicalDefense:
                 physicalDefense += buff.value;
@@ -295,11 +313,51 @@ public class PlayerStats : MonoBehaviour
             case Attributes.ColdDefense:
                 coldDefense += buff.value;
                 break;
-
-            // ¤§«á¦pªG¦b Attributes ¸É CriticalAttack¡BRecoilControl¡BMeleeDamage µ¥
-            // ¥i¥H¦b³o¸Ì¥[ case¡A©Î¥u¥Î per-hand ªº WeaponStats ¦s´N¦n
+            case Attributes.MaxEnergy:
+                maxEnergy += buff.value;
+                break;
+            case Attributes.EnergyRegen:
+                energyRegen += buff.value;
+                break;
+            case Attributes.DashEnergyCost:
+                dashEnergyCost += buff.value;
+                break;
+            case Attributes.FlyEnergyCost:
+                flyEnergyCost += buff.value;
+                break;
+            case Attributes.CriticalChance:
+                criticalChance += buff.value;
+                break;
+            case Attributes.CriticalMultiplier:
+                criticalMultiplier += buff.value;
+                break;
+            case Attributes.SprintSpeed:
+                sprintSpeed += buff.value;
+                break;
+            case Attributes.DashSpeed:
+                dashSpeed += buff.value;
+                break;
+            case Attributes.JumpHeight:
+                jumpHeight += buff.value;
+                break;
+            case Attributes.FlyForce:
+                flyForce += buff.value;
+                break;
+            case Attributes.MaxHealth:
+                maxHealth += buff.value;
+                break;
+            case Attributes.AimingDistance:
+                aimingDistance += buff.value;
+                break;
+            // ä¹‹å¾Œå¦‚æœåœ¨ Attributes è£œ CriticalAttackã€RecoilControlã€MeleeDamage ç­‰
+            // å¯ä»¥åœ¨é€™è£¡åŠ  caseï¼Œæˆ–åªç”¨ per-hand çš„ WeaponStats å­˜å°±å¥½
             default:
                 break;
         }
     }
+    public VisualChange CurrentLegVisual { get; private set; } = new VisualChange()
+    {
+        heightOffset = 0f,
+        animationType = default // ä¾ä½  AnimationType çš„é è¨­å€¼
+    };
 }

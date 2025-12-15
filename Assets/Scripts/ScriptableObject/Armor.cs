@@ -14,7 +14,6 @@ public class RandomBuff
     public EquipmentBuff buff;
     public float weight;
 }
-
 [CreateAssetMenu(fileName = "New Armor", menuName = "Inventory/Armor")]
 public class Armor : ItemObject
 {
@@ -43,3 +42,4 @@ public class Armor : ItemObject
         return randomBuffs[randomBuffs.Count - 1];
     }
 }
+

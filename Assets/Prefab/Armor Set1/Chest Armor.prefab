@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6812294137419831590}
   - component: {fileID: 5876969628934891584}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: Chest Armor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -58,7 +58,7 @@ SkinnedMeshRenderer:
   m_RendererPriority: 0
   m_Materials:
   - {fileID: 2100000, guid: bb4a54113ded5fb41b82f2a8e02d0a4c, type: 2}
-  - {fileID: 2100000, guid: e912af947410f9142b4c0e964b033b67, type: 2}
+  - {fileID: 2100000, guid: 18bfdaf667c8f95448f8d2bc457295fe, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

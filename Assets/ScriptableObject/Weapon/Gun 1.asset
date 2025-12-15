@@ -19,7 +19,25 @@ MonoBehaviour:
   dropPrefab: {fileID: 0}
   weaponPrefab: {fileID: 4226059282245262856, guid: e02f93e7b6e6ddc4fae39b516f5a560e, type: 3}
   buffs:
-  - attribute: 7
+  - attribute: 0
+    value: 10
+  - attribute: 8
+    value: 1.8
+  - attribute: 9
+    value: 1
+  - attribute: 10
+    value: 1
+  - attribute: 11
+    value: 0.07
+  - attribute: 12
+    value: 0
+  - attribute: 13
+    value: 1.5
+  - attribute: 14
+    value: 35
+  - attribute: 15
+    value: 110
+  - attribute: 16
     value: 1
   randomBuffs: []
   attachmentPoints:

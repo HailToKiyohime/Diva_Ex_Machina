@@ -18,7 +18,27 @@ MonoBehaviour:
   maxStack: 1
   dropPrefab: {fileID: 0}
   weaponPrefab: {fileID: 401324664704972914, guid: 4895dc18a95f9194eb80bb47d531ac9d, type: 3}
-  buffs: []
+  buffs:
+  - attribute: 0
+    value: 10
+  - attribute: 8
+    value: 2.2
+  - attribute: 9
+    value: 1
+  - attribute: 10
+    value: 1
+  - attribute: 11
+    value: 0.2
+  - attribute: 12
+    value: 0
+  - attribute: 13
+    value: 0.8
+  - attribute: 14
+    value: 30
+  - attribute: 15
+    value: 160
+  - attribute: 16
+    value: 1
   randomBuffs:
   - buff:
       attribute: 0

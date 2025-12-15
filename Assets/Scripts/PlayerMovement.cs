@@ -1,6 +1,7 @@
 ﻿using SadnessMonday.BetterPhysics;
 using UnityEngine;
-
+using System.Collections.Generic;
+using UnityEngine.InputSystem;
 public class PlayerMovement : MonoBehaviour
 {
     [Header("Character orientation")]
@@ -20,6 +21,20 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float groundCheckDistance = 0.1f;
     [SerializeField] private Transform groundPoint;
     [SerializeField] private LayerMask whatIsGround;
+    [Header("Attack Facing")]
+    [SerializeField] private float attackRotateSpeed = 25;         // 轉身速度
+    [SerializeField] private float attackAngleThreshold = 6f;       // 允許開火的角度誤差
+    [SerializeField] private float attackAimRayDistance = 100f;     // 非 lockOn 時，用準星 ray 取點距離
+    [SerializeField] private float singleShotBufferTime = 0.25f;    // 單發按下後，最多等待多久才消耗掉這次射擊
+    [SerializeField] private float maxAlignTime = 0.25f;            // 最多對準多久就強制放行（避免卡死）
+    private Weapon attackFacingOwner; // 目前誰在主導 attackFacingActive
+    private bool attackFacingActive;
+    private Vector3 attackDesiredForward; // XZ 平面朝向
+
+    // key = Weapon instance（AttackManager.leftWeapon/rightWeapon）
+    // value = 這次單發請求的失效時間 / 開始對準時間
+    private readonly Dictionary<Weapon, float> pendingSingleUntil = new();
+    private readonly Dictionary<Weapon, float> alignStartTime = new();
     [Header("Animation")]
     [SerializeField] private PlayerAnimation playerAnimation;
     [SerializeField] private float movementBlendSpeed = 3f; // 控制 0↔1 的快慢
@@ -35,6 +50,96 @@ public class PlayerMovement : MonoBehaviour
     public void FixedUpdate()
     {
         GroundCheck();
+    }
+
+    public void ProcessAttackFacingAndShoot(AttackManager attackManager, Weapon w, InputAction attackInput)
+    {
+        if (attackManager == null || w == null || attackInput == null) return;
+        if (PlayerAiming.Instance == null || characterModel == null) return;
+
+        bool isSingle = (w.firingMode == 0);
+
+        // 1) 收集「想射擊」意圖（單發需要緩存，否則轉完身就不是 this frame 了）
+        if (isSingle)
+        {
+            if (attackInput.WasPressedThisFrame())
+            {
+                pendingSingleUntil[w] = Time.time + singleShotBufferTime;
+                alignStartTime[w] = Time.time;
+            }
+
+            if (!pendingSingleUntil.TryGetValue(w, out float until) || Time.time > until)
+            {
+                pendingSingleUntil.Remove(w);
+                alignStartTime.Remove(w);
+                ClearAttackFacingOwnerIfSelf(w);
+                return;
+            }
+        }
+        else
+        {
+            // 連發/蓄力：只要按住就持續嘗試
+            if (!attackInput.IsPressed())
+            {
+                alignStartTime.Remove(w);
+                ClearAttackFacingOwnerIfSelf(w);
+                return;
+            }
+
+            if (!alignStartTime.ContainsKey(w))
+                alignStartTime[w] = Time.time;
+        }
+
+        // 2) 算出這一幀「應該面向哪裡」（lockOn -> aimingPoint；否則 -> 準星 ray）
+        Vector3 targetPoint;
+        if (PlayerAiming.Instance.lockOn && PlayerAiming.Instance.aimingPoint != null)
+            targetPoint = PlayerAiming.Instance.aimingPoint.position;
+        else
+            targetPoint = PlayerAiming.Instance.GetRay().GetPoint(attackAimRayDistance);
+
+        Vector3 lookDir = targetPoint - characterModel.position;
+        lookDir.y = 0f;
+        if (lookDir.sqrMagnitude < 0.0001f) return;
+
+        SetAttackFacingOwner(w, lookDir.normalized);
+
+        // 3) 判斷是否已對準（或超時就放行）
+        Vector3 flatForward = characterModel.forward;
+        flatForward.y = 0f;
+        if (flatForward.sqrMagnitude < 0.0001f) flatForward = attackDesiredForward;
+        flatForward.Normalize();
+
+        float angle = Vector3.Angle(flatForward, attackDesiredForward);
+        bool aligned = angle <= attackAngleThreshold;
+
+        bool timedOut = alignStartTime.TryGetValue(w, out float startT) && (Time.time - startT) >= maxAlignTime;
+
+        if (aligned || timedOut)
+        {
+            // 4) 真正觸發射擊（由 AttackManager 管理 cooldown/bullets）
+            bool didShoot = attackManager.TryStartShoot(w);
+
+            // 單發：一旦成功開火就消耗掉這次請求
+            if (didShoot && isSingle)
+            {
+                pendingSingleUntil.Remove(w);
+                alignStartTime.Remove(w);
+            }
+        }
+    }
+    private void SetAttackFacingOwner(Weapon w, Vector3 desiredForward)
+    {
+        attackFacingOwner = w;
+        attackFacingActive = true;
+        attackDesiredForward = desiredForward;
+    }
+    private void ClearAttackFacingOwnerIfSelf(Weapon w)
+    {
+        if (attackFacingOwner == w)
+        {
+            attackFacingOwner = null;
+            attackFacingActive = false;
+        }
     }
     public void HorizontalMovement(float moveX, float moveZ)
     {
@@ -167,6 +272,7 @@ public class PlayerMovement : MonoBehaviour
             whatIsGround
         );
         grounded = didHit;
+        playerAnimation.SetIsOnGround(grounded);
     }
     private void ResetJump()
     {
@@ -174,35 +280,37 @@ public class PlayerMovement : MonoBehaviour
     }
     private void RotateCharacter()
     {
-        // 先處理角色朝向
-        if (PlayerAiming.Instance.lockOn)
+        // 先處理角色朝向（攻擊優先，其次 lockOn，其次移動）
+        Vector3? desiredForward = null;
+
+        if (attackFacingActive)
+        {
+            desiredForward = attackDesiredForward;
+        }
+        else if (PlayerAiming.Instance.lockOn)
         {
             Vector3 lookDirection = PlayerAiming.Instance.aimingPoint.position - characterModel.position;
             lookDirection.y = 0f;
             if (lookDirection.sqrMagnitude > 0.001f)
-            {
-                Vector3 targetForward = lookDirection.normalized;
-                characterModel.forward = Vector3.Slerp(
-                    characterModel.forward,
-                    targetForward,
-                    Time.deltaTime * 10f
-                );
-            }
+                desiredForward = lookDirection.normalized;
         }
         else
         {
             if (moveDirection.sqrMagnitude > 0.001f)
             {
                 Vector3 faceDirection = moveDirection.normalized;
-                Vector3 targetForward = new Vector3(faceDirection.x, 0, faceDirection.z);
-                characterModel.forward = Vector3.Slerp(
-                    characterModel.forward,
-                    targetForward,
-                    Time.deltaTime * 10f
-                );
+                desiredForward = new Vector3(faceDirection.x, 0, faceDirection.z).normalized;
             }
         }
 
+        if (desiredForward.HasValue)
+        {
+            characterModel.forward = Vector3.Slerp(
+                characterModel.forward,
+                desiredForward.Value,
+                Time.deltaTime * attackRotateSpeed
+            );
+        }
         // 把世界空間的 moveDirection 轉成「角色本地」方向
         Vector3 localMove = Vector3.zero;
         if (moveDirection.sqrMagnitude > 0.001f)

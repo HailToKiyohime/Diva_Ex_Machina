@@ -9,7 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 373226415372086183}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: MuzzlePoint
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -39,6 +39,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: -8921899751567471654, guid: c6a1fdef2d106b8439d10a059a49367d, type: 3}
+      propertyPath: m_Layer
+      value: 8
+      objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: c6a1fdef2d106b8439d10a059a49367d, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -90,12 +94,24 @@ PrefabInstance:
     - target: {fileID: -7511558181221131132, guid: c6a1fdef2d106b8439d10a059a49367d, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
-      objectReference: {fileID: 2100000, guid: e912af947410f9142b4c0e964b033b67, type: 2}
+      objectReference: {fileID: 2100000, guid: 18bfdaf667c8f95448f8d2bc457295fe, type: 2}
+    - target: {fileID: -4590906901685811858, guid: c6a1fdef2d106b8439d10a059a49367d, type: 3}
+      propertyPath: m_Layer
+      value: 8
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: c6a1fdef2d106b8439d10a059a49367d, type: 3}
       propertyPath: m_Name
       value: Gun 1
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    - target: {fileID: 919132149155446097, guid: c6a1fdef2d106b8439d10a059a49367d, type: 3}
+      propertyPath: m_Layer
+      value: 8
+      objectReference: {fileID: 0}
+    m_RemovedComponents:
+    - {fileID: -1506153716083979947, guid: c6a1fdef2d106b8439d10a059a49367d, type: 3}
+    - {fileID: 8626569622736131839, guid: c6a1fdef2d106b8439d10a059a49367d, type: 3}
+    - {fileID: -2014684743964006748, guid: c6a1fdef2d106b8439d10a059a49367d, type: 3}
+    - {fileID: -5127886901929326026, guid: c6a1fdef2d106b8439d10a059a49367d, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects:
     - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: c6a1fdef2d106b8439d10a059a49367d, type: 3}
