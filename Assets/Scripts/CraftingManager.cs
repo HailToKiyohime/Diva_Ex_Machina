@@ -67,8 +67,6 @@ public class CraftingManager : MonoBehaviour
     public Canvas tooltipCanvas;
     [Tooltip("Tooltip 相對滑鼠的偏移（像素）。")]
     public Vector2 tooltipOffset = new Vector2(16f, -16f);
-    [Tooltip("若為 true：顯示 (current -> new)；若為 false：只顯示 +/- 差異。 ")]
-    public bool tooltipShowCurrentAndNew = true;
     [Tooltip("若為 true：差異為 0 的屬性也會顯示。通常建議關閉以保持乾淨。 ")]
     public bool tooltipShowZeroDiff = false;
 
