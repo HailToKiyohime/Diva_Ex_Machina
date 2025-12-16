@@ -19,17 +19,19 @@ MonoBehaviour:
   dropPrefab: {fileID: 0}
   rangeWeaponPartPrefab: {fileID: 7393721869439523434, guid: b10d3fcdb42008141b7e15349ecf06bb, type: 3}
   partType: 2
-  muzzlePoint: {fileID: 0}
   buffs:
-  - attribute: 2
-    value: 3
+  - attribute: 10
+    mode: 1
+    value: 5
   randomBuffs:
   - buff:
-      attribute: 4
+      attribute: 0
+      mode: 0
       value: 10
     weight: 1
   - buff:
       attribute: 1
+      mode: 0
       value: 5
     weight: 1
   meshRenderer: {fileID: 9050892394816699327, guid: b10d3fcdb42008141b7e15349ecf06bb, type: 3}

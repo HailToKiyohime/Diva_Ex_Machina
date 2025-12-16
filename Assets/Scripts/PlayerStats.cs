@@ -1,6 +1,12 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
-using System; // 加在檔案最上面
+using System; 
+
+public enum BuffApplyMode
+{
+    Add = 0,         // 加法：+value
+    Multiplier = 1   // 倍率：(1 + value) 倍；例如 0.2 = +20%
+}
 
 public enum Attributes
 {
@@ -15,14 +21,14 @@ public enum Attributes
     EnergyDefense,
     ColdDefense,
     //Range Weapon Specific
-    reloadTime,
-    bulletPerShot,
-    roundPerTap,
-    timeBetweenShooting,
-    timeBetweenShots,
-    spread,
-    magazineSize,
-    bulletSpeed,
+    ReloadTime,
+    BulletPerShot,
+    RoundPerPull,
+    TimeBetweenShooting,
+    TimeBetweenShots,
+    Spread,
+    MagazineSize,
+    BulletSpeed,
     FiringMode,//0:Single, 1:Auto, 2:Charge
     //Energy
     MaxEnergy,
@@ -34,10 +40,13 @@ public enum Attributes
     CriticalMultiplier,
     //Movement
     SprintSpeed,
+    AccelerationSpeed,
+    DecelerationSpeed,
     DashSpeed,
-    //Jump
+    //Jump/Fly
     JumpHeight,
-    FlyForce,
+    FlySpeed,
+    FlyAcceleration,
     //Health
     MaxHealth,
     //Aiming
@@ -72,13 +81,18 @@ public class WeaponStats
     // 之後如果要查某一種屬性（例如 RecoilControl）可以用這個
     public float GetAttribute(Attributes attr)
     {
-        float total = 0f;
+        float add = 0f;
+        float mul = 1f;
+
         foreach (var b in buffs)
         {
-            if (b.attribute == attr)
-                total += b.value;
+            if (b.attribute != attr) continue;
+
+            if (b.mode == BuffApplyMode.Add) add += b.value;
+            else if (b.mode == BuffApplyMode.Multiplier) mul *= (1f + b.value);
         }
-        return total;
+
+        return add * mul;
     }
 }
 
@@ -104,12 +118,14 @@ public class BaseStats
 
     [Header("Base Movement")]
     public float sprintSpeed = 20f;
+    public float accelerationSpeed = 30f;
+    public float decelerationSpeed = 30f;
     public float dashSpeed = 40f;
 
     [Header("Base Jump / Fly")]
     public float jumpHeight = 2f;
-    public float flyForce = 10f;
-
+    public float flySpeed = 0f;
+    public float flyAcceleration = 0f;
     [Header("Base Health")]
     public float maxHealth = 1000f;
     [Header("Base Aiming")]
@@ -135,7 +151,7 @@ public class PlayerStats : MonoBehaviour
     [Header("RangeWeapon")]
     public float reloadTime;
     public float bulletPerShot;
-    public float roundPerTap;
+    public float roundPerPull;
     public float timeBetweenShooting;
     public float timeBetweenShots;
     public float spread;
@@ -153,10 +169,13 @@ public class PlayerStats : MonoBehaviour
     public float flyEnergyCost;
     [Header("Movement")]
     public float sprintSpeed;
+    public float accelerationSpeed;
+    public float decelerationSpeed;
     public float dashSpeed;
     [Header("Jump / Fly")]
     public float jumpHeight;
-    public float flyForce;
+    public float flySpeed;
+    public float flyAcceleration;
     [Header("Health")]
     public float maxHealth;
     [Header("Aiming")]
@@ -209,28 +228,30 @@ public class PlayerStats : MonoBehaviour
         flyEnergyCost = baseStats.flyEnergyCost;
 
         sprintSpeed = baseStats.sprintSpeed;
+        accelerationSpeed = baseStats.accelerationSpeed;
+        decelerationSpeed = baseStats.decelerationSpeed;    
         dashSpeed = baseStats.dashSpeed;
 
         jumpHeight = baseStats.jumpHeight;
-        flyForce = baseStats.flyForce;
-
+        flySpeed = baseStats.flySpeed;
+        flyAcceleration = baseStats.flyAcceleration;
         maxHealth = baseStats.maxHealth;
     }
     public void RecalculateFromEquipment()
     {
         ResetState();
-
-
-        // 2. 清空左右手武器狀態
         leftHand.Reset();
         rightHand.Reset();
 
-        // reset 腿甲視覺
         CurrentLegVisual.heightOffset = 0f;
         CurrentLegVisual.animationType = AnimationType.Bipedal;
+
         if (EquipmentManager.Instance == null ||
             EquipmentManager.Instance.equipmentSlots == null)
             return;
+
+        // ★新增：收集全身 buffs（不含左右手手甲）
+        List<EquipmentBuff> globalBuffs = new List<EquipmentBuff>();
 
         List<EquipmentSlot> slots = EquipmentManager.Instance.equipmentSlots;
         for (int i = 0; i < slots.Count; i++)
@@ -238,45 +259,48 @@ public class PlayerStats : MonoBehaviour
             var slot = slots[i];
             if (slot == null || slot.item == null)
                 continue;
+
             var inst = slot.item;
-            // ===== 裝甲 =====
+
             if (inst is ArmorInstance armorInst)
             {
-                // ★抓腿甲 VisualChange（LegArmor 是 Armor 的子類 :contentReference[oaicite:5]{index=5}）
                 if (slot.equipmentType == ItemType.LegsArmor && armorInst.item is LegArmor leg && leg.visualChange != null)
                 {
                     CurrentLegVisual.heightOffset = leg.visualChange.heightOffset;
                     CurrentLegVisual.animationType = leg.visualChange.animationType;
                 }
-                // 左手手甲 → 只影響 leftHand，不進入全身 base stats
+
                 if (slot.equipmentType == ItemType.LeftHandArmor)
                 {
                     leftHand.handArmor = armorInst;
                     AddBuffListToWeapon(leftHand, armorInst.buffs);
                 }
-                // 右手手甲 → 只影響 rightHand，不進入全身 base stats
                 else if (slot.equipmentType == ItemType.RightHandArmor)
                 {
                     rightHand.handArmor = armorInst;
                     AddBuffListToWeapon(rightHand, armorInst.buffs);
                 }
-                // 其他裝甲（頭、胸、腰、腿、噴射背包...) → 加到全身屬性
                 else
                 {
-                    ApplyBuffListToGlobal(armorInst.buffs);
+                    // ★原本是 ApplyBuffListToGlobal(armorInst.buffs);
+                    if (armorInst.buffs != null) globalBuffs.AddRange(armorInst.buffs);
                 }
             }
             else if (inst is RangeWeaponInstance rangeWeaponInst && i == leftWeaponSlotIndex)
             {
                 leftHand.weapon = rangeWeaponInst;
-                AddBuffListToWeapon(leftHand, rangeWeaponInst.buffs);
+                AddWeaponAndAttachmentBuffs(leftHand, rangeWeaponInst);
             }
             else if (inst is RangeWeaponInstance rangeWeaponInst2 && i == rightWeaponSlotIndex)
             {
                 rightHand.weapon = rangeWeaponInst2;
-                AddBuffListToWeapon(rightHand, rangeWeaponInst2.buffs);
+                AddWeaponAndAttachmentBuffs(rightHand, rangeWeaponInst2);
             }
         }
+
+        // ★最後統一套用（先加後乘）
+        ApplyBuffListToGlobal(globalBuffs);
+
         OnLegVisualChanged?.Invoke(CurrentLegVisual);
         OnHandWeaponDataChanged?.Invoke();
     }
@@ -290,74 +314,105 @@ public class PlayerStats : MonoBehaviour
     void ApplyBuffListToGlobal(List<EquipmentBuff> buffs)
     {
         if (buffs == null) return;
+
+        // Pass 1: Add
         foreach (var buff in buffs)
         {
-            ApplyBuffToGlobal(buff);
+            if (buff.mode == BuffApplyMode.Add)
+                ApplyAddToGlobal(buff);
+        }
+
+        // Pass 2: Multiplier
+        foreach (var buff in buffs)
+        {
+            if (buff.mode == BuffApplyMode.Multiplier)
+                ApplyMultiplierToGlobal(buff);
         }
     }
-
-    void ApplyBuffToGlobal(EquipmentBuff buff)
+    void ApplyAddToGlobal(EquipmentBuff buff)
     {
         switch (buff.attribute)
         {
-            // Defense
-            case Attributes.PhysicalDefense:
-                physicalDefense += buff.value;
-                break;
-            case Attributes.ExplosionDefense:
-                explosionDefense += buff.value;
-                break;
-            case Attributes.EnergyDefense:
-                energyDefense += buff.value;
-                break;
-            case Attributes.ColdDefense:
-                coldDefense += buff.value;
-                break;
-            case Attributes.MaxEnergy:
-                maxEnergy += buff.value;
-                break;
-            case Attributes.EnergyRegen:
-                energyRegen += buff.value;
-                break;
-            case Attributes.DashEnergyCost:
-                dashEnergyCost += buff.value;
-                break;
-            case Attributes.FlyEnergyCost:
-                flyEnergyCost += buff.value;
-                break;
-            case Attributes.CriticalChance:
-                criticalChance += buff.value;
-                break;
-            case Attributes.CriticalMultiplier:
-                criticalMultiplier += buff.value;
-                break;
-            case Attributes.SprintSpeed:
-                sprintSpeed += buff.value;
-                break;
-            case Attributes.DashSpeed:
-                dashSpeed += buff.value;
-                break;
-            case Attributes.JumpHeight:
-                jumpHeight += buff.value;
-                break;
-            case Attributes.FlyForce:
-                flyForce += buff.value;
-                break;
-            case Attributes.MaxHealth:
-                maxHealth += buff.value;
-                break;
-            case Attributes.AimingDistance:
-                aimingDistance += buff.value;
-                break;
-            // 之後如果在 Attributes 補 CriticalAttack、RecoilControl、MeleeDamage 等
-            // 可以在這裡加 case，或只用 per-hand 的 WeaponStats 存就好
-            default:
-                break;
+            case Attributes.PhysicalDefense: physicalDefense += buff.value; break;
+            case Attributes.ExplosionDefense: explosionDefense += buff.value; break;
+            case Attributes.EnergyDefense: energyDefense += buff.value; break;
+            case Attributes.ColdDefense: coldDefense += buff.value; break;
+
+            case Attributes.MaxEnergy: maxEnergy += buff.value; break;
+            case Attributes.EnergyRegen: energyRegen += buff.value; break;
+            case Attributes.DashEnergyCost: dashEnergyCost += buff.value; break;
+            case Attributes.FlyEnergyCost: flyEnergyCost += buff.value; break;
+
+            case Attributes.CriticalChance: criticalChance += buff.value; break;
+            case Attributes.CriticalMultiplier: criticalMultiplier += buff.value; break;
+
+            case Attributes.SprintSpeed: sprintSpeed += buff.value; break;
+            case Attributes.AccelerationSpeed: accelerationSpeed += buff.value; break;
+            case Attributes.DecelerationSpeed: decelerationSpeed += buff.value; break;
+            case Attributes.DashSpeed: dashSpeed += buff.value; break;
+
+            case Attributes.JumpHeight: jumpHeight += buff.value; break;
+            case Attributes.FlySpeed: flySpeed += buff.value; break;
+            case Attributes.FlyAcceleration: flyAcceleration += buff.value; break;
+
+            case Attributes.MaxHealth: maxHealth += buff.value; break;
+            case Attributes.AimingDistance: aimingDistance += buff.value; break;
         }
     }
+    void ApplyMultiplierToGlobal(EquipmentBuff buff)
+    {
+        float m = 1f + buff.value; // 0.2 => 1.2倍；-0.1 => 0.9倍
+        switch (buff.attribute)
+        {
+            case Attributes.PhysicalDefense: physicalDefense *= m; break;
+            case Attributes.ExplosionDefense: explosionDefense *= m; break;
+            case Attributes.EnergyDefense: energyDefense *= m; break;
+            case Attributes.ColdDefense: coldDefense *= m; break;
+
+            case Attributes.MaxEnergy: maxEnergy *= m; break;
+            case Attributes.EnergyRegen: energyRegen *= m; break;
+            case Attributes.DashEnergyCost: dashEnergyCost *= m; break;
+            case Attributes.FlyEnergyCost: flyEnergyCost *= m; break;
+
+            case Attributes.CriticalChance: criticalChance *= m; break;
+            case Attributes.CriticalMultiplier: criticalMultiplier *= m; break;
+
+            case Attributes.SprintSpeed: sprintSpeed *= m; break;
+            case Attributes.AccelerationSpeed: accelerationSpeed *= m; break;
+            case Attributes.DecelerationSpeed: decelerationSpeed *= m; break;
+            case Attributes.DashSpeed: dashSpeed *= m; break;
+
+            case Attributes.JumpHeight: jumpHeight *= m; break;
+            case Attributes.FlySpeed: flySpeed *= m; break;
+            case Attributes.FlyAcceleration: flyAcceleration *= m; break;
+
+            case Attributes.MaxHealth: maxHealth *= m; break;
+            case Attributes.AimingDistance: aimingDistance *= m; break;
+        }
+    }
+
     public VisualChange CurrentLegVisual { get; private set; } = new VisualChange()
     {
         heightOffset = 0f,
         animationType = default // 依你 AnimationType 的預設值
     };
+
+    private void AddWeaponAndAttachmentBuffs(WeaponStats target, RangeWeaponInstance weaponInst)
+    {
+        if (weaponInst == null) return;
+
+        // 武器本體 buffs
+        AddBuffListToWeapon(target, weaponInst.buffs);
+
+        // 零件 buffs（attachment 裡每個 PartInstance）
+        if (weaponInst.attachment == null) return;
+
+        foreach (var part in weaponInst.attachment)
+        {
+            // 通常 item == null 代表該槽沒裝零件；也避免殘留 buffs 造成幽靈加成
+            if (part == null || part.item == null) continue;
+
+            AddBuffListToWeapon(target, part.buffs);
+        }
+    }
 }

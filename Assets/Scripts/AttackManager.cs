@@ -1,4 +1,4 @@
-using System.Collections;
+ï»¿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -37,7 +37,7 @@ public class AttackManager : MonoBehaviour
     //Just for testing
     public GameObject testBulletPrefab;
 
-    // ¥Î¨Ó§PÂ_¡u¬O§_´«¤F¤@§âªZ¾¹¡v¡A¥H«K­«¸m¤l¼uµ¥ runtime state
+    // ç”¨ä¾†åˆ¤æ–·ã€Œæ˜¯å¦æ›äº†ä¸€æŠŠæ­¦å™¨ã€ï¼Œä»¥ä¾¿é‡ç½®å­å½ˆç­‰ runtime state
     private RangeWeaponInstance _leftSource;
     private RangeWeaponInstance _rightSource;
 
@@ -68,7 +68,7 @@ public class AttackManager : MonoBehaviour
     {
         if (outWeapon == null) return;
 
-        // ¨SªZ¾¹¡G²MªÅ¿é¥X¡]¤]¥i¥H§ï¦¨ disable ¸Ó¤â®gÀ»¡^
+        // æ²’æ­¦å™¨ï¼šæ¸…ç©ºè¼¸å‡ºï¼ˆä¹Ÿå¯ä»¥æ”¹æˆ disable è©²æ‰‹å°„æ“Šï¼‰
         if (hand == null || hand.weapon == null)
         {
             cachedSource = null;
@@ -89,28 +89,31 @@ public class AttackManager : MonoBehaviour
             return;
         }
 
-        // ¦pªG´«ªZ¾¹¡G­«¸m runtime state¡]¤l¼u/¸Ë¶ñª¬ºAµ¥¡^
+        // å¦‚æœæ›æ­¦å™¨ï¼šé‡ç½® runtime stateï¼ˆå­å½ˆ/è£å¡«ç‹€æ…‹ç­‰ï¼‰
         bool changedWeapon = cachedSource != hand.weapon;
         cachedSource = hand.weapon;
 
-        // 1) ¤l¼u prefab / muzzle¡G§A¥i¨Ì§Aªº RangeWeaponInstance µ²ºc±µ¸ê®Æ
-        //outWeapon.bullet = hand.weapon.item.bulletPrefab; // <- ¨Ì§Aªº¹ê»ÚÄæ¦ì§ï
-        outWeapon.muzzle = hand.weapon.muzzlePoint;  // muzzle ³q±`¬O³õ´º¤Wªº Transform¡A¤£¤@©w¦b stats ¸Ì
+        // 1) å­å½ˆ prefab / muzzleï¼šä½ å¯ä¾ä½ çš„ RangeWeaponInstance çµæ§‹æ¥è³‡æ–™
+        // âœ… å–å› RangeWeapon SOï¼Œæ‹¿åˆ° bullet prefab
+        var rw = hand.weapon.item as RangeWeapon;   // RangeWeaponInstance.item æ˜¯ ItemObject
+        outWeapon.bullet = (rw != null) ? rw.bullet : null;  // RangeWeapon.bullet :contentReference[oaicite:3]{index=3}
 
-        // 2) §â¸Ó¤â¡uÁ` Buff¡vÂà¦¨®gÀ»¼Æ­È
+        outWeapon.muzzle = hand.weapon.muzzlePoint;  // muzzle é€šå¸¸æ˜¯å ´æ™¯ä¸Šçš„ Transformï¼Œä¸ä¸€å®šåœ¨ stats è£¡
+
+        // 2) æŠŠè©²æ‰‹ã€Œç¸½ Buffã€è½‰æˆå°„æ“Šæ•¸å€¼
         outWeapon.physicalDamage = hand.GetAttribute(Attributes.PhysicalDamage);
         outWeapon.explosionDamage = hand.GetAttribute(Attributes.ExplosionDamage);
         outWeapon.energyDamage = hand.GetAttribute(Attributes.EnergyDamage);
         outWeapon.coldDamage = hand.GetAttribute(Attributes.ColdDamage);
 
-        outWeapon.reloadTime = hand.GetAttribute(Attributes.reloadTime);
-        outWeapon.bulletPerShot = Mathf.RoundToInt(hand.GetAttribute(Attributes.bulletPerShot));
-        outWeapon.roundPerTap = Mathf.RoundToInt(hand.GetAttribute(Attributes.roundPerTap));
-        outWeapon.timeBetweenShooting = hand.GetAttribute(Attributes.timeBetweenShooting);
-        outWeapon.timeBetweenShots = hand.GetAttribute(Attributes.timeBetweenShots);
-        outWeapon.spread = hand.GetAttribute(Attributes.spread);
-        outWeapon.magazineSize = Mathf.RoundToInt(hand.GetAttribute(Attributes.magazineSize));
-        outWeapon.bulletSpeed = hand.GetAttribute(Attributes.bulletSpeed);
+        outWeapon.reloadTime = hand.GetAttribute(Attributes.ReloadTime);
+        outWeapon.bulletPerShot = Mathf.RoundToInt(hand.GetAttribute(Attributes.BulletPerShot));
+        outWeapon.roundPerTap = Mathf.RoundToInt(hand.GetAttribute(Attributes.RoundPerPull));
+        outWeapon.timeBetweenShooting = hand.GetAttribute(Attributes.TimeBetweenShooting);
+        outWeapon.timeBetweenShots = hand.GetAttribute(Attributes.TimeBetweenShots);
+        outWeapon.spread = hand.GetAttribute(Attributes.Spread);
+        outWeapon.magazineSize = Mathf.RoundToInt(hand.GetAttribute(Attributes.MagazineSize));
+        outWeapon.bulletSpeed = hand.GetAttribute(Attributes.BulletSpeed);
         outWeapon.firingMode = Mathf.RoundToInt(hand.GetAttribute(Attributes.FiringMode));
 
         if (changedWeapon)
@@ -152,11 +155,11 @@ public class AttackManager : MonoBehaviour
     {
         if (w == null) return false;
 
-        // ¨S¤l¼u´N¹Á¸Õ´«¼u¡]¸ò HandleAttack ¦PÅŞ¿è¡^
+        // æ²’å­å½ˆå°±å˜—è©¦æ›å½ˆï¼ˆè·Ÿ HandleAttack åŒé‚è¼¯ï¼‰
         if (w.readyToShoot && !w.reloading && w.bulletsLeft <= 0)
             StartReload(w);
 
-        // ¥i¥H®gÀ»¤~¯u¥¿¶}¤õ
+        // å¯ä»¥å°„æ“Šæ‰çœŸæ­£é–‹ç«
         if (w.readyToShoot && !w.reloading && w.bulletsLeft > 0)
         {
             w.bulletsLeft = Mathf.Max(0, w.bulletsLeft);
@@ -172,14 +175,15 @@ public class AttackManager : MonoBehaviour
         w.readyToShoot = false;
         int shotsToFire = Mathf.Min(w.roundPerTap, w.bulletsLeft);
         // Cache once per burst to avoid repeated GetComponent calls
-        var bulletPrefab = testBulletPrefab;
+        var bulletPrefab = (w.bullet != null) ? w.bullet : testBulletPrefab;
         var muzzle = w.muzzle;
-
+        if (bulletPrefab == null || muzzle == null)
+            yield break;
         for (int i = 0; i < shotsToFire; i++)
         {
             for (int x = 0; x < w.bulletPerShot; x++) {
                 // Spawn projectile
-                var currentBullet = Instantiate(testBulletPrefab, muzzle.position, Quaternion.identity);
+                var currentBullet = Instantiate(bulletPrefab, muzzle.position, Quaternion.identity);
 
                 Vector3 targetPoint;
 
@@ -198,13 +202,13 @@ public class AttackManager : MonoBehaviour
                     }
                     else
                     {
-                        // Lock was lost (enemy died or despawned) ¡÷ use free-aim fallback
+                        // Lock was lost (enemy died or despawned) â†’ use free-aim fallback
                         targetPoint = ray.GetPoint(100f);
                     }
                 }
                 else
                 {
-                    // Not locked or constrained-lock ¡÷ use the crosshair ray
+                    // Not locked or constrained-lock â†’ use the crosshair ray
                     targetPoint = ray.GetPoint(100f);
                 }
                 // Direction + spread
@@ -271,19 +275,19 @@ public class AttackManager : MonoBehaviour
         w.allowInvoke = true;
     }
 
-    // Safely reads target position/velocity. Handles destroyed (¡§fake null¡¨) rigidbodies.
+    // Safely reads target position/velocity. Handles destroyed (â€œfake nullâ€) rigidbodies.
     private bool TrySampleTarget(Rigidbody rb, out Vector3 pos, out Vector3 vel)
     {
         pos = default;
         vel = default;
 
-        // Unity¡¦s overloaded == handles ¡§fake null¡¨
+        // Unityâ€™s overloaded == handles â€œfake nullâ€
         if (!rb) return false;
 
         try
         {
             pos = rb.position;          // can throw if just destroyed this frame
-            vel = rb.linearVelocity;    // BetterPhysics property ¡X do not alter
+            vel = rb.linearVelocity;    // BetterPhysics property â€” do not alter
             return true;
         }
         catch (MissingReferenceException)

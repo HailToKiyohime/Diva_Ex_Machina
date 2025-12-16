@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Net.Mail;
 using TMPro;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
+
+#region Instances (keep in this file for compatibility)
 
 [System.Serializable]
 public class ItemInstance
@@ -12,62 +12,59 @@ public class ItemInstance
     public ItemObject item;
     public int amount;
 }
+
 [System.Serializable]
 public class RangeWeaponInstance : ItemInstance
 {
-    public string newWeaponName;// 用來存鍛造後的新名稱
+    public string newWeaponName;                 // 用來存鍛造後的新名稱
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
     public List<PartInstance> attachment;
     public Transform muzzlePoint;
-    // 用來存不同 shader 的顏色
-    [SerializeField]
-    public List<Color> colors = new List<Color>();
 
-    // 可選：記錄此裝備用的 shader 名稱，方便還原
-    [SerializeField]
-    public string shaderName;
+    // 用來存不同 shader 的顏色
+    [SerializeField] public List<Color> colors = new List<Color>();
+
+    // 記錄此裝備用的 shader 名稱，方便還原
+    [SerializeField] public string shaderName;
 }
+
 [System.Serializable]
 public class ArmorInstance : ItemInstance
 {
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
 
-    // 用來存不同 shader 的顏色
-    [SerializeField]
-    public List<Color> colors = new List<Color>();
-
-    // 可選：記錄此裝備用的 shader 名稱，方便還原
-    [SerializeField]
-    public string shaderName;
+    [SerializeField] public List<Color> colors = new List<Color>();
+    [SerializeField] public string shaderName;
 }
+
 [System.Serializable]
 public class PartInstance : ItemInstance
 {
     public WeaponPartType partType;
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
-    // 用來存不同 shader 的顏色
-    [SerializeField]
-    public List<Color> colors = new List<Color>();
-    // 可選：記錄此裝備用的 shader 名稱，方便還原
-    [SerializeField]
-    public string shaderName;
+
+    [SerializeField] public List<Color> colors = new List<Color>();
+    [SerializeField] public string shaderName;
 }
 
+#endregion
 
 public class InventoryManager : MonoBehaviour
 {
     public static InventoryManager Instance { get; private set; }
+
     [Header("Inventory Slot")]
     [SerializeReference] public List<ItemInstance> inventory = new();
 
     [Header("UI Button Prefab")]
     public GameObject buttonPrefab;
-    public Transform itemsButtonParent;// 放按鈕的容器
-    public Transform inventoryButtonParent;// 放按鈕的容器
+    public Transform itemsButtonParent;      // 右邊清單按鈕容器
+    public Transform inventoryButtonParent;  // 左邊裝備槽按鈕容器
     [Header("UI Button Image")]
     public Sprite scopeIconImage;
     public Sprite barrelIconImage;
     public Sprite gunIconImage;
+
     [Header("Color Block/ Inventory Block")]
     public GameObject inventoryBlock;
     public GameObject characterColorBlock;
@@ -75,38 +72,62 @@ public class InventoryManager : MonoBehaviour
 
     [Header("Color Panel")]
     public ColorPicker characterEquipmentColorPicker;
+
     [Header("Button Toggle Group")]
-    public ToggleGroup inventoryToggleGroup;
-    public ToggleGroup WeaponPartsColorToggleGroup;
+    public ToggleGroup inventoryToggleGroup;         // 裝備槽 ToggleGroup
+    public ToggleGroup WeaponPartsColorToggleGroup;  // 槍/零件 ToggleGroup
 
+    [Header("Page Switch")]
+    [SerializeField] private UIPageSwitch pageSwitch;
     private GameObject currentPage;
-    [SerializeField]
-    private UIPageSwitch pageSwitch;
 
-    // 紀錄每個 Toggle 對應的物品
-    private Dictionary<Toggle, ItemInstance> toggleItemMap = new();
-
-    //parts buttons parent
+    [Header("Weapon Parts Buttons")]
     public Transform partsButtonParent;
-    //parts button prefab
     public GameObject partButtonPrefab;
     public Color selectedColor;
     public Color normalColor;
 
-    void Awake()
+    // 紀錄右邊清單 Toggle 對應的物品
+    private readonly Dictionary<Toggle, ItemInstance> toggleItemMap = new();
+
+    private bool IsColorMode => characterColorBlock != null && characterColorBlock.activeSelf;
+
+    private void Awake()
     {
-        // If an instance already exists and it's not this one, destroy this new instance
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
-            return; // Exit to prevent further execution of this Awake method
+            return;
         }
-        // Otherwise, set this instance as the Singleton
         Instance = this;
     }
 
+    #region Public entry for Equipment Slot Toggles (IMPORTANT)
+
+    // 主人：把每個「裝備槽 Toggle」的 OnValueChanged(bool) 只綁這個就好
+    public void OnEquipmentSlotToggleChanged(bool isOn)
+    {
+        if (!isOn) return;
+
+        if (IsColorMode)
+        {
+            // Color Page 開著：只切上色目標 +（若槍）重建零件按鈕
+            OpenColorPage();
+        }
+        else
+        {
+            // Color Page 沒開：開背包清單（你原本的 inventory 清單）
+            OpenInventoryPage();
+        }
+    }
+
+    #endregion
+
+    #region Inventory CRUD
+
     public void AddItemToInventory(ItemObject item)
     {
+        if (item == null) return;
 
         if (item is Armor a)
         {
@@ -116,70 +137,55 @@ public class InventoryManager : MonoBehaviour
                 amount = 1,
             };
 
-            // 如果 Armor 有 SkinnedMeshRenderer，就讀取該材質的顏色
-            if (a.skinnedMeshRenderer)
+            // 讀顏色
+            if (a.skinnedMeshRenderer && a.skinnedMeshRenderer.sharedMaterial)
             {
-                var renderer = a.skinnedMeshRenderer; // 先抓出 renderer (頂多 1~2 行)
-                if (renderer.sharedMaterial)          // 再從 sharedMaterial 讀取 shader 與顏色
-                {
-                    var mat = renderer.sharedMaterial;
-                    var shader = mat.shader;
-                    inst.shaderName = shader.name;
+                var mat = a.skinnedMeshRenderer.sharedMaterial;
+                inst.shaderName = mat.shader.name;
 
-                    // 根據 shader 名稱判斷要讀幾組顏色
-                    if (shader.name.Contains("Mix 3"))
-                    {
-                        inst.colors.Add(mat.GetColor("_BaseColor"));
-                        inst.colors.Add(mat.GetColor("_Layer1Color"));
-                        inst.colors.Add(mat.GetColor("_Layer2Color"));
-                    }
-                    else if (shader.name.Contains("Mix 4"))
-                    {
-                        inst.colors.Add(mat.GetColor("_BaseColor"));
-                        inst.colors.Add(mat.GetColor("_Layer1Color"));
-                        inst.colors.Add(mat.GetColor("_Layer2Color"));
-                        inst.colors.Add(mat.GetColor("_Layer3Color"));
-                    }
-                    else if (shader.name.Contains("Mix 5"))
-                    {
-                        inst.colors.Add(mat.GetColor("_BaseColor"));
-                        for (int i = 1; i < 5; i++)
-                            inst.colors.Add(mat.GetColor($"_Layer{i}Color"));
-                    }
+                if (inst.shaderName.Contains("Mix 3"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                }
+                else if (inst.shaderName.Contains("Mix 4"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                    inst.colors.Add(mat.GetColor("_Layer3Color"));
+                }
+                else if (inst.shaderName.Contains("Mix 5"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    for (int i = 1; i < 5; i++)
+                        inst.colors.Add(mat.GetColor($"_Layer{i}Color"));
                 }
             }
-            // (1) 固定 Buff 先加
-            foreach (EquipmentBuff buff in a.buffs)
-            {
-                inst.buffs.Add(buff);
-            }
-            // (2) 隨機 Buff，再從 Armor 的 RandomBuffPool 裡抽（如果 Armor 有設定 RandomBuffPool）
-            var pickedBuff = a.GetRandomBuff(); // 回傳的可能是 null（代表沒抽到）
-            if (pickedBuff != null)
-            {
-                inst.buffs.Add(pickedBuff.buff); // 只取其中一條隨機 Buff，也可以改成多條
-            }
 
-            // 最後把這個帶 Buff 的實例加到背包
+            foreach (EquipmentBuff buff in a.buffs)
+                inst.buffs.Add(buff);
+
+            var pickedBuff = a.GetRandomBuff();
+            if (pickedBuff != null)
+                inst.buffs.Add(pickedBuff.buff);
+
             inventory.Add(inst);
-            Debug.Log($"ArmorInstance added. Total buffs: {inst.buffs.Count}");
+            return;
         }
 
-        else if (item is RangeWeapon rw)
+        if (item is RangeWeapon rw)
         {
             var attachmentPoints = new List<PartInstance>();
-
-            foreach (var part in rw.attachmentPoints)
+            foreach (var ap in rw.attachmentPoints)
             {
-                var attachment = new PartInstance
+                attachmentPoints.Add(new PartInstance
                 {
                     item = null,
                     amount = 0,
-                    partType = part.allowPart
-                };
-                attachmentPoints.Add(attachment);
-
-
+                    partType = ap.allowPart
+                });
             }
 
             var inst = new RangeWeaponInstance
@@ -187,60 +193,48 @@ public class InventoryManager : MonoBehaviour
                 item = item,
                 amount = 1,
                 attachment = attachmentPoints,
-                muzzlePoint = rw.weaponPrefab != null
-                                ? rw.weaponPrefab.transform.Find("MuzzlePoint")
-                                : null,
+                muzzlePoint = rw.weaponPrefab != null ? rw.weaponPrefab.transform.Find("MuzzlePoint") : null,
             };
 
-            if (rw.meshRenderer)
+            // 讀顏色（修正：Mix5 也要把 BaseColor 放進來）
+            if (rw.meshRenderer && rw.meshRenderer.sharedMaterial)
             {
-                // 這裡以 meshRenderer.sharedMaterial 為主，減少重複程式碼深度
-                var renderer = rw.meshRenderer;
-                if (renderer.sharedMaterial)
+                var mat = rw.meshRenderer.sharedMaterial;
+                inst.shaderName = mat.shader.name;
+
+                if (inst.shaderName.Contains("Mix 3"))
                 {
-                    var mat = renderer.sharedMaterial;
-                    var shader = mat.shader;
-                    inst.shaderName = shader.name;
-                    if (shader.name.Contains("Mix 3"))
-                    {
-                        inst.colors.Add(mat.GetColor("_BaseColor"));
-                        inst.colors.Add(mat.GetColor("_Layer1Color"));
-                        inst.colors.Add(mat.GetColor("_Layer2Color"));
-                    }
-                    else if (shader.name.Contains("Mix 4"))
-                    {
-                        inst.colors.Add(mat.GetColor("_BaseColor"));
-                        inst.colors.Add(mat.GetColor("_Layer1Color"));
-                        inst.colors.Add(mat.GetColor("_Layer2Color"));
-                        inst.colors.Add(mat.GetColor("_Layer3Color"));
-                    }
-                    else if (shader.name.Contains("Mix 5"))
-                    {
-                        inst.colors.Add(mat.GetColor("_BaseColor"));
-                        for (int i = 1; i < 5; i++)
-                            inst.colors.Add(mat.GetColor($"_Layer{i}Color"));
-                    }
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                }
+                else if (inst.shaderName.Contains("Mix 4"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                    inst.colors.Add(mat.GetColor("_Layer3Color"));
+                }
+                else if (inst.shaderName.Contains("Mix 5"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    for (int i = 1; i < 5; i++)
+                        inst.colors.Add(mat.GetColor($"_Layer{i}Color"));
                 }
             }
 
-            // (1) 固定 Buff 先加
             foreach (EquipmentBuff buff in rw.buffs)
-            {
                 inst.buffs.Add(buff);
-            }
 
-            // (2) 隨機 Buff，再從 Armor 的 RandomBuffPool 裡抽（如果 Armor 有設定 RandomBuffPool）
-            var pickedBuff = rw.GetRandomBuff(); // 回傳的可能是 null（代表沒抽到）
+            var pickedBuff = rw.GetRandomBuff();
             if (pickedBuff != null)
-            {
-                inst.buffs.Add(pickedBuff.buff); // 只取其中一條隨機 Buff，也可以改成多條
-            }
+                inst.buffs.Add(pickedBuff.buff);
 
-            // 最後把這個帶 Buff 的實例加到背包
             inventory.Add(inst);
-            Debug.Log($"RangeWeaponInstance added. Total buffs: {inst.buffs.Count}");
+            return;
         }
-        else if (item is RangeWeaponPart rwp)
+
+        if (item is RangeWeaponPart rwp)
         {
             var inst = new PartInstance
             {
@@ -249,83 +243,54 @@ public class InventoryManager : MonoBehaviour
                 partType = rwp.partType
             };
 
-
-            if (rwp.meshRenderer)
+            if (rwp.meshRenderer && rwp.meshRenderer.sharedMaterial)
             {
-                var renderer = rwp.meshRenderer;
-                if (renderer.sharedMaterial)
-                {
-                    var mat = renderer.sharedMaterial;
-                    var shader = mat.shader;
-                    inst.shaderName = shader.name;
-                    if (shader.name.Contains("Mix 3"))
-                    {
-                        inst.colors.Add(mat.GetColor("_BaseColor"));
-                        inst.colors.Add(mat.GetColor("_Layer1Color"));
-                        inst.colors.Add(mat.GetColor("_Layer2Color"));
-                    }
-                    else if (shader.name.Contains("Mix 4"))
-                    {
-                        inst.colors.Add(mat.GetColor("_BaseColor"));
-                        inst.colors.Add(mat.GetColor("_Layer1Color"));
-                        inst.colors.Add(mat.GetColor("_Layer2Color"));
-                        inst.colors.Add(mat.GetColor("_Layer3Color"));
-                    }
-                    else if (shader.name.Contains("Mix 5"))
-                    {
-                        inst.colors.Add(mat.GetColor("_BaseColor"));
-                        for (int i = 1; i < 5; i++)
-                            inst.colors.Add(mat.GetColor($"_Layer{i}Color"));
-                    }
+                var mat = rwp.meshRenderer.sharedMaterial;
+                inst.shaderName = mat.shader.name;
 
+                if (inst.shaderName.Contains("Mix 3"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                }
+                else if (inst.shaderName.Contains("Mix 4"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                    inst.colors.Add(mat.GetColor("_Layer3Color"));
+                }
+                else if (inst.shaderName.Contains("Mix 5"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    for (int i = 1; i < 5; i++)
+                        inst.colors.Add(mat.GetColor($"_Layer{i}Color"));
                 }
             }
+
             foreach (EquipmentBuff buff in rwp.buffs)
-            {
                 inst.buffs.Add(buff);
-            }
-            // (2) 隨機 Buff，再從 Armor 的 RandomBuffPool 裡抽（如果 Armor 有設定 RandomBuffPool）
-            var pickedBuff = rwp.GetRandomBuff(); // 回傳的可能是 null（代表沒抽到）
+
+            var pickedBuff = rwp.GetRandomBuff();
             if (pickedBuff != null)
-            {
-                inst.buffs.Add(pickedBuff.buff); // 只取其中一條隨機 Buff，也可以改成多條
-            }
+                inst.buffs.Add(pickedBuff.buff);
 
             inventory.Add(inst);
+            return;
         }
 
-        else
-        {
-            var inst = new ItemInstance
-            {
-                item = item,
-                amount = 1,
-            };
-            inventory.Add(inst);
-        }
+        inventory.Add(new ItemInstance { item = item, amount = 1 });
     }
 
     public void RemoveItemFromInventory(ItemInstance itemInstance)
     {
         if (itemInstance == null) return;
-
-        // 以參考相等為準，如果外面保留的是同一個實例，
-        // 這裡就能正確找到並移除。
         int idx = inventory.IndexOf(itemInstance);
-        if (idx >= 0)
-        {
-            inventory.RemoveAt(idx);
-        }
-        else
-        {
-            // 如果沒找到，也可以（選擇性）做一個 fallback：
-            // 例如比對 item / amount 等欄位。視需求而定。
-        }
+        if (idx >= 0) inventory.RemoveAt(idx);
     }
-    public void AddCraftedRangeWeaponToInventory(
-    RangeWeaponInstance baseWeaponInstance,
-    List<PartInstance> rangeWeaponParts
-)
+
+    public void AddCraftedRangeWeaponToInventory(RangeWeaponInstance baseWeaponInstance, List<PartInstance> rangeWeaponParts)
     {
         if (baseWeaponInstance == null)
         {
@@ -333,231 +298,127 @@ public class InventoryManager : MonoBehaviour
             return;
         }
 
-        // 建一個全新的 RangeWeaponInstance，避免直接修改原本那一支
         var newInst = new RangeWeaponInstance
         {
             item = baseWeaponInstance.item,
             amount = 1,
             newWeaponName = baseWeaponInstance.newWeaponName,
-
-            // Buff 直接複製一份（淺拷貝即可，視設計而定）
             buffs = new List<EquipmentBuff>(baseWeaponInstance.buffs),
-
-            // 新的 Part 列表
             attachment = new List<PartInstance>(),
-
-            // 槍口 Transform 直接沿用（因為多半指的是武器 prefab 上特定 child）
             muzzlePoint = baseWeaponInstance.muzzlePoint,
-
-            // 從 baseWeaponInstance 複製顏色與 shaderName
             shaderName = baseWeaponInstance.shaderName,
-            colors = (baseWeaponInstance.colors != null)
-                        ? new List<Color>(baseWeaponInstance.colors)
-                        : new List<Color>()
+            colors = baseWeaponInstance.colors != null ? new List<Color>(baseWeaponInstance.colors) : new List<Color>()
         };
 
-        // 把剛剛 Forge() 收集好的零件 (PartInstance) 裝進去
         if (rangeWeaponParts != null)
         {
             foreach (var part in rangeWeaponParts)
-            {
-                if (part == null) continue;
-                newInst.attachment.Add(part);
-            }
+                if (part != null) newInst.attachment.Add(part);
         }
 
-        // 加進背包
         inventory.Add(newInst);
-
-        // 除錯資訊
-        Debug.Log($"Forged new ranged weapon. Inventory count = {inventory.Count}");
-    }
-    public void OpenWeaponInventory()
-    {
-        OpenPartsInventory(ItemType.RangeWeapon);
-    }
-    public void OpenHeadArmorInventory()
-    {
-        OpenPartsInventory(ItemType.HeadArmor);
-    }
-    public void OpenChestArmorInventory()
-    {
-        OpenPartsInventory(ItemType.ChestArmor);
-    }
-    public void OpenLeftHandInventory()
-    {
-        OpenPartsInventory(ItemType.LeftHandArmor);
-    }
-    public void OpenRightHandInventory()
-    {
-        OpenPartsInventory(ItemType.RightHandArmor);
     }
 
-    public void OpenWaistArmorInventory()
-    {
-        OpenPartsInventory(ItemType.WaistArmor);
-    }
-    public void OpenLegsArmorInventory()
-    {
-        OpenPartsInventory(ItemType.LegsArmor);
-    }
+    #endregion
 
-    public void OpenThrusterInventory()
-    {
-        OpenPartsInventory(ItemType.Thruster);
-    }
+    #region Inventory Page Openers (keep for Inspector)
 
-    public void OpenConsumableInventory()
-    {
-        OpenPartsInventory(ItemType.Consumable);
-    }
+    public void OpenWeaponInventory() => OpenPartsInventory(ItemType.RangeWeapon);
+    public void OpenHeadArmorInventory() => OpenPartsInventory(ItemType.HeadArmor);
+    public void OpenChestArmorInventory() => OpenPartsInventory(ItemType.ChestArmor);
+    public void OpenLeftHandInventory() => OpenPartsInventory(ItemType.LeftHandArmor);
+    public void OpenRightHandInventory() => OpenPartsInventory(ItemType.RightHandArmor);
+    public void OpenWaistArmorInventory() => OpenPartsInventory(ItemType.WaistArmor);
+    public void OpenLegsArmorInventory() => OpenPartsInventory(ItemType.LegsArmor);
+    public void OpenThrusterInventory() => OpenPartsInventory(ItemType.Thruster);
+    public void OpenConsumableInventory() => OpenPartsInventory(ItemType.Consumable);
+    public void OpenMaterialInventory() => OpenPartsInventory(ItemType.Material);
 
-    public void OpenMaterialInventory()
+    #endregion
+
+    #region Inventory List UI (right panel)
+
+    public void OpenInventoryPage()
     {
-        OpenPartsInventory(ItemType.Material);
+        int index = GetSelectedSlotIndex();
+        var slots = EquipmentManager.Instance.equipmentSlots;
+        if (index < 0 || index >= slots.Count)
+        {
+            Debug.LogWarning($"OpenInventoryPage: invalid slot index {index}");
+            return;
+        }
+        OpenPartsInventory(slots[index].equipmentType);
     }
 
     public void OpenPartsInventory(ItemType itemType)
     {
-        Debug.Log("colorBlock.activeSelf: " + characterColorBlock.activeSelf);
-        if (characterColorBlock.activeSelf != true)
+        // Color mode 時：不要在這裡開 inventory 清單（避免裝備槽點一下又開清單）
+        if (IsColorMode) return;
+
+        bool anySlotSelected = inventoryToggleGroup != null && inventoryToggleGroup.AnyTogglesOn();
+        if (!anySlotSelected)
         {
-            Debug.Log("inventoryToggleGroup.AnyTogglesOn(): " + inventoryToggleGroup.AnyTogglesOn());
-            if (inventoryToggleGroup.AnyTogglesOn())
-            {
-
-                // 先清空右邊的物品列表
-                ClearInventoryButton();
-
-                // 先記住目前選到哪個裝備槽
-                int slotIndex = GetSelectedSlotIndex();
-
-                // 把所有裝備槽上的「Remove Equipment Button」先關掉
-                for (int i = 0; i < inventoryButtonParent.childCount; i++)
-                {
-                    var removeBtn = FindChild(inventoryButtonParent.GetChild(i).gameObject, "Remove Equipment Button");
-                    if (removeBtn != null)
-                        removeBtn.SetActive(false);
-                }
-
-                // 檢查這個槽現在是不是有裝東西
-                bool slotHasEquipment = false;
-                if (slotIndex >= 0 &&
-                    EquipmentManager.Instance != null &&
-                    slotIndex < EquipmentManager.Instance.equipmentSlots.Count)
-                {
-                    slotHasEquipment = EquipmentManager.Instance.equipmentSlots[slotIndex].equipedItem != null;
-                }
-
-                // 開始生成符合這個類型的物品按鈕
-                foreach (var inv in inventory)
-                {
-                    // 沒物品或型別不對就跳過
-                    if (inv == null || inv.item == null || inv.item.type != itemType)
-                        continue;
-
-                    // 生成按鈕
-                    var button = Instantiate(buttonPrefab, itemsButtonParent);
-
-                    // 圖示
-                    var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
-                    if (icon != null)
-                        icon.sprite = inv.item.icon;
-
-                    // 名稱
-                    var label = button.transform.Find("Item Name")?.GetComponent<TMP_Text>();
-                    if (label != null)
-                    {
-                        if (inv is RangeWeaponInstance rwi)
-                        {
-                            Debug.Log(" rwi.newWeaponName = " + rwi.newWeaponName);
-
-                            string displayName = inv.item.itemName;   // 先用 ScriptableObject 的名字當預設
-
-                            if (!string.IsNullOrEmpty(rwi.newWeaponName))
-                                displayName = rwi.newWeaponName;      // 只有真的改過名才覆蓋
-
-                            label.text = displayName;
-                        }
-                        else
-                        {
-                            label.text = inv.item.itemName;
-                        }
-                    }
-
-                    // Toggle
-                    var btn = button.GetComponent<Toggle>();
-                    if (btn != null)
-                    {
-                        // 如果這個槽本來就有裝備，就把那個槽的 Remove Button 打開
-                        if (slotHasEquipment && slotIndex >= 0)
-                        {
-                            var removeBtn = FindChild(inventoryButtonParent.GetChild(slotIndex).gameObject, "Remove Equipment Button");
-                            if (removeBtn != null)
-                                removeBtn.SetActive(true);
-                        }
-
-                        // 為了避免閉包問題，做一個本地變數
-                        ItemInstance capturedItem = inv;
-                        toggleItemMap[btn] = capturedItem;
-                        btn.onValueChanged.AddListener(isOn =>
-                        {
-                            if (!isOn) return;
-                            OnClickInventoryItem(capturedItem, btn);
-                        });
-
-                        // 如果這個物品已經裝在任一個槽上，就把它鎖住
-                        foreach (var slot in EquipmentManager.Instance.equipmentSlots)
-                        {
-                            if (slot != null && capturedItem == slot.item)
-                            {
-                                btn.interactable = false;
-                                break;
-                            }
-                        }
-                    }
-                }
-                statBlock.SetActive(false);
-                inventoryBlock.SetActive(true);
-                currentPage = inventoryBlock;
-                pageSwitch.pages[0] = currentPage;
-            }
-            else
-            {
-                statBlock.SetActive(true);
-                inventoryBlock.SetActive(false);
-                // 其他兩個 Block 可視需求加上 .SetActive(false)
-                // characterColorBlock.SetActive(false);
-                // 把所有裝備槽上的「Remove Equipment Button」先關掉
-                for (int i = 0; i < inventoryButtonParent.childCount; i++)
-                {
-                    var removeBtn = FindChild(inventoryButtonParent.GetChild(i).gameObject, "Remove Equipment Button");
-                    if (removeBtn != null)
-                        removeBtn.SetActive(false);
-                }
-                // 記得更新 currentPage
-                currentPage = statBlock;
-                pageSwitch.pages[0] = currentPage;
-            }
+            ShowStatPage();
+            SetAllRemoveButtonsActive(false);
+            return;
         }
+
+        ClearInventoryButton();
+        int slotIndex = GetSelectedSlotIndex();
+
+        SetAllRemoveButtonsActive(false);
+
+        bool slotHasEquipment = false;
+        if (slotIndex >= 0 &&
+            EquipmentManager.Instance != null &&
+            slotIndex < EquipmentManager.Instance.equipmentSlots.Count)
         {
-            if (characterColorBlock.activeSelf == true)
+            slotHasEquipment = EquipmentManager.Instance.equipmentSlots[slotIndex].equipedItem != null;
+        }
+
+        if (slotHasEquipment)
+            SetRemoveButtonForSlot(slotIndex, true);
+
+        foreach (var inv in inventory)
+        {
+            if (inv == null || inv.item == null) continue;
+            if (inv.item.type != itemType) continue;
+
+            var button = Instantiate(buttonPrefab, itemsButtonParent);
+
+            // icon
+            var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
+            if (icon != null) icon.sprite = inv.item.icon;
+
+            // name
+            var label = button.transform.Find("Item Name")?.GetComponent<TMP_Text>();
+            if (label != null)
             {
-                if (inventoryToggleGroup.AnyTogglesOn())
-                {
-                    SelectPartToColor(GetSelectedSlotIndex()); // 傳入裝備槽索引
-                }
+                if (inv is RangeWeaponInstance rwi && !string.IsNullOrEmpty(rwi.newWeaponName))
+                    label.text = rwi.newWeaponName;
                 else
-                {
-                    characterEquipmentColorPicker.targetGameObject = null;
-                    characterEquipmentColorPicker.targetMaterials = new List<Material>();
-                    characterEquipmentColorPicker.currentMaterialIndex = -1;
-                    characterEquipmentColorPicker.currentTextureIndex = -1;
-                    characterEquipmentColorPicker.ClearnButton();
-                }
+                    label.text = inv.item.itemName;
             }
+
+            var tgl = button.GetComponent<Toggle>();
+            if (tgl == null) continue;
+
+            ItemInstance capturedItem = inv;
+            toggleItemMap[tgl] = capturedItem;
+
+            // 先鎖住：已裝備中的物品
+            tgl.interactable = !IsItemEquippedAnywhere(capturedItem);
+
+            tgl.onValueChanged.AddListener(isOn =>
+            {
+                if (!isOn) return;
+                OnClickInventoryItem(capturedItem, tgl);
+            });
         }
+
+        ShowInventoryPage();
     }
+
     public void ClearInventoryButton()
     {
         for (int i = itemsButtonParent.childCount - 1; i >= 0; i--)
@@ -565,10 +426,17 @@ public class InventoryManager : MonoBehaviour
 
         toggleItemMap.Clear();
     }
+
     private void OnClickInventoryItem(ItemInstance item, Toggle btn)
     {
-        Debug.Log("Working");
-        if (item is RangeWeaponInstance rw)
+        if (item == null || item.item == null)
+        {
+            btn.isOn = false;
+            return;
+        }
+
+        // Weapon equip（需要 mountPoint）
+        if (item is RangeWeaponInstance)
         {
             int slotIndex = GetSelectedSlotIndex();
             if (slotIndex < 0)
@@ -589,166 +457,106 @@ public class InventoryManager : MonoBehaviour
 
             Transform mountPoint = weaponTransform.weaponTransform;
 
-            if (EquipmentManager.Instance.TryEquipWeaponFromInventory(item, mountPoint, slotIndex))
-            {
-                // 解鎖同一清單中的其他按鈕
-                foreach (var t in itemsButtonParent.GetComponentsInChildren<Toggle>(true))
-                {
-                    if (t == btn)
-                        continue;
-
-                    // 關掉其它按鈕的選取狀態
-                    t.isOn = false;
-
-                    // 找不到對應物品 → 當成一般按鈕，解鎖即可
-                    if (!toggleItemMap.TryGetValue(t, out var mappedItem))
-                    {
-                        t.interactable = true;
-                        continue;
-                    }
-
-                    // 檢查這個物品有沒有裝在任何一個裝備槽
-                    bool equipped = false;
-                    foreach (var slot in EquipmentManager.Instance.equipmentSlots)
-                    {
-                        if (slot != null && slot.item == mappedItem)
-                        {
-                            equipped = true;
-                            break;
-                        }
-                    }
-
-                    // 如果已經裝備，就保持鎖住；沒裝就可以互動
-                    t.interactable = !equipped;
-                }
-
-                Image spriteImage =
-                    FindChild(inventoryButtonParent.GetChild(slotIndex).gameObject, "Item Icon")
-                    .GetComponent<Image>();
-                spriteImage.sprite = item.item.icon;
-                spriteImage.color = new Color(1, 1, 1, 1);
-
-                FindChild(inventoryButtonParent.GetChild(slotIndex).gameObject, "Remove Equipment Button")
-                    .SetActive(true);
-
-                // 鎖住當前已裝備的按鈕
-                btn.interactable = false;
-            }
-            else
+            if (!EquipmentManager.Instance.TryEquipWeaponFromInventory(item, mountPoint, slotIndex))
             {
                 btn.isOn = false;
+                return;
             }
-        }
-        else
-        {
-            // 原本 Armor / 其他裝備邏輯
-            if (EquipmentManager.Instance.TryEquipFromInventory(item))
-            {
-                foreach (var t in itemsButtonParent.GetComponentsInChildren<Toggle>(true))
-                {
-                    if (t == btn)
-                        continue;
 
-                    // 關掉其它按鈕的選取狀態
-                    t.isOn = false;
+            // UI 更新
+            SetEquipmentSlotIcon(slotIndex, item.item.icon);
+            SetRemoveButtonForSlot(slotIndex, true);
 
-                    // 找不到對應物品 → 當成一般按鈕，解鎖即可
-                    if (!toggleItemMap.TryGetValue(t, out var mappedItem))
-                    {
-                        t.interactable = true;
-                        continue;
-                    }
+            RefreshItemListLockStates(btn);
 
-                    // 檢查這個物品有沒有裝在任何一個裝備槽
-                    bool equipped = false;
-                    foreach (var slot in EquipmentManager.Instance.equipmentSlots)
-                    {
-                        if (slot != null && slot.item == mappedItem)
-                        {
-                            equipped = true;
-                            break;
-                        }
-                    }
-
-                    // 如果已經裝備，就保持鎖住；沒裝就可以互動
-                    t.interactable = !equipped;
-                }
-
-                Image spriteImage =
-                    FindChild(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Item Icon")
-                    .GetComponent<Image>();
-                spriteImage.sprite = item.item.icon;
-                spriteImage.color = new Color(1, 1, 1, 1);
-                FindChild(inventoryButtonParent.GetChild(GetSelectedSlotIndex()).gameObject, "Remove Equipment Button")
-                    .SetActive(true);
-
-                btn.interactable = false;
-            }
-            else
-            {
-                btn.isOn = false;
-            }
-        }
-    }
-
-
-    public void OpenInventoryPage()
-    {
-        int index = GetSelectedSlotIndex();
-
-        var slots = EquipmentManager.Instance.equipmentSlots;
-        if (index < 0 || index >= slots.Count)
-        {
-            Debug.LogWarning($"OpenInventoryPage: invalid slot index {index}");
+            // 鎖住當前已裝備的按鈕
+            btn.interactable = false;
             return;
         }
 
-        OpenPartsInventory(slots[index].equipmentType);
+        // Armor / other equip
+        if (!EquipmentManager.Instance.TryEquipFromInventory(item))
+        {
+            btn.isOn = false;
+            return;
+        }
+
+        int idx = GetSelectedSlotIndex();
+        if (idx >= 0)
+        {
+            SetEquipmentSlotIcon(idx, item.item.icon);
+            SetRemoveButtonForSlot(idx, true);
+        }
+
+        RefreshItemListLockStates(btn);
+        btn.interactable = false;
     }
+
+    private void RefreshItemListLockStates(Toggle selectedBtn)
+    {
+        foreach (var t in itemsButtonParent.GetComponentsInChildren<Toggle>(true))
+        {
+            if (t == null) continue;
+            if (t == selectedBtn) continue;
+
+            // 關掉其它按鈕的選取狀態
+            t.isOn = false;
+
+            if (!toggleItemMap.TryGetValue(t, out var mappedItem))
+            {
+                t.interactable = true;
+                continue;
+            }
+
+            // 已裝備的物品維持鎖住
+            t.interactable = !IsItemEquippedAnywhere(mappedItem);
+        }
+    }
+
+    private bool IsItemEquippedAnywhere(ItemInstance item)
+    {
+        if (item == null) return false;
+        foreach (var slot in EquipmentManager.Instance.equipmentSlots)
+        {
+            if (slot != null && slot.item == item)
+                return true;
+        }
+        return false;
+    }
+
+    #endregion
+
+    #region Unequip
 
     public void Unequip()
     {
         int index = GetSelectedSlotIndex();
         if (index < 0) return;
 
-        // 清空該設備槽
         EquipmentManager.Instance.CleanEquipmentSlot(index);
 
-        // 找到該槽位下的 Remove Equipment Button 並隱藏
-        var removeBtn = FindChild(inventoryButtonParent.GetChild(index).gameObject, "Remove Equipment Button");
-        if (removeBtn != null)
-            removeBtn.SetActive(false);
+        SetRemoveButtonForSlot(index, false);
+        SetEquipmentSlotIcon(index, null);
 
-        Image spriteImage = FindChild(inventoryButtonParent.GetChild(index).gameObject, "Item Icon")
-                            .GetComponent<Image>();
-        spriteImage.sprite = null;
-        spriteImage.color = new Color(1, 1, 1, 0);  // alpha=0 代表完全透明
-
-        // 重新打開該槽位種類對應的物品清單
-        OpenInventoryPage();
-        if (characterColorBlock.activeSelf == true)
-        {
-            SelectPartToColor(index);
-        }
+        // 依模式刷新
+        if (IsColorMode) OpenColorPage();
+        else OpenInventoryPage();
     }
+
+    #endregion
+
+    #region Color Page (select equipment / weapon parts)
+
     public void OpenColorPage()
     {
-        int index = GetSelectedSlotIndex();
+        if (!IsColorMode) return;
 
-        // 0) 顏色頁沒開就不處理
-        if (!characterColorBlock.activeSelf) return;
-
-        // 1) 先清掉舊的 parts buttons
         CleanPartButtons();
+        SetAllRemoveButtonsActive(false);
 
-        // 2) 先把所有裝備槽的 Remove Equipment Button 關掉（保持你原本邏輯）
-        for (int i = 0; i < inventoryButtonParent.childCount; i++)
-        {
-            var removeBtn = FindChild(inventoryButtonParent.GetChild(i).gameObject, "Remove Equipment Button");
-            if (removeBtn != null) removeBtn.SetActive(false);
-        }
-
+        int index = GetSelectedSlotIndex();
         var slots = EquipmentManager.Instance.equipmentSlots;
+
         if (index < 0 || index >= slots.Count)
         {
             ClearColorPickerState();
@@ -758,61 +566,27 @@ public class InventoryManager : MonoBehaviour
         var slot = slots[index];
         var equippedGO = slot.equipedItem;
 
-        // 3) 沒裝備：清空 ColorPicker
-        if (!equippedGO)
+        // 沒裝備：清空 ColorPicker
+        if (equippedGO == null)
         {
             ClearColorPickerState();
             return;
         }
 
-        // 4) 先預設把「目前槽位裝備本體」設為 target（非武器也適用）
-        SelectPartToColor(equippedGO);
+        // 預設先選本體（非武器也適用）
+        SelectPartToColor(equippedGO, slot.item);
 
-        // 5) 只有 RangeWeapon 才生成零件按鈕
+        // 只有 RangeWeapon 才生成零件按鈕
         if (slot.item is not RangeWeaponInstance rwi || rwi.item is not RangeWeapon rw)
             return;
 
         if (partsButtonParent == null || partButtonPrefab == null || WeaponPartsColorToggleGroup == null)
             return;
 
-        // --- Local helper：建立一顆 Part Toggle ---
-        Toggle CreatePartToggle(Sprite iconSprite, GameObject targetPart, bool defaultOn)
-        {
-            var goBtn = Instantiate(partButtonPrefab, partsButtonParent);
-            var tgl = goBtn.GetComponent<Toggle>();
-            if (tgl == null) return null;
+        // 建立按鈕：Gun 本體（預設選中）
+        CreatePartToggle(gunIconImage, equippedGO, rwi, true);
 
-            tgl.group = WeaponPartsColorToggleGroup;
-
-            // icon
-            var icon = goBtn.transform.Find("Part Icon")?.GetComponent<UnityEngine.UI.Image>();
-            if (icon != null) icon.sprite = iconSprite;
-
-            // 如果找不到對應零件，直接禁用避免點了沒反應
-            tgl.interactable = (targetPart != null);
-
-            // 先套正常色
-            ApplyToggleColors(tgl, false);
-
-            // 綁事件：選中就切 target
-            tgl.onValueChanged.AddListener(isOn =>
-            {
-                ApplyToggleColors(tgl, isOn);
-                if (!isOn) return;
-
-                if (targetPart != null)
-                    SelectPartToColor(targetPart);
-            });
-
-            // 最後才設定初始 isOn（確保事件與顏色能跑）
-            tgl.isOn = defaultOn;
-            return tgl;
-        }
-
-        // 6) 先建立「Gun 本體」按鈕（預設選中）
-        CreatePartToggle(gunIconImage, equippedGO, true);
-
-        // 7) 再為每個已裝上的 attachment 建立按鈕
+        // 已裝上的 attachment 逐一建按鈕
         if (rwi.attachment == null) return;
 
         foreach (var attach in rwi.attachment)
@@ -820,23 +594,42 @@ public class InventoryManager : MonoBehaviour
             if (attach?.item == null) continue;
 
             WeaponPartType partType = attach.partType;
+            GameObject partGO = FindEquippedPartGO(equippedGO, rw, partType);
+            Sprite icon = GetPartIcon(partType);
 
-            // 用 partType -> 找掛點名 -> 找實例掛點 -> 抓掛點底下的零件物件
-            var partGO = FindEquippedPartGO(equippedGO, rw, partType);
-
-            // icon
-            var iconSprite = GetPartIcon(partType);
-
-            CreatePartToggle(iconSprite, partGO, false);
+            CreatePartToggle(icon, partGO, attach, false);
         }
     }
-    private void ClearColorPickerState()
+
+    private Toggle CreatePartToggle(Sprite iconSprite, GameObject targetPart, ItemInstance instanceToSave, bool defaultOn)
     {
-        characterEquipmentColorPicker.targetGameObject = null;
-        characterEquipmentColorPicker.targetMaterials = new List<Material>();
-        characterEquipmentColorPicker.currentMaterialIndex = -1;
-        characterEquipmentColorPicker.currentTextureIndex = -1;
-        characterEquipmentColorPicker.ClearnButton();
+        var goBtn = Instantiate(partButtonPrefab, partsButtonParent);
+        var tgl = goBtn.GetComponent<Toggle>();
+        if (tgl == null) return null;
+
+        tgl.group = WeaponPartsColorToggleGroup;
+
+        var icon = goBtn.transform.Find("Part Icon")?.GetComponent<Image>();
+        if (icon != null) icon.sprite = iconSprite;
+
+        // 找不到對應零件：禁用，避免點了沒反應
+        tgl.interactable = (targetPart != null);
+
+        // 先設正常色
+        ApplyToggleColors(tgl, false);
+
+        tgl.onValueChanged.AddListener(isOn =>
+        {
+            ApplyToggleColors(tgl, isOn);
+            if (!isOn) return;
+
+            if (targetPart != null)
+                SelectPartToColor(targetPart, instanceToSave);
+        });
+
+        // 最後才設 isOn（確保事件/顏色都已綁好）
+        tgl.isOn = defaultOn;
+        return tgl;
     }
 
     private void ApplyToggleColors(Toggle tgl, bool isOn)
@@ -845,10 +638,12 @@ public class InventoryManager : MonoBehaviour
 
         var cb = tgl.colors;
         var c = isOn ? selectedColor : normalColor;
+
         cb.normalColor = c;
         cb.selectedColor = c;
         cb.highlightedColor = c;
         cb.pressedColor = c;
+
         tgl.colors = cb;
     }
 
@@ -856,14 +651,14 @@ public class InventoryManager : MonoBehaviour
     {
         if (partType == WeaponPartType.Barrel) return barrelIconImage;
         if (partType == WeaponPartType.Scope) return scopeIconImage;
-        return null; // 主人想加其他 partType icon 就在這裡擴充
+        return null; // 主人要擴充更多零件 icon，就在這裡加
     }
 
+    // partType -> 找 attachmentPoints 的掛點名 -> FindChild -> 取該掛點下第一個 child
     private GameObject FindEquippedPartGO(GameObject weaponRoot, RangeWeapon rw, WeaponPartType partType)
     {
         if (weaponRoot == null || rw == null) return null;
 
-        // 1) 由 partType 找到掛點名稱（跟 EquipmentManager 裝備流程一致）:contentReference[oaicite:2]{index=2}
         string mountName = null;
         foreach (var ap in rw.attachmentPoints)
         {
@@ -875,14 +670,22 @@ public class InventoryManager : MonoBehaviour
 
         if (string.IsNullOrEmpty(mountName)) return null;
 
-        // 2) 在武器實例上找同名掛點（你 InventoryManager 的 FindChild 是遞迴找 name）:contentReference[oaicite:3]{index=3}
         var mountGO = FindChild(weaponRoot, mountName);
         if (mountGO == null) return null;
 
-        // 3) 掛點底下第一個 child 就是那個零件 prefab（你的裝備流程也是 Instantiate 到掛點底下）:contentReference[oaicite:4]{index=4}
         if (mountGO.transform.childCount <= 0) return null;
-
         return mountGO.transform.GetChild(0).gameObject;
+    }
+
+    private void ClearColorPickerState()
+    {
+        if (characterEquipmentColorPicker == null) return;
+
+        characterEquipmentColorPicker.targetGameObject = null;
+        characterEquipmentColorPicker.targetMaterials = new List<Material>();
+        characterEquipmentColorPicker.currentMaterialIndex = -1;
+        characterEquipmentColorPicker.currentTextureIndex = -1;
+        characterEquipmentColorPicker.ClearnButton();
     }
 
     public void CleanPartButtons()
@@ -890,80 +693,74 @@ public class InventoryManager : MonoBehaviour
         if (partsButtonParent == null) return;
 
         for (int i = partsButtonParent.childCount - 1; i >= 0; i--)
-        {
             Destroy(partsButtonParent.GetChild(i).gameObject);
-        }
     }
 
-    // 新增：選擇不同的裝備槽時，重新指定 ColorPicker 的 target
+    #endregion
+
+    #region Select Part To Color
+
+    // 保留舊介面：有些地方可能還在用 index 版本
     public void SelectPartToColor(int equipmentSlotsIndex)
     {
-        if (characterColorBlock.activeSelf == true)
+        if (!IsColorMode) return;
+
+        var slots = EquipmentManager.Instance.equipmentSlots;
+        if (equipmentSlotsIndex < 0 || equipmentSlotsIndex >= slots.Count)
         {
-
-            var slots = EquipmentManager.Instance.equipmentSlots;
-            if (equipmentSlotsIndex < 0 || equipmentSlotsIndex >= slots.Count)
-                return;
-
-            var go = slots[equipmentSlotsIndex].equipedItem;
-            if (go != null)
-            {
-                characterEquipmentColorPicker.targetGameObject = go;
-                characterEquipmentColorPicker.AddTargetMaterialsToList();
-                characterEquipmentColorPicker.CreateButtons();
-            }
-            else
-            {
-                characterEquipmentColorPicker.targetGameObject = null;
-                characterEquipmentColorPicker.targetMaterials = new List<Material>();
-                characterEquipmentColorPicker.currentMaterialIndex = -1;
-                characterEquipmentColorPicker.currentTextureIndex = -1;
-                characterEquipmentColorPicker.ClearnButton();
-            }
+            ClearColorPickerState();
+            return;
         }
+
+        var go = slots[equipmentSlotsIndex].equipedItem;
+        SelectPartToColor(go);
     }
 
     public void SelectPartToColor(GameObject part)
     {
-        if (characterColorBlock.activeSelf == true)
+        if (!IsColorMode) return;
+
+        if (characterEquipmentColorPicker == null)
+            return;
+
+        if (part == null)
         {
-
-            var slots = EquipmentManager.Instance.equipmentSlots;
-
-            var go = part;
-            if (go != null)
-            {
-                characterEquipmentColorPicker.targetGameObject = go;
-                characterEquipmentColorPicker.AddTargetMaterialsToList();
-                characterEquipmentColorPicker.CreateButtons();
-            }
-            else
-            {
-                characterEquipmentColorPicker.targetGameObject = null;
-                characterEquipmentColorPicker.targetMaterials = new List<Material>();
-                characterEquipmentColorPicker.currentMaterialIndex = -1;
-                characterEquipmentColorPicker.currentTextureIndex = -1;
-                characterEquipmentColorPicker.ClearnButton();
-            }
+            ClearColorPickerState();
+            return;
         }
+
+        characterEquipmentColorPicker.targetGameObject = part;
+        characterEquipmentColorPicker.AddTargetMaterialsToList();
+        characterEquipmentColorPicker.CreateButtons();
     }
+    public void SelectPartToColor(GameObject part, ItemInstance instanceToSave)
+    {
+        if (!IsColorMode) return;
+        if (characterEquipmentColorPicker == null) return;
+
+        characterEquipmentColorPicker.targetItemInstance = instanceToSave;
+        SelectPartToColor(part); // 沿用你原本的：設 targetGameObject + AddTargetMaterialsToList + CreateButtons
+    }
+    #endregion
+
+    #region Utilities
 
     public int GetSelectedSlotIndex()
     {
+        if (inventoryButtonParent == null) return -1;
+
         for (int i = 0; i < inventoryButtonParent.childCount; i++)
         {
             var child = inventoryButtonParent.GetChild(i);
             var t = child.GetComponentInChildren<Toggle>(true);
-            if (t != null && t.isOn)
-            {
-                return i; // 找到當前被勾選的（isOn = true）按鈕所在的索引
-            }
+            if (t != null && t.isOn) return i;
         }
-        return -1; // 都沒有人被選到
+        return -1;
     }
-
     public GameObject FindChild(GameObject parentObject, string targetName)
     {
+        if (parentObject == null) return null;
+
         foreach (Transform childTransform in parentObject.transform)
         {
             if (childTransform.gameObject.name == targetName)
@@ -973,8 +770,60 @@ public class InventoryManager : MonoBehaviour
             if (found != null)
                 return found;
         }
-
         return null;
     }
 
+    private void SetEquipmentSlotIcon(int slotIndex, Sprite sprite)
+    {
+        if (inventoryButtonParent == null) return;
+        if (slotIndex < 0 || slotIndex >= inventoryButtonParent.childCount) return;
+
+        var iconGO = FindChild(inventoryButtonParent.GetChild(slotIndex).gameObject, "Item Icon");
+        if (iconGO == null) return;
+
+        var img = iconGO.GetComponent<Image>();
+        if (img == null) return;
+
+        img.sprite = sprite;
+        img.color = (sprite != null) ? new Color(1, 1, 1, 1) : new Color(1, 1, 1, 0);
+    }
+
+    private void SetRemoveButtonForSlot(int slotIndex, bool active)
+    {
+        if (inventoryButtonParent == null) return;
+        if (slotIndex < 0 || slotIndex >= inventoryButtonParent.childCount) return;
+
+        var removeBtn = FindChild(inventoryButtonParent.GetChild(slotIndex).gameObject, "Remove Equipment Button");
+        if (removeBtn != null) removeBtn.SetActive(active);
+    }
+
+    private void SetAllRemoveButtonsActive(bool active)
+    {
+        if (inventoryButtonParent == null) return;
+
+        for (int i = 0; i < inventoryButtonParent.childCount; i++)
+            SetRemoveButtonForSlot(i, active);
+    }
+
+    private void ShowInventoryPage()
+    {
+        if (statBlock != null) statBlock.SetActive(false);
+        if (inventoryBlock != null) inventoryBlock.SetActive(true);
+
+        currentPage = inventoryBlock;
+        if (pageSwitch != null && pageSwitch.pages != null && pageSwitch.pages.Length > 0)
+            pageSwitch.pages[0] = currentPage;
+    }
+
+    private void ShowStatPage()
+    {
+        if (statBlock != null) statBlock.SetActive(true);
+        if (inventoryBlock != null) inventoryBlock.SetActive(false);
+
+        currentPage = statBlock;
+        if (pageSwitch != null && pageSwitch.pages != null && pageSwitch.pages.Length > 0)
+            pageSwitch.pages[0] = currentPage;
+    }
+
+    #endregion
 }

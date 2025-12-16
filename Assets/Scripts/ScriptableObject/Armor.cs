@@ -5,6 +5,7 @@ using System.Collections.Generic;
 public struct EquipmentBuff
 {
     public Attributes attribute;
+    public BuffApplyMode mode;
     public float value;
 }
 

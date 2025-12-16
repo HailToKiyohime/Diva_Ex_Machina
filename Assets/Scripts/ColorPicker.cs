@@ -8,6 +8,7 @@ public class ColorPicker : MonoBehaviour
 {
 
     public GameObject targetGameObject;
+    public ItemInstance targetItemInstance;
     public List<Material> targetMaterials;
     public int currentMaterialIndex = -1;
     public int currentTextureIndex = -1;
@@ -405,7 +406,77 @@ public class ColorPicker : MonoBehaviour
         else
             Debug.LogWarning($"{mat.name} missing property: {propName}");
 
-        WriteColorBackToArmorInstance(color, materialIndex, textureIndex);
+        WriteColorBackToItemInstance(color, materialIndex, textureIndex);
+    }
+    private void WriteColorBackToItemInstance(Color color, int materialIndex, int textureIndex)
+    {
+        if (textureIndex < 0) return;
+
+        // 由 InventoryManager 明確指定；沒指定就不要寫（避免誤寫）
+        if (targetItemInstance == null) return;
+
+        // 取出 colors / shaderName（依不同 instance 類型）
+        List<Color> colorsList = null;
+        string shaderName = null;
+
+        if (targetItemInstance is ArmorInstance ai)
+        {
+            colorsList = ai.colors;
+            shaderName = ai.shaderName;
+        }
+        else if (targetItemInstance is RangeWeaponInstance rwi)
+        {
+            colorsList = rwi.colors;
+            shaderName = rwi.shaderName;
+        }
+        else if (targetItemInstance is PartInstance pi)
+        {
+            colorsList = pi.colors;
+            shaderName = pi.shaderName;
+        }
+        else
+        {
+            return;
+        }
+
+        if (colorsList == null) colorsList = new List<Color>();
+
+        // shaderName 沒紀錄就用目前材質補上
+        if (string.IsNullOrEmpty(shaderName))
+        {
+            if (materialIndex >= 0 && targetMaterials != null &&
+                materialIndex < targetMaterials.Count && targetMaterials[materialIndex] != null)
+            {
+                shaderName = targetMaterials[materialIndex].shader.name;
+
+                if (targetItemInstance is ArmorInstance ai2) ai2.shaderName = shaderName;
+                else if (targetItemInstance is RangeWeaponInstance rwi2) rwi2.shaderName = shaderName;
+                else if (targetItemInstance is PartInstance pi2) pi2.shaderName = shaderName;
+            }
+        }
+
+        int requiredCount = 1;
+        if (!string.IsNullOrEmpty(shaderName))
+        {
+            if (shaderName.Contains("Mix 5")) requiredCount = 5;
+            else if (shaderName.Contains("Mix 4")) requiredCount = 4;
+            else if (shaderName.Contains("Mix 3")) requiredCount = 3;
+            else requiredCount = Mathf.Max(requiredCount, textureIndex + 1);
+        }
+        else
+        {
+            requiredCount = Mathf.Max(requiredCount, textureIndex + 1);
+        }
+
+        while (colorsList.Count < requiredCount) colorsList.Add(Color.white);
+        while (colorsList.Count <= textureIndex) colorsList.Add(Color.white);
+
+        colorsList[textureIndex] = color;
+
+        // 把 list 寫回（避免 colorsList 是新建的）
+        if (targetItemInstance is ArmorInstance ai3) ai3.colors = colorsList;
+        else if (targetItemInstance is RangeWeaponInstance rwi3) rwi3.colors = colorsList;
+        else if (targetItemInstance is PartInstance pi3) pi3.colors = colorsList;
     }
     public void AddTargetMaterialsToList()
     {
@@ -417,10 +488,6 @@ public class ColorPicker : MonoBehaviour
         {
             targetMaterials.Add(targetGameObject.GetComponent<MeshRenderer>().materials[0]);
         }
-    }
-    public void AddMaterialsToList()
-    {
-
     }
 
     public void WriteColorBackToArmorInstance(Color color, int materialIndex, int textureIndex)

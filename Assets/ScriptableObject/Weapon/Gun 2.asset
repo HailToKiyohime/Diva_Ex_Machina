@@ -50,3 +50,4 @@ MonoBehaviour:
   - pointTransform: {fileID: -4696466991668722060, guid: 592401325a68b65498d3654bda0271e5, type: 3}
     allowPart: 1
   meshRenderer: {fileID: -7511558181221131132, guid: 592401325a68b65498d3654bda0271e5, type: 3}
+  bullet: {fileID: 3891428710695554583, guid: f8141f7e21beae648a43caf66175acfa, type: 3}

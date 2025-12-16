@@ -20,24 +20,34 @@ MonoBehaviour:
   weaponPrefab: {fileID: 4226059282245262856, guid: e02f93e7b6e6ddc4fae39b516f5a560e, type: 3}
   buffs:
   - attribute: 0
+    mode: 0
     value: 10
   - attribute: 8
+    mode: 0
     value: 1.8
   - attribute: 9
+    mode: 0
     value: 1
   - attribute: 10
+    mode: 0
     value: 1
   - attribute: 11
+    mode: 0
     value: 0.07
   - attribute: 12
+    mode: 0
     value: 0
   - attribute: 13
+    mode: 0
     value: 1.5
   - attribute: 14
+    mode: 0
     value: 35
   - attribute: 15
+    mode: 0
     value: 110
   - attribute: 16
+    mode: 0
     value: 1
   randomBuffs: []
   attachmentPoints:
@@ -46,3 +56,4 @@ MonoBehaviour:
   - pointTransform: {fileID: -4315894499819760558, guid: c6a1fdef2d106b8439d10a059a49367d, type: 3}
     allowPart: 1
   meshRenderer: {fileID: 2424351632257400797, guid: e02f93e7b6e6ddc4fae39b516f5a560e, type: 3}
+  bullet: {fileID: 3891428710695554583, guid: f8141f7e21beae648a43caf66175acfa, type: 3}

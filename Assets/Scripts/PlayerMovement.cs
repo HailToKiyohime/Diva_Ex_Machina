@@ -16,11 +16,11 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float jumpCooldown = 0.2f;
     [SerializeField] private bool canRegenerateEnergy;
     [SerializeField] private Vector3 moveDirection = new Vector3(0, 0, 0);
-    [SerializeField] private float horizontalDeceleration = 25f;
-
     [SerializeField] private float groundCheckDistance = 0.1f;
     [SerializeField] private Transform groundPoint;
     [SerializeField] private LayerMask whatIsGround;
+    [SerializeField] private float flyInputBuffer = 0.12f; // 飛行請求緩衝（避免 Update/FixedUpdate 不同步漏掉）
+    private float flyRequestUntil = 0f;
     [Header("Attack Facing")]
     [SerializeField] private float attackRotateSpeed = 25;         // 轉身速度
     [SerializeField] private float attackAngleThreshold = 6f;       // 允許開火的角度誤差
@@ -50,8 +50,66 @@ public class PlayerMovement : MonoBehaviour
     public void FixedUpdate()
     {
         GroundCheck();
+        ApplyHorizontalMovementFixed(Time.fixedDeltaTime);
+        ApplyFlyFixed(Time.fixedDeltaTime); // 新增
+    }
+    private void ApplyHorizontalMovementFixed(float dt)
+    {
+        Vector3 v = playerRigidbody.velocity;
+        Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
+
+        // 沒輸入：用 deceleration 拉回 0（只處理 x/z，保留 y）
+        if (moveDirection.sqrMagnitude < 0.0001f)
+        {
+            horizontalVel = Vector3.MoveTowards(horizontalVel, Vector3.zero, PlayerStats.Instance.decelerationSpeed * dt);
+            playerRigidbody.velocity = new Vector3(horizontalVel.x, v.y, horizontalVel.z);
+            return;
+        }
+
+        // 有輸入：用 acceleration 推向目標水平速度（同樣只處理 x/z）
+        Vector3 targetHorizontalVel = moveDirection * PlayerStats.Instance.sprintSpeed;
+        horizontalVel = Vector3.MoveTowards(horizontalVel, targetHorizontalVel, PlayerStats.Instance.accelerationSpeed * dt);
+
+        playerRigidbody.velocity = new Vector3(horizontalVel.x, v.y, horizontalVel.z);
     }
 
+    private void ApplyFlyFixed(float dt)
+    {
+        // 落地就清掉飛行請求
+        if (grounded)
+        {
+            flyRequestUntil = 0f;
+            return;
+        }
+
+        // 沒有飛行請求就不干預 Y 速度（讓重力自然下落）
+        if (Time.time > flyRequestUntil) return;
+
+        var stats = PlayerStats.Instance;
+        if (stats == null) return;
+
+        if (stats.currentEnergy <= 0f)
+        {
+            flyRequestUntil = 0f;
+            return;
+        }
+
+        Vector3 v = playerRigidbody.velocity;
+
+        // 這裡把 flyForce 當成「目標上升速度（m/s）」來用
+        float targetVy = stats.flySpeed;
+
+        // 用 accelerationSpeed 當作「飛行加速度（m/s^2）」讓 vy 逼近 targetVy
+        float newVy = Mathf.MoveTowards(v.y, targetVy, stats.flyAcceleration * dt);
+
+        playerRigidbody.velocity = new Vector3(v.x, newVy, v.z);
+
+        // 能量消耗用 fixed dt（不飄幀率）
+        stats.currentEnergy = Mathf.Max(0f, stats.currentEnergy - dt * stats.flyEnergyCost);
+
+        if (stats.currentEnergy <= 0f)
+            flyRequestUntil = 0f;
+    }
     public void ProcessAttackFacingAndShoot(AttackManager attackManager, Weapon w, InputAction attackInput)
     {
         if (attackManager == null || w == null || attackInput == null) return;
@@ -143,57 +201,23 @@ public class PlayerMovement : MonoBehaviour
     }
     public void HorizontalMovement(float moveX, float moveZ)
     {
-        // 1) 取得水平 forward/right（把 y 設成 0 再正規化）
+        // 只更新 moveDirection（給 RotateCharacter / 動畫用），不要在 Update 內碰剛體
         Vector3 forward = characterOrientation.forward;
         forward.y = 0f;
-        forward = forward.normalized;
 
         Vector3 right = characterOrientation.right;
         right.y = 0f;
-        right = right.normalized;
 
-        // 2) 用「壓扁後」的方向算移動
+        // 避免極端情況（方向向量太小）造成 NaN
+        if (forward.sqrMagnitude > 0.0001f) forward.Normalize();
+        if (right.sqrMagnitude > 0.0001f) right.Normalize();
+
         moveDirection = forward * moveZ + right * moveX;
 
-        // === 新增：沒有輸入時，強力減速 ===
         if (moveDirection.sqrMagnitude < 0.0001f)
-        {
-            // 取出目前速度
-            Vector3 v = playerRigidbody.velocity;
-
-            // 只處理水平速度（x,z），y 保留給重力 & 跳躍
-            Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
-
-            if (horizontalVel.sqrMagnitude > 0.0001f)
-            {
-                // 用 MoveTowards 把水平速度快速拉向 0
-                horizontalVel = Vector3.MoveTowards(
-                    horizontalVel,
-                    Vector3.zero,
-                    horizontalDeceleration * Time.deltaTime
-                );
-
-                // 寫回剛體速度
-                playerRigidbody.velocity = new Vector3(horizontalVel.x, v.y, horizontalVel.z);
-            }
-
-            // 沒有輸入就不再做加速
-            return;
-        }
-
-
-        moveDirection = moveDirection.normalized;
-
-        Vector3 targetVelocity = moveDirection * PlayerStats.Instance.sprintSpeed;
-
-        // 3) 只對水平速度做修正
-        Vector3 currentVelocity = playerRigidbody.velocity;
-        Vector3 currentHorizontalVelocity = new Vector3(currentVelocity.x, 0f, currentVelocity.z);
-
-        Vector3 deltaHorizontalVelocity = targetVelocity - currentHorizontalVelocity;
-
-
-        playerRigidbody.AddForce(deltaHorizontalVelocity, ForceMode.Acceleration);
+            moveDirection = Vector3.zero;
+        else
+            moveDirection.Normalize();
     }
     public bool JumpAction()
     {
@@ -213,10 +237,15 @@ public class PlayerMovement : MonoBehaviour
 
     public void FlyAction()
     {
+        // 空中且有能量才允許提出飛行請求
+        if (grounded) return;
+        if (PlayerStats.Instance.currentEnergy <= 0f) return;
+
         CancelInvoke("ResetEnergyRegenerate");
         canRegenerateEnergy = false;
-        playerRigidbody.AddForceWithoutLimit(Vector3.up * PlayerStats.Instance.flyForce, ForceMode.Force);
-        PlayerStats.Instance.currentEnergy = PlayerStats.Instance.currentEnergy - Time.deltaTime * PlayerStats.Instance.flyEnergyCost;
+
+        // 把「飛行輸入」延長一小段時間，確保 FixedUpdate 一定能吃到
+        flyRequestUntil = Time.time + flyInputBuffer;
     }
 
     private void ResetEnergyRegenerate()
