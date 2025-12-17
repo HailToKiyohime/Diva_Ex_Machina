@@ -1,9 +1,7 @@
-using System;
+ï»¿using System;
 using System.Collections.Generic;
-using System.Drawing;
-using UnityEditor.Experimental.GraphView;
+using TMPro;
 using UnityEngine;
-using static Unity.Burst.Intrinsics.Arm;
 
 [System.Serializable]
 public class EquipmentSlot
@@ -21,6 +19,16 @@ public class EquipmentManager : MonoBehaviour
     public Transform equipmentPage;
     [SerializeField] public List<EquipmentSlot> equipmentSlots = new();
 
+    [Header("Equipment Stat Block")]
+    [Tooltip("å·¦å´ï¼šHealth / Defence / Energy Efficiency / Speed")]
+    public TextMeshProUGUI leftStatBlock;
+    [Tooltip("å³å´ï¼šLH Attack / RH Attack")]
+    public TextMeshProUGUI rightStatBlock;
+    [Tooltip("è‹¥ç‚º trueï¼šInfinity é¡¯ç¤ºç‚º âˆï¼›è‹¥ç‚º falseï¼šé¡¯ç¤ºç‚º Infinite")]
+    public bool showInfinitySymbol = true;
+
+    private bool _hookedPlayerStats;
+
     void Awake()
     {
         // If an instance already exists and it's not this one, destroy this new instance
@@ -33,6 +41,91 @@ public class EquipmentManager : MonoBehaviour
         Instance = this;
     }
 
+    private void OnEnable()
+    {
+        HookPlayerStatsEvents();
+    }
+
+    private void Start()
+    {
+        HookPlayerStatsEvents();
+        RefreshEquipmentStatBlock();
+    }
+
+    private void OnDisable()
+    {
+        UnhookPlayerStatsEvents();
+    }
+
+    private void HookPlayerStatsEvents()
+    {
+        if (_hookedPlayerStats) return;
+        if (PlayerStats.Instance == null) return;
+
+        PlayerStats.Instance.OnHandWeaponDataChanged += RefreshEquipmentStatBlock;
+        _hookedPlayerStats = true;
+    }
+
+    private void UnhookPlayerStatsEvents()
+    {
+        if (!_hookedPlayerStats) return;
+        if (PlayerStats.Instance == null) return;
+
+        PlayerStats.Instance.OnHandWeaponDataChanged -= RefreshEquipmentStatBlock;
+        _hookedPlayerStats = false;
+    }
+
+    // ===== Equipment Stat Block UI =====
+    public void RefreshEquipmentStatBlock()
+    {
+        if (leftStatBlock == null || rightStatBlock == null)
+            return;
+
+        var ps = PlayerStats.Instance;
+        if (ps == null)
+        {
+            leftStatBlock.text = string.Empty;
+            rightStatBlock.text = string.Empty;
+            return;
+        }
+
+        int health = ps.GetDisplayHealth();
+        int defence = ps.GetDisplayDefenceAverage();
+        int speed = ps.GetDisplaySpeed();
+        var eff = ps.GetEnergyEfficiencyInfo();
+
+        string flyStr;
+        if (eff.flyInfinite || float.IsPositiveInfinity(eff.flySustainSeconds))
+            flyStr = showInfinitySymbol ? "âˆ" : "Infinite";
+        else
+            flyStr = $"{FormatNumber(eff.flySustainSeconds)}s";
+
+        string dashCountStr = (eff.dashCountFromFull == int.MaxValue)
+            ? (showInfinitySymbol ? "âˆ" : "Infinite")
+            : eff.dashCountFromFull.ToString();
+
+        string dashRateStr = float.IsPositiveInfinity(eff.sustainableDashPerSecond)
+            ? (showInfinitySymbol ? "âˆ/s" : "Infinite/s")
+            : $"{FormatNumber(eff.sustainableDashPerSecond)}/s";
+
+        leftStatBlock.text =
+            $"Health: {health}\n" +
+            $"Defence: {defence}\n" +
+            $"EN Efficiency: Fly {flyStr} | Dash {dashCountStr} ({dashRateStr})\n" +
+            $"Speed: {speed}";
+
+        rightStatBlock.text =
+            $"LH Attack: {ps.GetDisplayLhAttack()}\n" +
+            $"RH Attack: {ps.GetDisplayRhAttack()}";
+    }
+
+    private static string FormatNumber(float v)
+    {
+        if (Mathf.Abs(v - Mathf.Round(v)) < 0.0001f)
+            return Mathf.RoundToInt(v).ToString();
+        return v.ToString("0.##");
+    }
+
     public bool TryEquipFromInventory(ItemInstance item)
     {
         if (item == null || item.item == null) return false;
@@ -43,11 +136,11 @@ public class EquipmentManager : MonoBehaviour
 
             if (slot.equipmentType != item.item.type) continue;
 
-            // ²M±¼ÂÂ¹ê¨Ò
+            // Â²MÂ±Â¼Ã‚Ã‚Â¹ÃªÂ¨Ã’
             if (slot.equipedItem) Destroy(slot.equipedItem);
 
             Debug.Log($"TryEquipFromInventory: found matching slot {i} for item {item.item.itemName}");
-            // ¸Ë¥Ò¡G¥Í¦¨¨Ã¸j°©
+            // Â¸Ã‹Â¥Ã’Â¡GÂ¥ÃÂ¦Â¨Â¨ÃƒÂ¸jÂ°Â©
             if (item.item is Armor armor && armor.skinnedMeshRenderer)
             {
                 Debug.Log($"TryEquipFromInventory: equipping armor {armor.itemName} to slot {i}");
@@ -56,21 +149,21 @@ public class EquipmentManager : MonoBehaviour
                 if (!slot.equipedItem)
                 {
                     Debug.LogWarning("TryEquipFromInventory: BoneCombiner failed to instantiate mesh");
-                    return false; // ¹ê¨Ò¤Æ¥¢±Ñ®É¤£­n·í§@¦¨¥\
+                    return false; // Â¹ÃªÂ¨Ã’Â¤Ã†Â¥Â¢Â±Ã‘Â®Ã‰Â¤Â£Â­nÂ·Ã­Â§@Â¦Â¨Â¥\
                 }
                 Debug.Log($"TryEquipFromInventory: equipped armor instance created for {armor.itemName}");
                 slot.item = item;
 
-                // ­Y¦³¦s¦â±m¡A³o¸Ì®M¦^¥h¡]¥i¿ï¡^
+                // Â­YÂ¦Â³Â¦sÂ¦Ã¢Â±mÂ¡AÂ³oÂ¸ÃŒÂ®MÂ¦^Â¥hÂ¡]Â¥iÂ¿Ã¯Â¡^
                 if (item is ArmorInstance ai && slot.equipedItem)
                 {
                     var smr = slot.equipedItem.GetComponent<SkinnedMeshRenderer>();
                     if (smr)
                     {
-                        var mat = smr.material; // ¨C¥ó¸Ë³Æ¿W¥ß§÷½è
+                        var mat = smr.material; // Â¨CÂ¥Ã³Â¸Ã‹Â³Ã†Â¿WÂ¥ÃŸÂ§Ã·Â½Ã¨
                         if (!string.IsNullOrEmpty(ai.shaderName))
                         {
-                            // ½d¨Ò¡G¨Ì shaderName ®M¦^ÃC¦â
+                            // Â½dÂ¨Ã’Â¡GÂ¨ÃŒ shaderName Â®MÂ¦^ÃƒCÂ¦Ã¢
                             if (ai.shaderName.Contains("Mix 3") && ai.colors.Count >= 3)
                             {
                                 mat.SetColor("_BaseColor", ai.colors[0]);
@@ -93,13 +186,14 @@ public class EquipmentManager : MonoBehaviour
                     }
                 }
                 Debug.Log($"TryEquipFromInventory: armor {armor.itemName} equipped to slot {i}");
-                // ¡¹ ¸Ë³Æ¦¨¥\«á­«ºâÄİ©Ê
+                // Â¡Â¹ Â¸Ã‹Â³Ã†Â¦Â¨Â¥\Â«Ã¡Â­Â«ÂºÃ¢Ã„ÃÂ©ÃŠ
                 PlayerStats.Instance?.RecalculateFromEquipment();
-                return true; // ¦¨¥\«á¥ß§Y¦^¶Ç
+                RefreshEquipmentStatBlock();
+                return true; // Â¦Â¨Â¥\Â«Ã¡Â¥ÃŸÂ§YÂ¦^Â¶Ã‡
             }
-            return false; // Ãş«¬§k¦X¦ı¤£¬O Armor¡]©Î¯ÊRenderer¡^
+            return false; // ÃƒÃ¾Â«Â¬Â§kÂ¦XÂ¦Ã½Â¤Â£Â¬O ArmorÂ¡]Â©ÃÂ¯ÃŠRendererÂ¡^
         }
-        return false; // §ä¤£¨ì¹ïÀ³¼Ñ
+        return false; // Â§Ã¤Â¤Â£Â¨Ã¬Â¹Ã¯Ã€Â³Â¼Ã‘
     }
     public bool TryEquipWeaponFromInventory(ItemInstance item, Transform mountPoint, int slotIndex)
     {
@@ -121,17 +215,17 @@ public class EquipmentManager : MonoBehaviour
             return false;
         }
 
-        // ²M±¼³o¤@®æ­ì¥»ªºªZ¾¹
+        // Â²MÂ±Â¼Â³oÂ¤@Â®Ã¦Â­Ã¬Â¥Â»ÂªÂºÂªZÂ¾Â¹
         if (slot.equipedItem) Destroy(slot.equipedItem);
 
-        // ¥u³B²z RangeWeaponInstance
+        // Â¥uÂ³BÂ²z RangeWeaponInstance
         if (item is not RangeWeaponInstance rwi || rwi.item is not RangeWeapon rw)
         {
             Debug.LogWarning("TryEquipWeaponFromInventory: item is not RangeWeaponInstance/RangeWeapon");
             return false;
         }
 
-        // 1) ¥DªZ¾¹±¾¦b mountPoint¡]³õ´ºª«¥ó¡^
+        // 1) Â¥DÂªZÂ¾Â¹Â±Â¾Â¦b mountPointÂ¡]Â³ÃµÂ´ÂºÂªÂ«Â¥Ã³Â¡^
         slot.equipedItem = Instantiate(rw.weaponPrefab, mountPoint, false);
         slot.equipedItem.transform.localRotation = Quaternion.Euler(new Vector3(-90, 90, 0));
         slot.item = item;
@@ -141,13 +235,13 @@ public class EquipmentManager : MonoBehaviour
         }
 
 
-        // 1-1) §â RangeWeaponInstance ¤W¦sªºÃC¦â®M¦^¥h
+        // 1-1) Â§Ã¢ RangeWeaponInstance Â¤WÂ¦sÂªÂºÃƒCÂ¦Ã¢Â®MÂ¦^Â¥h
         if (rwi.colors != null && rwi.colors.Count > 0 && !string.IsNullOrEmpty(rwi.shaderName))
         {
             var rend = slot.equipedItem.GetComponentInChildren<Renderer>();
             if (rend)
             {
-                var mat = rend.material; // ¹ê¨Ò§÷½è
+                var mat = rend.material; // Â¹ÃªÂ¨Ã’Â§Ã·Â½Ã¨
                 if (rwi.shaderName.Contains("Mix 3") && rwi.colors.Count >= 3)
                 {
                     mat.SetColor("_BaseColor", rwi.colors[0]);
@@ -170,7 +264,7 @@ public class EquipmentManager : MonoBehaviour
             }
         }
 
-        // 2) ªş¥ó±¾¦b¡u¥DªZ¾¹¹ê¨Ò¡v¤Wªº¦P¦W±¾ÂI¡A¨Ã®M¦^ÃC¦â
+        // 2) ÂªÃ¾Â¥Ã³Â±Â¾Â¦bÂ¡uÂ¥DÂªZÂ¾Â¹Â¹ÃªÂ¨Ã’Â¡vÂ¤WÂªÂºÂ¦PÂ¦WÂ±Â¾Ã‚IÂ¡AÂ¨ÃƒÂ®MÂ¦^ÃƒCÂ¦Ã¢
         if (rwi.attachment != null)
         {
             foreach (var attach in rwi.attachment)
@@ -192,7 +286,7 @@ public class EquipmentManager : MonoBehaviour
                     part.transform.localPosition = Vector3.zero;
                     part.transform.localRotation = Quaternion.identity;
                     part.transform.localScale = Vector3.one;
-                    if (FindChildRecursive(part.transform, "MuzzlePoint")!=null)
+                    if (FindChildRecursive(part.transform, "MuzzlePoint") != null)
                     {
                         rwi.muzzlePoint = FindChildRecursive(part.transform, "MuzzlePoint");
                     }
@@ -229,6 +323,7 @@ public class EquipmentManager : MonoBehaviour
         }
 
         PlayerStats.Instance?.RecalculateFromEquipment();
+        RefreshEquipmentStatBlock();
         Debug.Log($"Equipped weapon '{rw.itemName}' to slot index {slotIndex}");
         return true;
     }
@@ -238,9 +333,10 @@ public class EquipmentManager : MonoBehaviour
     {
         EquipmentSlot slot = equipmentSlots[equipmentSlotsIndex];
         Destroy(slot.equipedItem);
-        slot.equipedItem = null; 
+        slot.equipedItem = null;
         slot.item = null;
         PlayerStats.Instance?.RecalculateFromEquipment();
+        RefreshEquipmentStatBlock();
     }
     private static Transform FindChildRecursive(Transform root, string name)
     {

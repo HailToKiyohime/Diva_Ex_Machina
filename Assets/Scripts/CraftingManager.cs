@@ -67,6 +67,8 @@ public class CraftingManager : MonoBehaviour
     public Canvas tooltipCanvas;
     [Tooltip("Tooltip 相對滑鼠的偏移（像素）。")]
     public Vector2 tooltipOffset = new Vector2(16f, -16f);
+    [Tooltip("若為 true：顯示 (current -> new)；若為 false：只顯示 +/- 差異。 ")]
+    public bool tooltipShowCurrentAndNew = true;
     [Tooltip("若為 true：差異為 0 的屬性也會顯示。通常建議關閉以保持乾淨。 ")]
     public bool tooltipShowZeroDiff = false;
 
@@ -895,8 +897,8 @@ public class CraftingManager : MonoBehaviour
                 float oldFactor = o.hasMul ? o.mul : 1f;
                 float newFactor = n.hasMul ? n.mul : 1f;
 
-                string oldDisp = FormatMulOrZero(oldFactor);
-                string newDisp = FormatMulOrZero(newFactor);
+                string oldDisp = FormatMulOrZero(attr, oldFactor);
+                string newDisp = FormatMulOrZero(attr, newFactor);
 
                 string label = both ? $"{PrettyAttrName(attr)} (Mul)" : PrettyAttrName(attr);
                 string coloredNew = ColorizeNewValue(attr, oldFactor, newFactor, newDisp, isMultiplier: true);
@@ -962,13 +964,28 @@ public class CraftingManager : MonoBehaviour
 
     private string FormatAddOrZero(Attributes attr, float v)
     {
-        if (Mathf.Abs(v) < 0.0001f) return "0";
+        // For count-like stats, a "0" modifier means baseline is effectively x1.
+        // Showing 0 here is confusing (e.g. RoundPerPull: (0 -> x6) implies "shoot 0 rounds").
+        if (Mathf.Abs(v) < 0.0001f)
+        {
+            if (attr == Attributes.RoundPerPull || attr == Attributes.BulletPerShot)
+                return "x1";
+            return "0";
+        }
+
         return FormatAddValue(attr, v);
     }
 
-    private static string FormatMulOrZero(float factor)
+    private static string FormatMulOrZero(Attributes attr, float factor)
     {
-        if (Mathf.Abs(factor - 1f) < 0.0001f) return "0";
+        // Same baseline rule as above: for count-like stats, baseline should display as x1.
+        if (Mathf.Abs(factor - 1f) < 0.0001f)
+        {
+            if (attr == Attributes.RoundPerPull || attr == Attributes.BulletPerShot)
+                return "x1";
+            return "0";
+        }
+
         return $"x{FormatNumberStatic(factor)}";
     }
 
@@ -993,8 +1010,11 @@ public class CraftingManager : MonoBehaviour
             case Attributes.Spread:
                 return $"{v:0.##}°";
             case Attributes.MagazineSize:
+                return Mathf.RoundToInt(v).ToString();
             case Attributes.BulletPerShot:
+                return $"x{Mathf.Max(1, Mathf.RoundToInt(v))}";
             case Attributes.RoundPerPull:
+                return $"x{Mathf.Max(1, Mathf.RoundToInt(v))}";
             case Attributes.FiringMode:
                 return Mathf.RoundToInt(v).ToString();
             default:
@@ -1032,9 +1052,11 @@ public class CraftingManager : MonoBehaviour
             case Attributes.Spread:
                 return $"{v:0.##}°";
             case Attributes.MagazineSize:
-            case Attributes.BulletPerShot:
-            case Attributes.RoundPerPull:
                 return Mathf.RoundToInt(v).ToString();
+            case Attributes.BulletPerShot:
+                return $"x{Mathf.Max(1, Mathf.RoundToInt(v))}";
+            case Attributes.RoundPerPull:
+                return $"x{Mathf.Max(1, Mathf.RoundToInt(v))}";
             default:
                 return FormatNumber(v);
         }

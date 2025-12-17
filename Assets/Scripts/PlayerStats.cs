@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
-using System; 
+using System;
 
 public enum BuffApplyMode
 {
@@ -189,6 +189,18 @@ public class PlayerStats : MonoBehaviour
     public int leftWeaponSlotIndex = -1;
     public int rightWeaponSlotIndex = -1;
 
+    [System.Serializable]
+    public struct EnergyEfficiencyInfo
+    {
+        // FlyEnergyCost 是「每秒」，EnergyRegen 是「每秒」
+        public bool flyInfinite;
+        public float flySustainSeconds;
+
+        // DashEnergyCost 是「每次」
+        public int dashCountFromFull;
+        public float sustainableDashPerSecond;
+    }
+
     void Awake()
     {
         if (Instance != null && Instance != this)
@@ -229,13 +241,14 @@ public class PlayerStats : MonoBehaviour
 
         sprintSpeed = baseStats.sprintSpeed;
         accelerationSpeed = baseStats.accelerationSpeed;
-        decelerationSpeed = baseStats.decelerationSpeed;    
+        decelerationSpeed = baseStats.decelerationSpeed;
         dashSpeed = baseStats.dashSpeed;
 
         jumpHeight = baseStats.jumpHeight;
         flySpeed = baseStats.flySpeed;
         flyAcceleration = baseStats.flyAcceleration;
         maxHealth = baseStats.maxHealth;
+        aimingDistance = baseStats.aimingDistance;
     }
     public void RecalculateFromEquipment()
     {
@@ -250,8 +263,11 @@ public class PlayerStats : MonoBehaviour
             EquipmentManager.Instance.equipmentSlots == null)
             return;
 
-        // ★新增：收集全身 buffs（不含左右手手甲）
+        // 全身（Global）與武器（Weapon）加成要分流：
+        // - 全身：影響 leftStatBlock（Health/Defence/Energy/Speed）與全域 critical
+        // - 武器：影響左右手武器最終屬性（包含：Head 等非手甲帶來的武器屬性）
         List<EquipmentBuff> globalBuffs = new List<EquipmentBuff>();
+        List<EquipmentBuff> sharedWeaponBuffs = new List<EquipmentBuff>();
 
         List<EquipmentSlot> slots = EquipmentManager.Instance.equipmentSlots;
         for (int i = 0; i < slots.Count; i++)
@@ -273,17 +289,19 @@ public class PlayerStats : MonoBehaviour
                 if (slot.equipmentType == ItemType.LeftHandArmor)
                 {
                     leftHand.handArmor = armorInst;
-                    AddBuffListToWeapon(leftHand, armorInst.buffs);
+                    DistributeArmorBuffs(armorInst.buffs, isHandArmor: true, globalBuffs, weaponBuffs: leftHand.buffs, sharedWeaponBuffs);
                 }
                 else if (slot.equipmentType == ItemType.RightHandArmor)
                 {
                     rightHand.handArmor = armorInst;
-                    AddBuffListToWeapon(rightHand, armorInst.buffs);
+                    DistributeArmorBuffs(armorInst.buffs, isHandArmor: true, globalBuffs, weaponBuffs: rightHand.buffs, sharedWeaponBuffs);
                 }
                 else
                 {
-                    // ★原本是 ApplyBuffListToGlobal(armorInst.buffs);
-                    if (armorInst.buffs != null) globalBuffs.AddRange(armorInst.buffs);
+                    // 非手甲：
+                    // - Global 類屬性進 globalBuffs
+                    // - Weapon 類屬性（例如 Spread）進 sharedWeaponBuffs，套用到左右手武器
+                    DistributeArmorBuffs(armorInst.buffs, isHandArmor: false, globalBuffs, weaponBuffs: null, sharedWeaponBuffs);
                 }
             }
             else if (inst is RangeWeaponInstance rangeWeaponInst && i == leftWeaponSlotIndex)
@@ -298,6 +316,24 @@ public class PlayerStats : MonoBehaviour
             }
         }
 
+        // 如果主人只拿一把武器：把另一手手甲的「武器側」buff 也加到這把武器上
+        // （例：Spread 兩手疊加到唯一武器；將來手甲若有其他武器屬性也一併支援）
+        if (leftHand.weapon != null && rightHand.weapon == null && rightHand.buffs.Count > 0)
+        {
+            leftHand.buffs.AddRange(rightHand.buffs);
+        }
+        else if (rightHand.weapon != null && leftHand.weapon == null && leftHand.buffs.Count > 0)
+        {
+            rightHand.buffs.AddRange(leftHand.buffs);
+        }
+
+        // Head / Body 等「非手甲」提供的武器屬性，對左右手武器都生效
+        if (sharedWeaponBuffs.Count > 0)
+        {
+            leftHand.buffs.AddRange(sharedWeaponBuffs);
+            rightHand.buffs.AddRange(sharedWeaponBuffs);
+        }
+
         // ★最後統一套用（先加後乘）
         ApplyBuffListToGlobal(globalBuffs);
 
@@ -308,6 +344,124 @@ public class PlayerStats : MonoBehaviour
     {
         if (buffs == null) return;
         target.buffs.AddRange(buffs);
+    }
+
+    // ======= Buff 分流規則（Armor buffs -> Global / Weapon） =======
+    private static bool IsCriticalAttribute(Attributes attr)
+        => attr == Attributes.CriticalChance || attr == Attributes.CriticalMultiplier;
+
+    private static bool IsGlobalAttribute(Attributes attr)
+    {
+        switch (attr)
+        {
+            // Defence
+            case Attributes.PhysicalDefense:
+            case Attributes.ExplosionDefense:
+            case Attributes.EnergyDefense:
+            case Attributes.ColdDefense:
+            // Energy
+            case Attributes.MaxEnergy:
+            case Attributes.EnergyRegen:
+            case Attributes.DashEnergyCost:
+            case Attributes.FlyEnergyCost:
+            // Movement
+            case Attributes.SprintSpeed:
+            case Attributes.AccelerationSpeed:
+            case Attributes.DecelerationSpeed:
+            case Attributes.DashSpeed:
+            // Jump / Fly
+            case Attributes.JumpHeight:
+            case Attributes.FlySpeed:
+            case Attributes.FlyAcceleration:
+            // Health
+            case Attributes.MaxHealth:
+            // Aiming
+            case Attributes.AimingDistance:
+                return true;
+        }
+        return false;
+    }
+
+    private static bool IsWeaponAttribute(Attributes attr)
+    {
+        switch (attr)
+        {
+            // Damage Type
+            case Attributes.PhysicalDamage:
+            case Attributes.ExplosionDamage:
+            case Attributes.EnergyDamage:
+            case Attributes.ColdDamage:
+            // Range Weapon Specific
+            case Attributes.ReloadTime:
+            case Attributes.BulletPerShot:
+            case Attributes.RoundPerPull:
+            case Attributes.TimeBetweenShooting:
+            case Attributes.TimeBetweenShots:
+            case Attributes.Spread:
+            case Attributes.MagazineSize:
+            case Attributes.BulletSpeed:
+            case Attributes.FiringMode:
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 把 Armor buffs 依規則分流到：
+    /// - globalBuffs：全身屬性（Health/Defence/Energy/Speed...）+ 非手甲的 Critical
+    /// - weaponBuffs：手甲的武器側屬性（含手甲 Critical）
+    /// - sharedWeaponBuffs：非手甲提供的武器側屬性（例如 Head 的 Spread），套用到左右手武器
+    /// </summary>
+    private static void DistributeArmorBuffs(
+        List<EquipmentBuff> buffs,
+        bool isHandArmor,
+        List<EquipmentBuff> globalBuffs,
+        List<EquipmentBuff> weaponBuffs,
+        List<EquipmentBuff> sharedWeaponBuffs)
+    {
+        if (buffs == null) return;
+
+        for (int i = 0; i < buffs.Count; i++)
+        {
+            var b = buffs[i];
+
+            // Critical：依裝備位決定是否算作 Global 或 Weapon-side
+            if (IsCriticalAttribute(b.attribute))
+            {
+                if (isHandArmor)
+                {
+                    if (weaponBuffs != null) weaponBuffs.Add(b);
+                }
+                else
+                {
+                    if (globalBuffs != null) globalBuffs.Add(b);
+                }
+                continue;
+            }
+
+            // 全身屬性：永遠進 global
+            if (IsGlobalAttribute(b.attribute))
+            {
+                if (globalBuffs != null) globalBuffs.Add(b);
+                continue;
+            }
+
+            // 武器屬性：手甲->該手；非手甲->共享（左右手都吃）
+            if (IsWeaponAttribute(b.attribute))
+            {
+                if (isHandArmor)
+                {
+                    if (weaponBuffs != null) weaponBuffs.Add(b);
+                }
+                else
+                {
+                    if (sharedWeaponBuffs != null) sharedWeaponBuffs.Add(b);
+                }
+                continue;
+            }
+
+            // 其他未知屬性：目前不處理（避免把未定義的武器狀態誤加到 global）
+        }
     }
 
     // ======= local function: 全身屬性累積 =======
@@ -389,6 +543,110 @@ public class PlayerStats : MonoBehaviour
             case Attributes.MaxHealth: maxHealth *= m; break;
             case Attributes.AimingDistance: aimingDistance *= m; break;
         }
+    }
+
+    // ======= Equipment Stat Block（計算用：先把數值算穩） =======
+    public int GetDisplayHealth() => Mathf.RoundToInt(maxHealth);
+
+    public int GetDisplayDefenceAverage()
+    {
+        float avg = (physicalDefense + explosionDefense + energyDefense + coldDefense) / 4f;
+        return Mathf.RoundToInt(avg);
+    }
+
+    public int GetDisplaySpeed() => Mathf.RoundToInt(sprintSpeed);
+
+    /// <summary>
+    /// Energy Efficiency：同時考慮 Fly（每秒）與 Dash（每次）兩種成本。
+    /// - Fly：以「可連續飛行的秒數」呈現（若 regen >= cost 則為無限）
+    /// - Dash：
+    ///   1) 滿能量可 dash 幾次
+    ///   2) 以 regen 可支撐的 dash/秒
+    /// </summary>
+    public EnergyEfficiencyInfo GetEnergyEfficiencyInfo()
+    {
+        var info = new EnergyEfficiencyInfo();
+
+        // Fly（每秒）
+        float netFlyDrain = flyEnergyCost - energyRegen;
+        if (netFlyDrain <= 0f)
+        {
+            info.flyInfinite = true;
+            info.flySustainSeconds = float.PositiveInfinity;
+        }
+        else
+        {
+            info.flyInfinite = false;
+            info.flySustainSeconds = (maxEnergy <= 0f) ? 0f : (maxEnergy / netFlyDrain);
+        }
+
+        // Dash（每次）
+        if (dashEnergyCost <= 0f)
+        {
+            info.dashCountFromFull = int.MaxValue;
+            info.sustainableDashPerSecond = float.PositiveInfinity;
+        }
+        else
+        {
+            info.dashCountFromFull = Mathf.Max(0, Mathf.FloorToInt(maxEnergy / dashEnergyCost));
+            info.sustainableDashPerSecond = Mathf.Max(0f, energyRegen / dashEnergyCost);
+        }
+
+        return info;
+    }
+
+    public int GetDisplayLhAttack() => Mathf.RoundToInt(GetHandExpectedDps(isLeftHand: true));
+    public int GetDisplayRhAttack() => Mathf.RoundToInt(GetHandExpectedDps(isLeftHand: false));
+
+    public float GetHandExpectedDps(bool isLeftHand)
+    {
+        var hand = isLeftHand ? leftHand : rightHand;
+        if (hand == null || hand.weapon == null) return 0f;
+
+        float baseDamage =
+            hand.GetAttribute(Attributes.PhysicalDamage) +
+            hand.GetAttribute(Attributes.ExplosionDamage) +
+            hand.GetAttribute(Attributes.EnergyDamage) +
+            hand.GetAttribute(Attributes.ColdDamage);
+
+        if (baseDamage <= 0f) return 0f;
+
+        float mergedCritChance = Mathf.Clamp01(ApplyHandBuffsToBase(criticalChance, hand, Attributes.CriticalChance));
+        float mergedCritMultiplier = ApplyHandBuffsToBase(criticalMultiplier, hand, Attributes.CriticalMultiplier);
+        if (mergedCritMultiplier < 1f) mergedCritMultiplier = 1f;
+
+        // 注意：BulletPerShot / RoundPerPull 若算出 0，顯示與計算都要視為 x1
+        int bulletPerShotInt = Mathf.Max(1, Mathf.RoundToInt(hand.GetAttribute(Attributes.BulletPerShot)));
+        int roundPerPullInt = Mathf.Max(1, Mathf.RoundToInt(hand.GetAttribute(Attributes.RoundPerPull)));
+
+        float timeBetweenShootingFinal = hand.GetAttribute(Attributes.TimeBetweenShooting);
+        if (timeBetweenShootingFinal <= 0.0001f) return 0f;
+
+        float expectedPerTrigger =
+            (1f - mergedCritChance) * baseDamage +
+            mergedCritChance * (mergedCritMultiplier * baseDamage);
+
+        float shotsPerSecond = 1f / timeBetweenShootingFinal;
+        return expectedPerTrigger * bulletPerShotInt * roundPerPullInt * shotsPerSecond;
+    }
+
+    private static float ApplyHandBuffsToBase(float baseValue, WeaponStats hand, Attributes attr)
+    {
+        if (hand == null || hand.buffs == null || hand.buffs.Count == 0) return baseValue;
+
+        float add = 0f;
+        float mul = 1f;
+
+        for (int i = 0; i < hand.buffs.Count; i++)
+        {
+            var b = hand.buffs[i];
+            if (b.attribute != attr) continue;
+
+            if (b.mode == BuffApplyMode.Add) add += b.value;
+            else if (b.mode == BuffApplyMode.Multiplier) mul *= (1f + b.value);
+        }
+
+        return (baseValue + add) * mul;
     }
 
     public VisualChange CurrentLegVisual { get; private set; } = new VisualChange()
