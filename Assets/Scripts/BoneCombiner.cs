@@ -11,7 +11,7 @@ public class BoneCombiner : MonoBehaviour
     [SerializeField] private Transform rootBone;
     private PlayerControllers playerController;
 
-    public GameObject legs;
+    public GameObject[] legs;
 
 
     //private Inputs
@@ -52,5 +52,27 @@ public class BoneCombiner : MonoBehaviour
         inst.bones = originalSkinnedMeshRenderer.bones;  // 綁到玩家骨架
         inst.rootBone = rootBone;
         return inst.gameObject;
+    }
+
+    public void HideLegs()
+    {
+        for (int i = 0; i < legs.Length; i++)
+        {
+            if (legs[i] != null)
+            {
+                legs[i].SetActive(false);
+            }
+        }
+    }
+
+    public void ShowLegs()
+    {
+        for (int i = 0; i < legs.Length; i++)
+        {
+            if (legs[i] != null)
+            {
+                legs[i].SetActive(true);
+            }
+        }
     }
 }

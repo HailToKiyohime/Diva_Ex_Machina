@@ -20,12 +20,15 @@ public class EquipmentManager : MonoBehaviour
     [SerializeField] public List<EquipmentSlot> equipmentSlots = new();
 
     [Header("Equipment Stat Block")]
-    [Tooltip("左側：Health / Defence / Energy Efficiency / Speed")]
+    [Tooltip("Left side: Health / Defence / Jump Height / Max EN / EN regeneration / Rate of Climb / Dash Speed / Cruising Speed")]
     public TextMeshProUGUI leftStatBlock;
-    [Tooltip("右側：LH Attack / RH Attack")]
+    [Tooltip("Right side: LH Attack / RH Attack")]
     public TextMeshProUGUI rightStatBlock;
-    [Tooltip("若為 true：Infinity 顯示為 ∞；若為 false：顯示為 Infinite")]
-    public bool showInfinitySymbol = true;
+
+    [Tooltip("TMP <pos=...> for left value column")]
+    public float leftValuePos = 180f;
+    [Tooltip("TMP <pos=...> for right value column")]
+    public float rightValuePos = 150f;
 
     private bool _hookedPlayerStats;
 
@@ -89,42 +92,37 @@ public class EquipmentManager : MonoBehaviour
             return;
         }
 
-        int health = ps.GetDisplayHealth();
-        int defence = ps.GetDisplayDefenceAverage();
-        int speed = ps.GetDisplaySpeed();
-        var eff = ps.GetEnergyEfficiencyInfo();
+        // Left side (8 stats)
+        string left =
+            LineLeft("Health", ps.GetDisplayHealth()) + "\n" +
+            LineLeft("Defence", ps.GetDisplayDefenceAverage()) + "\n" +
+            LineLeft("Jump Height", FormatFloat(ps.GetDisplayJumpHeight())) + "\n" +
+            LineLeft("Max EN", ps.GetDisplayMaxEnergy()) + "\n" +
+            LineLeft("EN regeneration", FormatFloat(ps.GetDisplayEnergyRegen())) + "\n" +
+            LineLeft("Rate of Climb", FormatFloat(ps.GetDisplayFlySpeed())) + "\n" +
+            LineLeft("Dash Speed", FormatFloat(ps.GetDisplayDashSpeed())) + "\n" +
+            LineLeft("Cruising Speed", FormatFloat(ps.GetDisplaySprintSpeed()));
 
-        string flyStr;
-        if (eff.flyInfinite || float.IsPositiveInfinity(eff.flySustainSeconds))
-            flyStr = showInfinitySymbol ? "∞" : "Infinite";
-        else
-            flyStr = $"{FormatNumber(eff.flySustainSeconds)}s";
+        // Right side (2 stats)
+        string right =
+            LineRight("LH Attack", ps.GetDisplayLhAttack()) + "\n" +
+            LineRight("RH Attack", ps.GetDisplayRhAttack());
 
-        string dashCountStr = (eff.dashCountFromFull == int.MaxValue)
-            ? (showInfinitySymbol ? "∞" : "Infinite")
-            : eff.dashCountFromFull.ToString();
-
-        string dashRateStr = float.IsPositiveInfinity(eff.sustainableDashPerSecond)
-            ? (showInfinitySymbol ? "∞/s" : "Infinite/s")
-            : $"{FormatNumber(eff.sustainableDashPerSecond)}/s";
-
-        leftStatBlock.text =
-            $"Health: {health}\n" +
-            $"Defence: {defence}\n" +
-            $"EN Efficiency: Fly {flyStr} | Dash {dashCountStr} ({dashRateStr})\n" +
-            $"Speed: {speed}";
-
-        rightStatBlock.text =
-            $"LH Attack: {ps.GetDisplayLhAttack()}\n" +
-            $"RH Attack: {ps.GetDisplayRhAttack()}";
+        leftStatBlock.text = left;
+        rightStatBlock.text = right;
     }
 
-    private static string FormatNumber(float v)
-    {
-        if (Mathf.Abs(v - Mathf.Round(v)) < 0.0001f)
-            return Mathf.RoundToInt(v).ToString();
-        return v.ToString("0.##");
-    }
+    private string LineLeft(string label, int value)
+        => $"{label}:<pos={leftValuePos}>{value}";
+
+    private string LineLeft(string label, string value)
+        => $"{label}:<pos={leftValuePos}>{value}";
+
+    private string LineRight(string label, int value)
+        => $"{label}:<pos={rightValuePos}>{value}";
+
+    private static string FormatFloat(float v)
+        => v.ToString("0.##");
 
     public bool TryEquipFromInventory(ItemInstance item)
     {

@@ -107,18 +107,37 @@ public class InventoryManager : MonoBehaviour
     // 主人：把每個「裝備槽 Toggle」的 OnValueChanged(bool) 只綁這個就好
     public void OnEquipmentSlotToggleChanged(bool isOn)
     {
-        if (!isOn) return;
+        // ON：照舊，走「開背包」或「切上色目標」
+        if (isOn)
+        {
+            if (IsColorMode)
+            {
+                OpenColorPage();
+            }
+            else
+            {
+                OpenInventoryPage();
+            }
+            return;
+        }
+
+        // OFF：如果目前已經沒有任何裝備槽被選中，就要把 UI 清乾淨
+        bool anySlotSelected = inventoryToggleGroup != null && inventoryToggleGroup.AnyTogglesOn();
+        if (anySlotSelected) return;
+
+        SetAllRemoveButtonsActive(false);
 
         if (IsColorMode)
         {
-            // Color Page 開著：只切上色目標 +（若槍）重建零件按鈕
-            OpenColorPage();
+            // Color Mode：清空零件按鈕 & ColorPicker 目標
+            CleanPartButtons();
+            ClearColorPickerState();
+            return;
         }
-        else
-        {
-            // Color Page 沒開：開背包清單（你原本的 inventory 清單）
-            OpenInventoryPage();
-        }
+
+        // Inventory Mode：清空右側清單，回到 Stat Page
+        ClearInventoryButton();
+        ShowStatPage();
     }
 
     #endregion
@@ -345,6 +364,9 @@ public class InventoryManager : MonoBehaviour
         if (index < 0 || index >= slots.Count)
         {
             Debug.LogWarning($"OpenInventoryPage: invalid slot index {index}");
+            ClearInventoryButton();
+            ShowStatPage();
+            SetAllRemoveButtonsActive(false);
             return;
         }
         OpenPartsInventory(slots[index].equipmentType);
@@ -358,6 +380,7 @@ public class InventoryManager : MonoBehaviour
         bool anySlotSelected = inventoryToggleGroup != null && inventoryToggleGroup.AnyTogglesOn();
         if (!anySlotSelected)
         {
+            ClearInventoryButton();
             ShowStatPage();
             SetAllRemoveButtonsActive(false);
             return;
@@ -421,8 +444,11 @@ public class InventoryManager : MonoBehaviour
 
     public void ClearInventoryButton()
     {
-        for (int i = itemsButtonParent.childCount - 1; i >= 0; i--)
-            Destroy(itemsButtonParent.GetChild(i).gameObject);
+        if (itemsButtonParent != null)
+        {
+            for (int i = itemsButtonParent.childCount - 1; i >= 0; i--)
+                Destroy(itemsButtonParent.GetChild(i).gameObject);
+        }
 
         toggleItemMap.Clear();
     }
@@ -481,6 +507,11 @@ public class InventoryManager : MonoBehaviour
             return;
         }
 
+        if( item.item.type == ItemType.LegsArmor){
+            BoneCombiner.Instance.HideLegs();
+        }
+        // UI 更新
+
         int idx = GetSelectedSlotIndex();
         if (idx >= 0)
         {
@@ -533,6 +564,10 @@ public class InventoryManager : MonoBehaviour
         int index = GetSelectedSlotIndex();
         if (index < 0) return;
 
+        if (EquipmentManager.Instance.equipmentSlots[index].equipmentType == ItemType.LegsArmor)
+        {
+            BoneCombiner.Instance.ShowLegs();
+        }
         EquipmentManager.Instance.CleanEquipmentSlot(index);
 
         SetRemoveButtonForSlot(index, false);

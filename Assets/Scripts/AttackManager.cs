@@ -108,14 +108,11 @@ public class AttackManager : MonoBehaviour
         outWeapon.coldDamage = hand.GetAttribute(Attributes.ColdDamage);
 
         outWeapon.reloadTime = hand.GetAttribute(Attributes.ReloadTime);
-        // BulletPerShot / RoundPerPull 代表「次數」，理論上不應該是 0；
-        // 若算出 0（例如 buff 缺漏或被減到 0），最少要視為 x1，避免武器完全無法射擊。
         outWeapon.bulletPerShot = Mathf.Max(1, Mathf.RoundToInt(hand.GetAttribute(Attributes.BulletPerShot)));
         outWeapon.roundPerTap = Mathf.Max(1, Mathf.RoundToInt(hand.GetAttribute(Attributes.RoundPerPull)));
         outWeapon.timeBetweenShooting = hand.GetAttribute(Attributes.TimeBetweenShooting);
         outWeapon.timeBetweenShots = hand.GetAttribute(Attributes.TimeBetweenShots);
         outWeapon.spread = hand.GetAttribute(Attributes.Spread);
-        // 同理，MagazineSize 最少要 1，否則會導致 bulletsLeft = 0 而永遠不能射擊
         outWeapon.magazineSize = Mathf.Max(1, Mathf.RoundToInt(hand.GetAttribute(Attributes.MagazineSize)));
         outWeapon.bulletSpeed = hand.GetAttribute(Attributes.BulletSpeed);
         outWeapon.firingMode = Mathf.RoundToInt(hand.GetAttribute(Attributes.FiringMode));
