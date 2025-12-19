@@ -19,18 +19,10 @@ MonoBehaviour:
   dropPrefab: {fileID: 0}
   skinnedMeshRenderer: {fileID: 3350046120491577610, guid: 17e5ed8abab316244bb23b6212ec04fd, type: 3}
   buffs:
-  - attribute: 3
-    value: 5
-  - attribute: 0
-    value: 6
-  - attribute: 6
-    value: 3
-  randomBuffs:
-  - buff:
-      attribute: 0
-      value: 5
-    weight: 5
-  - buff:
-      attribute: 5
-      value: 10
-    weight: 1
+  - attribute: 31
+    mode: 0
+    value: 100
+  - attribute: 32
+    mode: 0
+    value: 10
+  randomBuffs: []

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using Unity.Cinemachine;
+using TMPro;
 public class PlayerAiming : MonoBehaviour
 {
     public static PlayerAiming Instance { get; private set; }
@@ -27,12 +28,14 @@ public class PlayerAiming : MonoBehaviour
     [SerializeField] private float centerLerpSpeed = 10f;
     [SerializeField] private float crosshairTiltLerp = 12f;
     [SerializeField] private float resetTiltLerp = 8f;
+    [SerializeField] private float lockOnDistance = 25f;
     [Header("UI Speeds")]
     [SerializeField] private float crosshairLerpSpeed = 30f;
     [Header("Cursor Settings")]
     [SerializeField] private bool cursorLocked = true;
 
     [SerializeField] private Rigidbody currentTargetRb;
+
     void Awake()
     {
         if (Instance != null && Instance != this)
@@ -68,6 +71,7 @@ public class PlayerAiming : MonoBehaviour
                 playerOrientation.transform.rotation = Quaternion.Euler(turn.y, turn.x, 0f);
         }
         CrosshairDetect();
+        
     }
     private static float ClampAngle(float angle, float min, float max)
     {
@@ -116,19 +120,42 @@ public class PlayerAiming : MonoBehaviour
             : Mathf.Infinity;
         float pixelRadius = GetLockAreaPixelRadius();
         bool isInsideLockArea = closestProximity < pixelRadius;
-        if (isInsideLockArea && targetDistance < 50 && isVisible)
+        if (isInsideLockArea && targetDistance < lockOnDistance && isVisible)
         {
             DriveCrosshairTo(closestScreenPoint, true);
             if (aimingPoint) aimingPoint.position = closestEnemy.transform.position;
             lockOn = true;
+            UIManager.Instance.distanceText.text = targetDistance.ToString("F2");
+            UIManager.Instance.distanceText.color = UIManager.Instance.lockonColor;
+            UIManager.Instance.distanceText.fontStyle = FontStyles.Bold;
         }
         else
         {
             ray = mainCam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
             SmoothResetCrosshairToCenter();
+
             if (aimingPoint && playerOrientation.transform)
-                aimingPoint.position = playerOrientation.transform.position + (playerOrientation.transform.forward * 10f);
+                aimingPoint.position = playerOrientation.transform.position + (playerOrientation.transform.forward * 100f);
+
             lockOn = false;
+
+            const float maxDistance = 500f;
+
+            float distanceToPoint = 0f;
+            if (Physics.Raycast(ray, out RaycastHit hit, maxDistance, ~0, QueryTriggerInteraction.Ignore))
+            {
+                // hit.distance = 從 ray.origin 到命中點的距離（這才是「瞄到哪裡」的距離）
+                distanceToPoint = hit.distance;
+            }
+            else
+            {
+                // 沒打到東西：依主人需求，可顯示 0 或 maxDistance
+                distanceToPoint = 0f;
+            }
+
+            UIManager.Instance.distanceText.text = distanceToPoint.ToString("F2");
+            UIManager.Instance.distanceText.color = UIManager.Instance.normalColor;
+            UIManager.Instance.distanceText.fontStyle = FontStyles.Normal;
         }
     }
     private void DriveCrosshairTo(Vector2 screenPoint, bool tilt)
@@ -170,4 +197,15 @@ public class PlayerAiming : MonoBehaviour
     public Rigidbody GetTargetRigidbody() => currentTargetRb;
 
     public Ray GetRay() => ray;
+
+    public void SetLockOnDistance(float newLockOnDistance)
+    {
+        lockOnDistance = newLockOnDistance;
+    }
+    public void SetAimAreaSize(float newSize)
+    {
+        AimAreaImage.rectTransform.sizeDelta = new Vector2(newSize, newSize);
+        UIManager.Instance.speedInfo.anchoredPosition = new Vector2((newSize/2)+55,0);
+        UIManager.Instance.distanceInfo.anchoredPosition = new Vector2(-((newSize / 2) + 55), 0);
+    }
 }

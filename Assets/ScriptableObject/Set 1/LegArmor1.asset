@@ -21,10 +21,7 @@ MonoBehaviour:
   buffs:
   - attribute: 23
     mode: 0
-    value: 15
-  - attribute: 24
-    mode: 0
-    value: 3
+    value: 5
   - attribute: 24
     mode: 0
     value: -7
@@ -33,13 +30,13 @@ MonoBehaviour:
     value: 3
   - attribute: 27
     mode: 0
-    value: 0.5
+    value: -0.5
   - attribute: 28
     mode: 0
-    value: 0.5
+    value: 3
   - attribute: 29
     mode: 0
-    value: 30
+    value: 10
   randomBuffs: []
   visualChange:
     heightOffset: 0.3

@@ -50,7 +50,10 @@ public enum Attributes
     //Health
     MaxHealth,
     //Aiming
+    LockOnRange,
     AimingDistance,
+    //Weight,
+    Weight,
 }
 
 public enum AnimationType
@@ -129,7 +132,9 @@ public class BaseStats
     [Header("Base Health")]
     public float maxHealth = 1000f;
     [Header("Base Aiming")]
-    public float aimingDistance = 100f;
+    public float lockOnRange = 300f;
+    public float aimingDistance = 50f;
+
 }
 
 
@@ -179,6 +184,7 @@ public class PlayerStats : MonoBehaviour
     [Header("Health")]
     public float maxHealth;
     [Header("Aiming")]
+    public float lockOnRange;
     public float aimingDistance;
     [Header("手部武器狀態（只在執行時使用）")]
     public WeaponStats leftHand = new WeaponStats();
@@ -200,7 +206,6 @@ public class PlayerStats : MonoBehaviour
         public int dashCountFromFull;
         public float sustainableDashPerSecond;
     }
-
     public int GetDisplayHealth() => Mathf.RoundToInt(maxHealth);
 
     public int GetDisplayDefenceAverage()
@@ -249,6 +254,9 @@ public class PlayerStats : MonoBehaviour
     public int GetDisplayLhAttack() => Mathf.RoundToInt(GetHandExpectedDps(true));
     public int GetDisplayRhAttack() => Mathf.RoundToInt(GetHandExpectedDps(false));
 
+    public float GetLockedOnRange() => lockOnRange/2;
+
+    public float GetAimingDistance() => aimingDistance;
     /// <summary>
     /// 主人先前定義的 Energy Efficiency（保留 API，以後若要用可直接接 UI）。
     /// FlyCost: 每秒；DashCost: 每次。
@@ -339,6 +347,9 @@ public class PlayerStats : MonoBehaviour
 
         // (可選) 讓監聽者立刻刷新一次
         OnHandWeaponDataChanged?.Invoke();
+
+        PlayerAiming.Instance?.SetAimAreaSize(lockOnRange);
+        PlayerAiming.Instance?.SetLockOnDistance(aimingDistance);
     }
 
     /// <summary>
@@ -369,6 +380,8 @@ public class PlayerStats : MonoBehaviour
         flySpeed = baseStats.flySpeed;
         flyAcceleration = baseStats.flyAcceleration;
         maxHealth = baseStats.maxHealth;
+        lockOnRange = baseStats.lockOnRange;
+        aimingDistance = baseStats.aimingDistance;
     }
     public void RecalculateFromEquipment()
     {
@@ -468,6 +481,9 @@ public class PlayerStats : MonoBehaviour
 
         OnLegVisualChanged?.Invoke(CurrentLegVisual);
         OnHandWeaponDataChanged?.Invoke();
+        PlayerAiming.Instance?.SetAimAreaSize(lockOnRange);
+        PlayerAiming.Instance?.SetLockOnDistance(aimingDistance);
+        
     }
 
     // ======= helpers: buff classification / splitting =======
@@ -561,6 +577,7 @@ public class PlayerStats : MonoBehaviour
 
             case Attributes.MaxHealth: maxHealth += buff.value; break;
             case Attributes.AimingDistance: aimingDistance += buff.value; break;
+            case Attributes.LockOnRange: lockOnRange += buff.value; break;
         }
     }
     void ApplyMultiplierToGlobal(EquipmentBuff buff)
@@ -592,6 +609,7 @@ public class PlayerStats : MonoBehaviour
 
             case Attributes.MaxHealth: maxHealth *= m; break;
             case Attributes.AimingDistance: aimingDistance *= m; break;
+            case Attributes.LockOnRange: lockOnRange *= m; break;
         }
     }
 

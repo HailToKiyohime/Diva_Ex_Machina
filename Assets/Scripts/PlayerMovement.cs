@@ -21,6 +21,21 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private LayerMask whatIsGround;
     [SerializeField] private float flyInputBuffer = 0.12f; // 飛行請求緩衝（避免 Update/FixedUpdate 不同步漏掉）
     private float flyRequestUntil = 0f;
+    [Header("Fly Assist (fall boost)")]
+    [SerializeField] private float fallBoostStartSpeed = 3f;      // 下落速度超過這個才開始加成（m/s）
+    [SerializeField] private float fallBoostFullSpeed = 18f;      // 下落到這個速度時達到最大加成（m/s）
+    [SerializeField] private float fallBoostMaxMultiplier = 3.0f; // 最大加速倍數（例如 2~4）
+    [SerializeField] private float fallBoostCurvePower = 1.5f;    // 曲線：>1 更偏向高速下落才大幅加成
+    [Header("Dash")]
+    [SerializeField] private float dashDuration = 0.1f;     // 主人指定：只持續 0.1s
+    [SerializeField] private float dashInputBuffer = 0.12f; // 跟 fly 一樣避免漏吃
+    [SerializeField] private float dashCooldown = 0.25f;    // 可自行調
+    private float dashRequestUntil = 0f;
+    private float dashActiveUntil = 0f;
+    private float nextDashTime = 0f;
+    private Vector3 dashDir = Vector3.forward;
+    private float dashAccel = 0f;        // 固定加速度（m/s^2）
+    private float dashTargetSpeed = 0f;  // 目標 dash 速度
     [Header("Attack Facing")]
     [SerializeField] private float attackRotateSpeed = 25;         // 轉身速度
     [SerializeField] private float attackAngleThreshold = 6f;       // 允許開火的角度誤差
@@ -46,15 +61,18 @@ public class PlayerMovement : MonoBehaviour
     {
         EnergyRegenerationCheck();
         RotateCharacter();
+        UIManager.Instance.speedText.text = playerRigidbody.velocity.magnitude < 0.0001f ? 0.ToString("F2") : playerRigidbody.velocity.magnitude.ToString("F2");
     }
     public void FixedUpdate()
     {
         GroundCheck();
         ApplyHorizontalMovementFixed(Time.fixedDeltaTime);
         ApplyFlyFixed(Time.fixedDeltaTime); // 新增
+        ApplyDashFixed(Time.fixedDeltaTime); // 新增
     }
     private void ApplyHorizontalMovementFixed(float dt)
     {
+        if (Time.time <= dashActiveUntil) return;
         Vector3 v = playerRigidbody.velocity;
         Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
 
@@ -100,10 +118,12 @@ public class PlayerMovement : MonoBehaviour
         float targetVy = stats.flySpeed;
 
         // 用 accelerationSpeed 當作「飛行加速度（m/s^2）」讓 vy 逼近 targetVy
-        float newVy = Mathf.MoveTowards(v.y, targetVy, stats.flyAcceleration * dt);
+        if (stats.flySpeed != 0)
+        {
+            float newVy = Mathf.MoveTowards(v.y, targetVy, stats.flyAcceleration * dt);
 
-        playerRigidbody.velocity = new Vector3(v.x, newVy, v.z);
-
+            playerRigidbody.velocity = new Vector3(v.x, newVy, v.z);
+        }
         // 能量消耗用 fixed dt（不飄幀率）
         stats.currentEnergy = Mathf.Max(0f, stats.currentEnergy - dt * stats.flyEnergyCost);
 
@@ -234,16 +254,81 @@ public class PlayerMovement : MonoBehaviour
         }
         return false;
     }
+    private void ApplyDashFixed(float dt)
+    {
+        if (Time.time > dashRequestUntil) return;
+
+        if (Time.time > dashActiveUntil)
+        {
+            dashRequestUntil = 0f;
+            return;
+        }
+
+        Vector3 v = playerRigidbody.velocity;
+        Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
+
+        float vParallel = Vector3.Dot(horizontalVel, dashDir);
+
+        // 達標就不要再推，避免疊加
+        if (vParallel >= dashTargetSpeed) return;
+
+        // 固定加速度（不受質量影響）
+        playerRigidbody.AddForceWithoutLimit(dashDir * dashAccel, ForceMode.Acceleration);
+    }
+    public bool DashAction()
+    {
+        var stats = PlayerStats.Instance;
+        if (stats == null) return false;
+
+        if (Time.time < nextDashTime) return false;
+
+        // 修正：能量不足就不啟動
+        if (stats.currentEnergy <= 0) return false;
+
+        Vector3 dir;
+        if (moveDirection.sqrMagnitude > 0.001f) dir = moveDirection;
+        else dir = characterModel != null ? characterModel.forward : transform.forward;
+
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f) return false;
+        dir.Normalize();
+
+        // 先算 dash 的固定加速度（只看水平）
+        Vector3 v = playerRigidbody.velocity;
+        Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
+
+        dashDir = dir;
+        dashTargetSpeed = stats.dashSpeed;
+
+        float vParallel = Vector3.Dot(horizontalVel, dashDir);
+        float deltaVStart = Mathf.Max(0f, dashTargetSpeed - vParallel);
+
+        // 固定加速度：整段 dashDuration 都用這個值
+        dashAccel = deltaVStart / dashDuration;
+
+        // 扣能量
+        stats.currentEnergy -= stats.dashEnergyCost;
+
+        dashRequestUntil = Time.time + dashInputBuffer;
+        dashActiveUntil = Time.time + dashDuration;
+        nextDashTime = Time.time + dashCooldown;
+
+        CancelInvoke("ResetEnergyRegenerate");
+        canRegenerateEnergy = false;
+
+        return true;
+    }
 
     public void FlyAction()
     {
         // 空中且有能量才允許提出飛行請求
         if (grounded) return;
         if (PlayerStats.Instance.currentEnergy <= 0f) return;
-
-        CancelInvoke("ResetEnergyRegenerate");
-        canRegenerateEnergy = false;
-
+        if (PlayerStats.Instance.flyEnergyCost > 0)
+        {
+            CancelInvoke("ResetEnergyRegenerate");
+            canRegenerateEnergy = false;
+        }
         // 把「飛行輸入」延長一小段時間，確保 FixedUpdate 一定能吃到
         flyRequestUntil = Time.time + flyInputBuffer;
     }
@@ -274,9 +359,9 @@ public class PlayerMovement : MonoBehaviour
         {
             PlayerStats.Instance.currentEnergy = PlayerStats.Instance.currentEnergy + (Time.deltaTime * PlayerStats.Instance.energyRegen);
         }
-        else if (PlayerStats.Instance.currentEnergy < PlayerStats.Instance.maxEnergy && !canRegenerateEnergy && PlayerStats.Instance.currentEnergy == 0)
+        else if (PlayerStats.Instance.currentEnergy < PlayerStats.Instance.maxEnergy && !canRegenerateEnergy && PlayerStats.Instance.currentEnergy <= 0)
         {
-            Invoke("ResetEnergyRegenerate", 3);
+            Invoke("ResetEnergyRegenerate", 5);
         }
         else if (PlayerStats.Instance.currentEnergy < PlayerStats.Instance.maxEnergy && !canRegenerateEnergy)
         {

@@ -15,6 +15,7 @@ Material:
   m_InvalidKeywords:
   - _BLENDOUTLINEMAINTEX_ON
   - _GLITTERAPPLYTRANSPARENCY_ON
+  - _RECEIVELIGHTSHADOW_ON
   - _SCREENRIMSHADOWFADE_ON
   - _USEMIDTONE_ON
   m_LightmapFlags: 4
@@ -24,6 +25,8 @@ Material:
   stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
+  - OpaqueDitherFade
+  - OpaqueDitherFadeOutline
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3

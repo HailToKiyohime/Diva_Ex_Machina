@@ -61,7 +61,6 @@ public class PlayerAnimation : MonoBehaviour
         PlayerStats.Instance.OnHandWeaponDataChanged += RefreshWeaponHoldLayers;
 
         ApplyLegVisualChange(PlayerStats.Instance.CurrentLegVisual);
-        PlayerStats.Instance.RecalculateFromEquipment();
         RefreshWeaponHoldLayers();
     }
     private void OnDisable()

@@ -43,7 +43,7 @@ public class PlayerController : MonoBehaviour
         }
         if (playerControls.Player.Sprint.WasPressedThisFrame())
         {
-
+            playerMovement.DashAction();
         }
         if (playerControls.Player.Reload.IsPressed())
         {
