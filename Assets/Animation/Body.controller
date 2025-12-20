@@ -372,19 +372,19 @@ AnimatorController:
   - serializedVersion: 5
     m_Name: Walking_Bipedal
     m_StateMachine: {fileID: -8498670397624955808}
-    m_Mask: {fileID: 31900000, guid: 6602d1c53b3208a4a9971716f6f0be6d, type: 2}
+    m_Mask: {fileID: 31900000, guid: 7205a1f9eb9a0b644a69accfe8e11160, type: 2}
     m_Motions: []
     m_Behaviours: []
     m_BlendingMode: 0
     m_SyncedLayerIndex: -1
-    m_DefaultWeight: 1
+    m_DefaultWeight: 0
     m_IKPass: 0
     m_SyncedLayerAffectsTiming: 0
     m_Controller: {fileID: 9100000}
   - serializedVersion: 5
     m_Name: Walking_Hover
     m_StateMachine: {fileID: -2715473299757866462}
-    m_Mask: {fileID: 31900000, guid: 6602d1c53b3208a4a9971716f6f0be6d, type: 2}
+    m_Mask: {fileID: 31900000, guid: 7205a1f9eb9a0b644a69accfe8e11160, type: 2}
     m_Motions: []
     m_Behaviours: []
     m_BlendingMode: 0
@@ -396,7 +396,7 @@ AnimatorController:
   - serializedVersion: 5
     m_Name: Barehanded
     m_StateMachine: {fileID: 5387614183935118222}
-    m_Mask: {fileID: 31900000, guid: c0c9901a7c6c4424cafdd229fa90e825, type: 2}
+    m_Mask: {fileID: 31900000, guid: 25a0a37deb2d44845ba0ac6e3b077265, type: 2}
     m_Motions: []
     m_Behaviours: []
     m_BlendingMode: 0
@@ -408,7 +408,7 @@ AnimatorController:
   - serializedVersion: 5
     m_Name: Wielding_Gun_Left
     m_StateMachine: {fileID: 1184593004080760164}
-    m_Mask: {fileID: 31900000, guid: c0c9901a7c6c4424cafdd229fa90e825, type: 2}
+    m_Mask: {fileID: 31900000, guid: 25a0a37deb2d44845ba0ac6e3b077265, type: 2}
     m_Motions: []
     m_Behaviours: []
     m_BlendingMode: 0
@@ -420,7 +420,7 @@ AnimatorController:
   - serializedVersion: 5
     m_Name: Wielding_Gun_Right
     m_StateMachine: {fileID: 1774378152073718481}
-    m_Mask: {fileID: 31900000, guid: c0c9901a7c6c4424cafdd229fa90e825, type: 2}
+    m_Mask: {fileID: 31900000, guid: 25a0a37deb2d44845ba0ac6e3b077265, type: 2}
     m_Motions: []
     m_Behaviours: []
     m_BlendingMode: 0
@@ -432,7 +432,7 @@ AnimatorController:
   - serializedVersion: 5
     m_Name: Dual_Wielding_Gun_Left
     m_StateMachine: {fileID: 8268737884705416547}
-    m_Mask: {fileID: 31900000, guid: 53e8b115ba935b64ea0043eacf201d7d, type: 2}
+    m_Mask: {fileID: 31900000, guid: ec9c9ffe1510d894e8b0549b17bc1d2b, type: 2}
     m_Motions: []
     m_Behaviours: []
     m_BlendingMode: 0

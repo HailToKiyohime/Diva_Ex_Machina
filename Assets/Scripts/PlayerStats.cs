@@ -340,7 +340,7 @@ public class PlayerStats : MonoBehaviour
         Instance = this;
 
         ResetState();
-
+        currentEnergy = maxEnergy; // 開場補滿能量
         // ✅ 開場保證清空左右手狀態（避免殘留引用）
         leftHand.Reset();
         rightHand.Reset();

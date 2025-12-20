@@ -33,7 +33,7 @@ MonoBehaviour:
     value: 10
   - attribute: 20
     mode: 0
-    value: 200
+    value: 300
   - attribute: 19
     mode: 0
     value: 50

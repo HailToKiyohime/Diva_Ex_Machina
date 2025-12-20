@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class UIManager : MonoBehaviour
 {
@@ -13,12 +14,13 @@ public class UIManager : MonoBehaviour
     [SerializeField] private GameObject CharacterCraftingCanvas;
     public int currentCameraSet = 0; // 0: Combat, 1: Equipment, 2: Crafting
     [Header("Combat UI")]
-    [SerializeField] public TextMeshProUGUI speedText;
-    [SerializeField] public TextMeshProUGUI distanceText;
-    [SerializeField] public RectTransform speedInfo;
-    [SerializeField] public RectTransform distanceInfo;
-    [SerializeField] public Color lockonColor;
-    [SerializeField] public Color normalColor;
+    public TextMeshProUGUI speedText;
+    public TextMeshProUGUI distanceText;
+    public RectTransform speedInfo;
+    public RectTransform distanceInfo;
+    public Color lockonColor;
+    public Color normalColor;
+    public Slider energyBar;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Awake()
     {
@@ -29,7 +31,18 @@ public class UIManager : MonoBehaviour
         }
         Instance = this;
     }
+    private void Start()
+    {
+        // 初始化 Slider 基本設定
+        if (energyBar != null)
+        {
+            energyBar.minValue = 0f;
+            energyBar.wholeNumbers = false;
+        }
 
+        // 開場先刷新一次
+        RefreshEnergyBar();
+    }
     // Update is called once per frame
     void Update()
     {
@@ -67,7 +80,23 @@ public class UIManager : MonoBehaviour
                 break;
         }
     }
+    private void LateUpdate()
+    {
+        if (currentCameraSet != 0) return;
 
+        RefreshEnergyBar();
+    }
+    public void RefreshEnergyBar()
+    {
+        if (energyBar == null) return;
+
+        var stats = PlayerStats.Instance;
+        if (stats == null) return;
+
+        float max = Mathf.Max(1f, stats.maxEnergy); // 避免 maxEnergy = 0 造成不合理狀態
+        energyBar.maxValue = max;
+        energyBar.value = Mathf.Clamp(stats.currentEnergy, 0f, max);
+    }
     public void SwitchToCombatUI()
     {
         currentCameraSet = 0;
