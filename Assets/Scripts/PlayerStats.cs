@@ -350,6 +350,7 @@ public class PlayerStats : MonoBehaviour
 
         PlayerAiming.Instance?.SetAimAreaSize(lockOnRange);
         PlayerAiming.Instance?.SetLockOnDistance(aimingDistance);
+        UIManager.Instance?.SetAmmoBarSize(lockOnRange);
     }
 
     /// <summary>
@@ -483,7 +484,7 @@ public class PlayerStats : MonoBehaviour
         OnHandWeaponDataChanged?.Invoke();
         PlayerAiming.Instance?.SetAimAreaSize(lockOnRange);
         PlayerAiming.Instance?.SetLockOnDistance(aimingDistance);
-        
+        UIManager.Instance?.SetAmmoBarSize(lockOnRange);
     }
 
     // ======= helpers: buff classification / splitting =======

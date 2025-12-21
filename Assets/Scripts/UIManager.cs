@@ -1,4 +1,4 @@
-using TMPro;
+Ôªøusing TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -21,6 +21,19 @@ public class UIManager : MonoBehaviour
     public Color lockonColor;
     public Color normalColor;
     public Slider energyBar;
+
+    [Header("Ammo Bar")]
+    public Image leftHandAmmoBar;
+    public Image rightHandAmmoBar;
+    public Image leftHandAmmoFrame;
+    public Image rightHandAmmoFrame;
+    public Color ammoNormalColor ;
+    public Color ammoReloadColor ;
+    public float ammoReloadFlashSpeed = 6f;
+
+    private bool _leftReloading;
+    private bool _rightReloading;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Awake()
     {
@@ -33,14 +46,13 @@ public class UIManager : MonoBehaviour
     }
     private void Start()
     {
-        // ™Ï©l§∆ Slider ∞Ú•ª≥]©w
         if (energyBar != null)
         {
             energyBar.minValue = 0f;
             energyBar.wholeNumbers = false;
         }
 
-        // ∂}≥ı•˝®Í∑s§@¶∏
+        // ÔøΩ}ÔøΩÔøΩÔøΩÔøΩÔøΩÔøΩsÔøΩ@ÔøΩÔøΩ
         RefreshEnergyBar();
     }
     // Update is called once per frame
@@ -85,6 +97,7 @@ public class UIManager : MonoBehaviour
         if (currentCameraSet != 0) return;
 
         RefreshEnergyBar();
+        UpdateAmmoBarColors();
     }
     public void RefreshEnergyBar()
     {
@@ -93,7 +106,7 @@ public class UIManager : MonoBehaviour
         var stats = PlayerStats.Instance;
         if (stats == null) return;
 
-        float max = Mathf.Max(1f, stats.maxEnergy); // ¡◊ßK maxEnergy = 0 ≥y¶®§£¶X≤z™¨∫A
+        float max = Mathf.Max(1f, stats.maxEnergy); // ÔøΩ◊ßK maxEnergy = 0 ÔøΩyÔøΩÔøΩÔøΩÔøΩÔøΩXÔøΩzÔøΩÔøΩÔøΩA
         energyBar.maxValue = max;
         energyBar.value = Mathf.Clamp(stats.currentEnergy, 0f, max);
     }
@@ -109,5 +122,55 @@ public class UIManager : MonoBehaviour
     {
         currentCameraSet = 2;
     }
+    public void changeLeftHandAmmoBar(float fillAmount)
+    {
+        if (leftHandAmmoBar != null)
+        {
+            leftHandAmmoBar.fillAmount = Mathf.Clamp01(fillAmount);
+        }
+    }
+    public void changeRightHandAmmoBar(float fillAmount)
+    {
+        if (rightHandAmmoBar != null)
+        {
+            rightHandAmmoBar.fillAmount = Mathf.Clamp01(fillAmount);
+        }
+    }
+    public void SetAmmoNormalized(float leftFill, float rightFill)
+    {
+        changeLeftHandAmmoBar(leftFill);
+        changeRightHandAmmoBar(rightFill);
+    }
+    public void SetAmmoState(float leftFill, bool leftReloading, float rightFill, bool rightReloading)
+    {
+        _leftReloading = leftReloading;
+        _rightReloading = rightReloading;
 
+        changeLeftHandAmmoBar(leftFill);
+        changeRightHandAmmoBar(rightFill);
+
+        UpdateAmmoBarColors(); // Á´ãÂàªÂ•óÁî®‰∏ÄÊ¨°È°èËâ≤
+    }
+
+    private void UpdateAmmoBarColors()
+    {
+        float pulse = (Mathf.Sin(Time.unscaledTime * ammoReloadFlashSpeed * Mathf.PI * 2f) + 1f) * 0.5f; // 0..1
+
+        if (leftHandAmmoBar != null)
+            leftHandAmmoBar.color = _leftReloading ? Color.Lerp(ammoReloadColor, Color.red, pulse) : ammoNormalColor;
+
+        if (rightHandAmmoBar != null)
+            rightHandAmmoBar.color = _rightReloading ? Color.Lerp(ammoReloadColor, Color.red, pulse) : ammoNormalColor;
+    }
+    public void SetAmmoBarSize(float lockOnRange)
+    {
+        
+        float newSize = lockOnRange*0.533f;
+        leftHandAmmoFrame.rectTransform.sizeDelta = new Vector2(newSize, newSize);
+        leftHandAmmoFrame.rectTransform.anchoredPosition = new Vector2(-(newSize / 2), -(newSize / 2));
+        leftHandAmmoBar.rectTransform.sizeDelta = new Vector2(newSize, newSize);
+        rightHandAmmoFrame.rectTransform.sizeDelta = new Vector2(newSize, newSize);
+        rightHandAmmoFrame.rectTransform.anchoredPosition = new Vector2((newSize / 2), -(newSize / 2));
+        rightHandAmmoBar.rectTransform.sizeDelta = new Vector2(newSize, newSize);
+    }
 }

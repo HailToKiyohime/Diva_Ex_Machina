@@ -7,12 +7,13 @@ public class Weapon
 {
     public Transform muzzle;
     public GameObject bullet;
-    //Damage Type
+    // Damage Type
     public float physicalDamage;
     public float explosionDamage;
     public float energyDamage;
     public float coldDamage;
-    //Range Weapon Specific
+
+    // Range Weapon Specific
     public float reloadTime;
     public int bulletPerShot;
     public int roundPerTap;
@@ -21,13 +22,17 @@ public class Weapon
     public float spread;
     public int magazineSize;
     public float bulletSpeed;
-    public int firingMode;//0:Single, 1:Auto, 2:Charge
-    //runtime State
+    public int firingMode; //0:Single, 1:Auto, 2:Charge
+
+    // Runtime State
     public int bulletsLeft;
     public bool shooting;
     public bool reloading;
     public bool readyToShoot;
     public bool allowInvoke;
+
+    // Reload UI runtime (0~1). When reloading, ammo bar shows this value.
+    [HideInInspector] public float reloadNormalized;
 }
 
 public class AttackManager : MonoBehaviour
@@ -35,7 +40,7 @@ public class AttackManager : MonoBehaviour
     public Weapon leftWeapon;
     public Weapon rightWeapon;
 
-    //Just for testing
+    // Just for testing
     public GameObject testBulletPrefab;
 
     // 用來判斷「是否換了一把武器」，以便重置子彈等 runtime state
@@ -48,6 +53,7 @@ public class AttackManager : MonoBehaviour
             PlayerStats.Instance.OnHandWeaponDataChanged += SyncFromPlayerStats;
 
         SyncFromPlayerStats();
+        PushAmmoUI();
     }
 
     private void OnDisable()
@@ -63,6 +69,7 @@ public class AttackManager : MonoBehaviour
 
         ApplyHand(stats.leftHand, leftWeapon, ref _leftSource);
         ApplyHand(stats.rightHand, rightWeapon, ref _rightSource);
+        PushAmmoUI();
     }
 
     private static void ApplyHand(WeaponStats hand, Weapon outWeapon, ref RangeWeaponInstance cachedSource)
@@ -87,6 +94,7 @@ public class AttackManager : MonoBehaviour
             outWeapon.magazineSize = 0;
             outWeapon.bulletSpeed = 0f;
             outWeapon.firingMode = 0;
+            outWeapon.reloadNormalized = 0f;
             return;
         }
 
@@ -94,12 +102,10 @@ public class AttackManager : MonoBehaviour
         bool changedWeapon = cachedSource != hand.weapon;
         cachedSource = hand.weapon;
 
-        // 1) 子彈 prefab / muzzle：你可依你的 RangeWeaponInstance 結構接資料
-        // ✅ 取回 RangeWeapon SO，拿到 bullet prefab
-        var rw = hand.weapon.item as RangeWeapon;   // RangeWeaponInstance.item 是 ItemObject
-        outWeapon.bullet = (rw != null) ? rw.bullet : null;  // RangeWeapon.bullet :contentReference[oaicite:3]{index=3}
-
-        outWeapon.muzzle = hand.weapon.muzzlePoint;  // muzzle 通常是場景上的 Transform，不一定在 stats 裡
+        // 1) 子彈 prefab / muzzle
+        var rw = hand.weapon.item as RangeWeapon;
+        outWeapon.bullet = (rw != null) ? rw.bullet : null;
+        outWeapon.muzzle = hand.weapon.muzzlePoint;
 
         // 2) 把該手「總 Buff」轉成射擊數值
         outWeapon.physicalDamage = hand.GetAttribute(Attributes.PhysicalDamage);
@@ -124,13 +130,43 @@ public class AttackManager : MonoBehaviour
             outWeapon.reloading = false;
             outWeapon.readyToShoot = true;
             outWeapon.allowInvoke = true;
+            outWeapon.reloadNormalized = 0f;
         }
+    }
+
+    private void PushAmmoUI()
+    {
+        var ui = UIManager.Instance;
+        if (ui == null) return;
+
+        float leftFill = CalcAmmoBarFill(leftWeapon);
+        float rightFill = CalcAmmoBarFill(rightWeapon);
+
+        // Also drive reload color + flashing (UIManager stores the colors)
+        ui.SetAmmoState(
+            leftFill, leftWeapon != null && leftWeapon.reloading,
+            rightFill, rightWeapon != null && rightWeapon.reloading
+        );
+    }
+
+    private static float CalcAmmoBarFill(Weapon w)
+    {
+        if (w == null) return 0f;
+
+        // Reload mode: fillAmount means reload progress
+        if (w.reloading)
+            return Mathf.Clamp01(w.reloadNormalized);
+
+        // Ammo mode: fillAmount means bullets / magazine
+        if (w.magazineSize <= 0) return 0f;
+        return Mathf.Clamp01((float)w.bulletsLeft / w.magazineSize);
     }
 
     public bool HandleAttack(Weapon w, UnityEngine.InputSystem.InputAction attackInput)
     {
         if (w == null)
             return false;
+
         if (w.firingMode == 0)
         {
             w.shooting = attackInput.WasPressedThisFrame();
@@ -139,6 +175,7 @@ public class AttackManager : MonoBehaviour
         {
             w.shooting = attackInput.IsPressed();
         }
+
         if (w.readyToShoot && w.shooting && w.bulletsLeft <= 0)
             StartReload(w);
 
@@ -152,6 +189,7 @@ public class AttackManager : MonoBehaviour
 
         return false;
     }
+
     public bool TryStartShoot(Weapon w)
     {
         if (w == null) return false;
@@ -171,15 +209,17 @@ public class AttackManager : MonoBehaviour
 
         return false;
     }
+
     private IEnumerator Shoot(Weapon w, Ray ray)
     {
         w.readyToShoot = false;
         int shotsToFire = Mathf.Min(w.roundPerTap, w.bulletsLeft);
-        // Cache once per burst to avoid repeated GetComponent calls
+
         var bulletPrefab = (w.bullet != null) ? w.bullet : testBulletPrefab;
         var muzzle = w.muzzle;
         if (bulletPrefab == null || muzzle == null)
             yield break;
+
         for (int i = 0; i < shotsToFire; i++)
         {
             for (int x = 0; x < w.bulletPerShot; x++)
@@ -189,7 +229,7 @@ public class AttackManager : MonoBehaviour
 
                 Vector3 targetPoint;
 
-                // NEW: if in constrained-lock, do NOT chase the target; shoot along the crosshair ray
+                // if in constrained-lock, do NOT chase the target; shoot along the crosshair ray
                 bool constrained = PlayerAiming.Instance.lockOn;
                 if (constrained)
                 {
@@ -210,11 +250,11 @@ public class AttackManager : MonoBehaviour
                 }
                 else
                 {
-                    // Not locked or constrained-lock → use the crosshair ray
+                    // Not locked → use the crosshair ray
                     targetPoint = ray.GetPoint(100f);
                 }
+
                 // Direction + spread
-                // Direction + spread (spread is degrees: max cone half-angle)
                 Vector3 dirNoSpread = (targetPoint - muzzle.position).normalized;
 
                 // Build an orthonormal basis around dirNoSpread
@@ -222,7 +262,7 @@ public class AttackManager : MonoBehaviour
                 if (right.sqrMagnitude < 0.0001f)
                     right = Vector3.Cross(dirNoSpread, Vector3.right);
                 right.Normalize();
-                Vector3 up = Vector3.Cross(right, dirNoSpread); // already normalized if right & dir are normalized
+                Vector3 up = Vector3.Cross(right, dirNoSpread);
 
                 // Sample a random direction inside a cone with half-angle = w.spread degrees
                 float maxRad = w.spread * Mathf.Deg2Rad;
@@ -236,17 +276,17 @@ public class AttackManager : MonoBehaviour
                 Vector3 lateral = right * Mathf.Cos(phi) + up * Mathf.Sin(phi);
                 Vector3 dirWithSpread = dirNoSpread * cosAlpha + lateral * sinAlpha;
 
-                // Apply launch velocity (BetterPhysics linearVelocity untouched)
                 var rb = currentBullet.GetComponent<Rigidbody>();
                 if (rb) rb.linearVelocity = dirWithSpread * w.bulletSpeed;
-
-                //var b = currentBullet.GetComponent<Bullet>();
-                //if (b) b.SetDamage(w.damage);
             }
+
             w.bulletsLeft--;
+            PushAmmoUI();
+
             if (i < shotsToFire - 1)
                 yield return new WaitForSeconds(w.timeBetweenShots);
         }
+
         if (w.allowInvoke)
         {
             w.allowInvoke = false;
@@ -256,20 +296,54 @@ public class AttackManager : MonoBehaviour
 
     public void StartReload(Weapon w)
     {
+        if (w == null) return;
         if (w.reloading) return;
+
+        // Enter reload mode immediately: clear bar to bottom (0)
         w.reloading = true;
+        w.reloadNormalized = 0f;
+        PushAmmoUI();
+
+        // Defensive: instant reload if reloadTime is 0 or negative
+        if (w.reloadTime <= 0f)
+        {
+            w.reloadNormalized = 1f;
+            PushAmmoUI();
+            FinishReload(w);
+            PushAmmoUI();
+            return;
+        }
+
         StartCoroutine(ReloadCoroutine(w));
     }
+
     private IEnumerator ReloadCoroutine(Weapon w)
     {
-        yield return new WaitForSeconds(w.reloadTime);
+        float elapsed = 0f;
+
+        // Smoothly refill ammo bar from 0 -> 1 over reloadTime
+        while (elapsed < w.reloadTime)
+        {
+            elapsed += Time.deltaTime;
+            w.reloadNormalized = Mathf.Clamp01(elapsed / w.reloadTime);
+            PushAmmoUI();
+            yield return null;
+        }
+
+        w.reloadNormalized = 1f;
+        PushAmmoUI();
+
         FinishReload(w);
+        PushAmmoUI();
     }
-    void FinishReload(Weapon w)
+
+    private void FinishReload(Weapon w)
     {
         w.bulletsLeft = w.magazineSize;
         w.reloading = false;
+        w.reloadNormalized = 0f;
     }
+
     private IEnumerator ResetShotCooldown(Weapon w)
     {
         yield return new WaitForSeconds(w.timeBetweenShooting);
@@ -288,8 +362,8 @@ public class AttackManager : MonoBehaviour
 
         try
         {
-            pos = rb.position;          // can throw if just destroyed this frame
-            vel = rb.linearVelocity;    // BetterPhysics property — do not alter
+            pos = rb.position;
+            vel = rb.linearVelocity;
             return true;
         }
         catch (MissingReferenceException)
@@ -297,6 +371,4 @@ public class AttackManager : MonoBehaviour
             return false;
         }
     }
-
 }
-
