@@ -25,8 +25,12 @@ public class UIManager : MonoBehaviour
     [Header("Ammo Bar")]
     public Image leftHandAmmoBar;
     public Image rightHandAmmoBar;
+    public Image leftShoulderAmmoBar;
+    public Image rightShoulderAmmoBar;
     public Image leftHandAmmoFrame;
     public Image rightHandAmmoFrame;
+    public Image leftShoulderAmmoFrame;
+    public Image rightShoulderAmmoFrame;
     public Color ammoNormalColor ;
     public Color ammoReloadColor ;
     public float ammoReloadFlashSpeed = 6f;
@@ -52,7 +56,6 @@ public class UIManager : MonoBehaviour
             energyBar.wholeNumbers = false;
         }
 
-        // �}������s�@��
         RefreshEnergyBar();
     }
     // Update is called once per frame
@@ -166,11 +169,18 @@ public class UIManager : MonoBehaviour
     {
         
         float newSize = lockOnRange*0.533f;
+        float newSize2 = lockOnRange * 0.566f;
         leftHandAmmoFrame.rectTransform.sizeDelta = new Vector2(newSize, newSize);
         leftHandAmmoFrame.rectTransform.anchoredPosition = new Vector2(-(newSize / 2), -(newSize / 2));
         leftHandAmmoBar.rectTransform.sizeDelta = new Vector2(newSize, newSize);
         rightHandAmmoFrame.rectTransform.sizeDelta = new Vector2(newSize, newSize);
         rightHandAmmoFrame.rectTransform.anchoredPosition = new Vector2((newSize / 2), -(newSize / 2));
         rightHandAmmoBar.rectTransform.sizeDelta = new Vector2(newSize, newSize);
+        leftShoulderAmmoFrame.rectTransform.sizeDelta = new Vector2(newSize2, newSize2);
+        leftShoulderAmmoFrame.rectTransform.anchoredPosition = new Vector2(-(newSize2 / 2), -(newSize2 / 2));
+        leftShoulderAmmoBar.rectTransform.sizeDelta = new Vector2(newSize2, newSize2);
+        rightShoulderAmmoFrame.rectTransform.sizeDelta = new Vector2(newSize2, newSize2);
+        rightShoulderAmmoFrame.rectTransform.anchoredPosition = new Vector2((newSize2 / 2), -(newSize2 / 2));
+        rightShoulderAmmoBar.rectTransform.sizeDelta = new Vector2(newSize2, newSize2);
     }
 }

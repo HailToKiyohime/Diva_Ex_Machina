@@ -11,7 +11,9 @@ Material:
   m_Shader: {fileID: 4800000, guid: cc5c1aecf31d1844db2e888dbfff02a9, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ValidKeywords:
+  - _ALPHATEST_ON
+  - _SURFACE_TYPE_TRANSPARENT
   m_InvalidKeywords:
   - _BLENDOUTLINEMAINTEX_ON
   - _GLITTERAPPLYTRANSPARENCY_ON
@@ -21,13 +23,13 @@ Material:
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
+  m_CustomRenderQueue: 3000
   stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
   - OpaqueDitherFade
   - OpaqueDitherFadeOutline
-  m_LockedProperties: 
+  m_LockedProperties: _StepSmoothness
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -213,7 +215,7 @@ Material:
     - _AutoRenderQueue: 1
     - _BaseMapUV: 0
     - _BaseStep: 0.5
-    - _Blend: 0
+    - _Blend: 4
     - _BlendModePreserveSpecular: 1
     - _BlendOutlineMainTex: 1
     - _BumpScale: 1
@@ -232,8 +234,8 @@ Material:
     - _DisableCharShadow: 0
     - _DitherFadeMaxZ: 0
     - _DitherFadeMinZ: 0
-    - _DstBlend: 0
-    - _DstBlendAlpha: 0
+    - _DstBlend: 10
+    - _DstBlendAlpha: 10
     - _EmissionMapUV: 0
     - _EmissionMaskCH: 1
     - _EnvironmentReflections: 1
@@ -336,7 +338,7 @@ Material:
     - _SpecularMaskCH: 1
     - _SpecularPower: 0.5
     - _SpecularSmoothness: 0.25
-    - _SrcBlend: 1
+    - _SrcBlend: 5
     - _SrcBlendAlpha: 1
     - _StencilComp: 0
     - _StencilFail: 0
@@ -345,7 +347,7 @@ Material:
     - _StencilZFail: 0
     - _StepSmoothness: 0.01
     - _Surface: 0
-    - _SurfaceType: 0
+    - _SurfaceType: 3
     - _ToonType: 0
     - _UseDarknessMode: 0
     - _UseDitherFade: 0
@@ -360,7 +362,7 @@ Material:
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
-    - _ZWriteMode: 1
+    - _ZWriteMode: 0
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}

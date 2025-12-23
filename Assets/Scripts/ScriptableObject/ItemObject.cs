@@ -10,6 +10,7 @@ public enum ItemType {
     Thruster,
     RangeWeapon,
     WeaponPart,
+    MeleeWeapon,
     Consumable,
     Material,
 }
@@ -20,8 +21,7 @@ public enum WeaponPartType
     Scope,
     Barrel,
     Blade,
-    Grip,
-    Actuators
+    Handle,
 }
 
 

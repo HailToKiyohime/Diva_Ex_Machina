@@ -21,6 +21,9 @@ public class CraftingManager : MonoBehaviour
 {
     public static CraftingManager Instance { get; private set; }
 
+    // ===== Crafting UI 元件 =====
+    //製作類型
+    public int craftingType = 0; //0:槍武器 1:近戰武器 2:肩扛式武器
     // 左側「合成零件插槽按鈕」們的父物件 (Receiver / Scope / Barrel)
     public Transform craftingPartsButtonParent;
     // 右側「背包物品按鈕」們的父物件
@@ -36,6 +39,9 @@ public class CraftingManager : MonoBehaviour
     // 記錄每一個合成插槽的狀態
     [SerializeField] public List<CraftingSlot> craftingSlots = new();
 
+    public GameObject rangeWeaponCraftingSlotPage;
+    public GameObject meleeWeaponCraftingSlotPage;
+
     [Header("UI Button Prefab")]
     // 右側背包物品按鈕的預置物
     public GameObject buttonPrefab;
@@ -50,6 +56,7 @@ public class CraftingManager : MonoBehaviour
     public GameObject weaponColorBlock;
 
     public TMP_InputField newWeaponName;
+
 
     [Header("Crafting Stat Block")]
     public TextMeshProUGUI leftStatBlock;
@@ -1492,6 +1499,21 @@ public class CraftingManager : MonoBehaviour
         else if (craftingSlots[index].equipmentType == WeaponPartType.Gun)
         {
             OpenRangeWeaponInventory();
+        }
+    }
+
+    public void SwitchWeaponCraftingTab(int weaponType)
+    {
+        craftingType = weaponType;
+        if (craftingType == 0)
+        {
+            rangeWeaponCraftingSlotPage.SetActive(true);
+            meleeWeaponCraftingSlotPage.SetActive(false);
+        }
+        else if (craftingType == 1)
+        {
+            rangeWeaponCraftingSlotPage.SetActive(false);
+            meleeWeaponCraftingSlotPage.SetActive(true);
         }
     }
 }
