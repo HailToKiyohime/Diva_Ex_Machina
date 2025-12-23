@@ -379,12 +379,10 @@ public class CraftingManager : MonoBehaviour
     public void OpenScopeInventory() => OpenRangeWeaponPartsInventory(ItemType.WeaponPart, WeaponPartType.Scope);
     // 打開 Barrel 清單
     public void OpenBarrelInventory() => OpenRangeWeaponPartsInventory(ItemType.WeaponPart, WeaponPartType.Barrel);
+    //打開 Handle 清單
 
-    // 打開整把武器清單
-    public void OpenRangeWeaponInventory() => OpenWeaponInventory(ItemType.RangeWeapon);
-
-    // 打開「指定 ItemType」的背包清單 (目前主要給 RangeWeapon 用)
-    public void OpenWeaponInventory(ItemType itemType)
+    // 打開 RangeWeapon的背包清單
+    public void OpenRangeWeaponInventory()
     {
         AssignRemovePartButtonListener();
 
@@ -404,7 +402,7 @@ public class CraftingManager : MonoBehaviour
 
         foreach (var inv in InventoryManager.Instance.inventory)
         {
-            if (inv == null || inv.item == null || inv.item.type != itemType)
+            if (inv == null || inv.item == null || inv.item.type != ItemType.RangeWeapon)
                 continue;
 
             // 只列出「還沒鍛造的 blueprint 武器」
@@ -434,6 +432,34 @@ public class CraftingManager : MonoBehaviour
 
             if (!(inv.item is RangeWeaponPart rwp) || rwp.partType != weaponPartType)
                 continue;
+
+            CreateInventoryButtonForCraftingItem(inv, slotHasEquipment, slotIndex);
+        }
+    }
+    //打開 Blade 清單
+    public void OpenBladeInventory()
+    {
+        AssignRemovePartButtonListener();
+
+        if (!craftingPartsToggleGroup.AnyTogglesOn() || weaponColorBlock.activeSelf)
+        {
+            // 沒選插槽或正在開顏色頁面 → 關掉 Remove 按鈕 + 清空列表
+            HideAllRemoveButtonsOnCraftingSlots();
+            ClearInventoryButton();
+            return;
+        }
+
+        ClearInventoryButton();
+
+        int slotIndex = GetSelectedSlotIndex();
+        HideAllRemoveButtonsOnCraftingSlots();
+        bool slotHasEquipment = SlotHasEquipment(slotIndex);
+
+        foreach (var inv in InventoryManager.Instance.inventory)
+        {
+            if (inv == null || inv.item == null || inv.item.type != ItemType.MeleeWeapon)
+                continue;
+
 
             CreateInventoryButtonForCraftingItem(inv, slotHasEquipment, slotIndex);
         }
@@ -497,6 +523,9 @@ public class CraftingManager : MonoBehaviour
                     t.interactable = true;
                 }
             }
+        }else if (item.item is MeleeWeaponPart mwp)
+        {
+
         }
         // 武器零件
         else if (item.item is RangeWeaponPart rwp)

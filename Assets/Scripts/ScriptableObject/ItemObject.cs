@@ -22,6 +22,7 @@ public enum WeaponPartType
     Barrel,
     Blade,
     Handle,
+    Coating,
 }
 
 

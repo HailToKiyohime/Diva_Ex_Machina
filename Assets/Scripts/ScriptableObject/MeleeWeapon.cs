@@ -10,6 +10,17 @@ public enum MeleeWeaponStance
     OneHandedSword,
     TwoHandedSword,
 }
+public enum MeleeWeaponPartAttribute { 
+    LongHandle,
+    ShortHandle,
+    GreatBlade,
+    LongBlade,
+    DaggerBlade,
+    HammerHead,
+    LanceHead,
+}
+
+
 [CreateAssetMenu(fileName = "New Melee Weapon", menuName = "Inventory/MeleeWeapon")]
 public class MeleeWeapon : ItemObject
 {
