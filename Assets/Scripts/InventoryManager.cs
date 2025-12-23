@@ -29,6 +29,20 @@ public class RangeWeaponInstance : ItemInstance
 }
 
 [System.Serializable]
+public class MeleeWeaponInstance : ItemInstance
+{
+    public string newWeaponName;                 // 用來存鍛造後的新名稱
+    public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
+    public List<PartInstance> attachment;
+
+    // 用來存不同 shader 的顏色
+    [SerializeField] public List<Color> colors = new List<Color>();
+
+    // 記錄此裝備用的 shader 名稱，方便還原
+    [SerializeField] public string shaderName;
+}
+
+[System.Serializable]
 public class ArmorInstance : ItemInstance
 {
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
@@ -292,6 +306,64 @@ public class InventoryManager : MonoBehaviour
                 inst.buffs.Add(buff);
 
             var pickedBuff = rwp.GetRandomBuff();
+            if (pickedBuff != null)
+                inst.buffs.Add(pickedBuff.buff);
+
+            inventory.Add(inst);
+            return;
+        }
+
+        if (item is MeleeWeapon mw)
+        {
+            var attachmentPoints = new List<PartInstance>();
+            foreach (var ap in mw.attachmentPoints)
+            {
+                attachmentPoints.Add(new PartInstance
+                {
+                    item = null,
+                    amount = 0,
+                    partType = ap.allowPart
+                });
+            }
+
+            var inst = new MeleeWeaponInstance
+            {
+                item = item,
+                amount = 1,
+                attachment = attachmentPoints,
+            };
+
+            // 讀顏色（修正：Mix5 也要把 BaseColor 放進來）
+            if (mw.meshRenderer && mw.meshRenderer.sharedMaterial)
+            {
+                var mat = mw.meshRenderer.sharedMaterial;
+                inst.shaderName = mat.shader.name;
+
+                if (inst.shaderName.Contains("Mix 3"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                }
+                else if (inst.shaderName.Contains("Mix 4"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                    inst.colors.Add(mat.GetColor("_Layer3Color"));
+                }
+                else if (inst.shaderName.Contains("Mix 5"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    for (int i = 1; i < 5; i++)
+                        inst.colors.Add(mat.GetColor($"_Layer{i}Color"));
+                }
+            }
+
+            foreach (EquipmentBuff buff in mw.buffs)
+                inst.buffs.Add(buff);
+
+            var pickedBuff = mw.GetRandomBuff();
             if (pickedBuff != null)
                 inst.buffs.Add(pickedBuff.buff);
 

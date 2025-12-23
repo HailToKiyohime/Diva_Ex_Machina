@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d8e82061701b4714c887065bd6d806f9, type: 3}
+  m_Name: Lance 1
+  m_EditorClassIdentifier: Assembly-CSharp::MeleeWeapon
+  itemName: Lance 1
+  type: 10
+  icon: {fileID: 0}
+  maxStack: 0
+  dropPrefab: {fileID: 0}
+  meleeWeaponPartPrefab: {fileID: 6289871019395418214, guid: 84a87fad539e4894b955781161998abf, type: 3}
+  meleeWeaponStance: 0
+  buffs: []
+  randomBuffs: []
+  attachmentPoints: []
+  meshRenderer: {fileID: -7511558181221131132, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
+  defaultHandle: {fileID: 4136720172559166523, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}

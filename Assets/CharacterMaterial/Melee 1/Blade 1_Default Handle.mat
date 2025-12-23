@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-4065861652834188668
+--- !u!114 &-1089582443577835570
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}
@@ -20,7 +20,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Lance 2
+  m_Name: Blade 1_Default Handle
   m_Shader: {fileID: -6465566751694194690, guid: 42db884f73c149e428aca688c140b6b4, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -38,7 +38,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _Base:
-        m_Texture: {fileID: 2800000, guid: f75d90e5d9d2c5845aba503c093abfb9, type: 3}
+        m_Texture: {fileID: 2800000, guid: 49b8d738082221944ae98dd7fa7ce9f3, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BaseMap:
@@ -66,15 +66,11 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Layer1:
-        m_Texture: {fileID: 2800000, guid: e793ff17394c1424285d8a5a63eff14a, type: 3}
+        m_Texture: {fileID: 2800000, guid: 7f0f30245c7410a408667c4f19d66810, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Layer2:
-        m_Texture: {fileID: 2800000, guid: 4a5f3f64a9d87644bb64de54341c22ed, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Layer3:
-        m_Texture: {fileID: 2800000, guid: e5531eb0d05a38b429cffb9714f3e6a3, type: 3}
+        m_Texture: {fileID: 2800000, guid: 8f161d8d57aa2394fa5cc097ce488582, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MainTex:
@@ -145,12 +141,11 @@ Material:
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.20392157, g: 0.20392157, b: 0.20392157, a: 1}
+    - _BaseColor: {r: 0.30980393, g: 0.30980393, b: 0.30980393, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _Layer1Color: {r: 0.6784314, g: 0.6784314, b: 0.6784314, a: 1}
-    - _Layer2Color: {r: 0.30980393, g: 0.30980393, b: 0.30980393, a: 1}
-    - _Layer3Color: {r: 0.8113208, g: 0, b: 0, a: 1}
+    - _Layer1Color: {r: 0.20392157, g: 0.20392157, b: 0.20392157, a: 1}
+    - _Layer2Color: {r: 0.6784314, g: 0.6784314, b: 0.6784314, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

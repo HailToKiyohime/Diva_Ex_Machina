@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d8e82061701b4714c887065bd6d806f9, type: 3}
+  m_Name: Blade 1
+  m_EditorClassIdentifier: Assembly-CSharp::MeleeWeapon
+  itemName: Blade 1
+  type: 10
+  icon: {fileID: 0}
+  maxStack: 0
+  dropPrefab: {fileID: 0}
+  meleeWeaponPartPrefab: {fileID: 9066328173521251229, guid: 9ddaa685a2a2b2949a4c20dc97bee2c6, type: 3}
+  meleeWeaponStance: 0
+  buffs: []
+  randomBuffs: []
+  attachmentPoints: []
+  meshRenderer: {fileID: 7409244921258183240, guid: 9ddaa685a2a2b2949a4c20dc97bee2c6, type: 3}
+  defaultHandle: {fileID: 2247335557921061852, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}

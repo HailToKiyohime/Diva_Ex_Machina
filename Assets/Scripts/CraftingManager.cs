@@ -26,10 +26,15 @@ public class CraftingManager : MonoBehaviour
     public int craftingType = 0; //0:槍武器 1:近戰武器 2:肩扛式武器
     // 左側「合成零件插槽按鈕」們的父物件 (Receiver / Scope / Barrel)
     public Transform craftingPartsButtonParent;
+    public Transform rangeWeaponPartsButtonParent;
+    public Transform meleeWeaponPartsButtonParent;
+
     // 右側「背包物品按鈕」們的父物件
     public Transform itemsButtonParent;
     // 左側插槽的 ToggleGroup，用來判斷目前有沒有選中插槽
-    public ToggleGroup craftingPartsToggleGroup;
+    private ToggleGroup craftingPartsToggleGroup;
+    public ToggleGroup rangeWeaponPartsToggleGroup;
+    public ToggleGroup meleeWeaponPartsToggleGroup;
     // 武器預覽的父節點
     public Transform weaponPreviewTransform;
     // 目前場景中的武器預覽實體
@@ -90,6 +95,8 @@ public class CraftingManager : MonoBehaviour
             return;
         }
         Instance = this;
+        craftingPartsButtonParent = rangeWeaponPartsButtonParent;
+        craftingPartsToggleGroup = rangeWeaponPartsToggleGroup;
     }
 
     private void Start()
@@ -124,7 +131,16 @@ public class CraftingManager : MonoBehaviour
         }
         return false;
     }
-
+    private bool IsForgedWeapon(MeleeWeaponInstance mwi)
+    {
+        if (mwi.attachment == null) return false;
+        foreach (var part in mwi.attachment)
+        {
+            if (part != null && part.item != null)
+                return true;
+        }
+        return false;
+    }
     // ===== Crafting Stat Block =====
 
     /// <summary>
@@ -436,13 +452,14 @@ public class CraftingManager : MonoBehaviour
             CreateInventoryButtonForCraftingItem(inv, slotHasEquipment, slotIndex);
         }
     }
-    //打開 Blade 清單
-    public void OpenBladeInventory()
+    //打開 Melee Weapon 清單
+    public void OpenMeleeWeaponInventory()
     {
         AssignRemovePartButtonListener();
-
+        Debug.Log("OpenMeleeWeaponInventory called.:" + craftingPartsToggleGroup.name);
         if (!craftingPartsToggleGroup.AnyTogglesOn() || weaponColorBlock.activeSelf)
         {
+            Debug.Log("No slot selected or color page is open.");
             // 沒選插槽或正在開顏色頁面 → 關掉 Remove 按鈕 + 清空列表
             HideAllRemoveButtonsOnCraftingSlots();
             ClearInventoryButton();
@@ -457,13 +474,18 @@ public class CraftingManager : MonoBehaviour
 
         foreach (var inv in InventoryManager.Instance.inventory)
         {
+
             if (inv == null || inv.item == null || inv.item.type != ItemType.MeleeWeapon)
                 continue;
 
+            // 只列出「還沒鍛造的 blueprint 武器」
+            if (inv is MeleeWeaponInstance mwi && IsForgedWeapon(mwi))
+                continue;
 
             CreateInventoryButtonForCraftingItem(inv, slotHasEquipment, slotIndex);
         }
     }
+
 
     // 右側「背包物品按鈕」被勾選時的處理
     private void OnClickInventoryItem(ItemInstance item, Toggle btn)
@@ -1536,11 +1558,15 @@ public class CraftingManager : MonoBehaviour
         craftingType = weaponType;
         if (craftingType == 0)
         {
+            craftingPartsButtonParent = rangeWeaponPartsButtonParent;
+            craftingPartsToggleGroup = rangeWeaponPartsToggleGroup;
             rangeWeaponCraftingSlotPage.SetActive(true);
             meleeWeaponCraftingSlotPage.SetActive(false);
         }
         else if (craftingType == 1)
         {
+            craftingPartsButtonParent = meleeWeaponPartsButtonParent;
+            craftingPartsToggleGroup = meleeWeaponPartsToggleGroup;
             rangeWeaponCraftingSlotPage.SetActive(false);
             meleeWeaponCraftingSlotPage.SetActive(true);
         }

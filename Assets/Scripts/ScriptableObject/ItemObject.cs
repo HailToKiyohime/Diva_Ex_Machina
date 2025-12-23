@@ -25,6 +25,12 @@ public enum WeaponPartType
     Coating,
 }
 
+[System.Serializable]
+public class AttachmentPoint
+{
+    public Transform pointTransform;
+    public WeaponPartType allowPart;
+}
 
 [CreateAssetMenu(fileName = "New Item", menuName = "Inventory/Item")]
 public class ItemObject : ScriptableObject

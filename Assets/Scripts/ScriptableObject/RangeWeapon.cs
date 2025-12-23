@@ -2,12 +2,6 @@ using NUnit.Framework;
 using UnityEngine;
 using System.Collections.Generic;
 
-[System.Serializable]
-public class AttachmentPoint
-{
-    public Transform pointTransform;
-    public WeaponPartType allowPart;
-}
 
 [CreateAssetMenu(fileName = "New Range Weapon", menuName = "Inventory/Range Weapon")]
 public class RangeWeapon : ItemObject
