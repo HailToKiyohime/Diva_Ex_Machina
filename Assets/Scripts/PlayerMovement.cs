@@ -21,11 +21,6 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private LayerMask whatIsGround;
     [SerializeField] private float flyInputBuffer = 0.12f; // 飛行請求緩衝（避免 Update/FixedUpdate 不同步漏掉）
     private float flyRequestUntil = 0f;
-    [Header("Fly Assist (fall boost)")]
-    [SerializeField] private float fallBoostStartSpeed = 3f;      // 下落速度超過這個才開始加成（m/s）
-    [SerializeField] private float fallBoostFullSpeed = 18f;      // 下落到這個速度時達到最大加成（m/s）
-    [SerializeField] private float fallBoostMaxMultiplier = 3.0f; // 最大加速倍數（例如 2~4）
-    [SerializeField] private float fallBoostCurvePower = 1.5f;    // 曲線：>1 更偏向高速下落才大幅加成
     [Header("Dash")]
     [SerializeField] private float dashDuration = 0.1f;     // 主人指定：只持續 0.1s
     [SerializeField] private float dashInputBuffer = 0.12f; // 跟 fly 一樣避免漏吃
@@ -53,7 +48,6 @@ public class PlayerMovement : MonoBehaviour
     [Header("Animation")]
     [SerializeField] private PlayerAnimation playerAnimation;
     [SerializeField] private float movementBlendSpeed = 3f; // 控制 0↔1 的快慢
-    private float movementBlend = 0f;                      // 目前的動畫參數值
     private float animX = 0f; // 水平（左右）動畫輸入
     private float animY = 0f; // 垂直（前後）動畫輸入
     // Update is called once per frame

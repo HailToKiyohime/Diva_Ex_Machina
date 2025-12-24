@@ -31,8 +31,7 @@ public class PlayerAiming : MonoBehaviour
     [SerializeField] private float lockOnDistance = 25f;
     [Header("UI Speeds")]
     [SerializeField] private float crosshairLerpSpeed = 30f;
-    [Header("Cursor Settings")]
-    [SerializeField] private bool cursorLocked = true;
+
 
     [SerializeField] private Rigidbody currentTargetRb;
 

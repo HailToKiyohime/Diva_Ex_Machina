@@ -41,6 +41,7 @@ public class CraftingManager : MonoBehaviour
     public GameObject weaponPreview;
     // 目前正在預覽 / 組裝中的武器資料 (ScriptableObject)
     public RangeWeapon rangeWeapon;
+    public MeleeWeapon meleeWeapon;
     // 記錄每一個合成插槽的狀態
     [SerializeField] public List<CraftingSlot> craftingSlots = new();
 
@@ -54,6 +55,8 @@ public class CraftingManager : MonoBehaviour
     public GameObject craftingSlotPrefab;
     public Sprite barrelIcon;
     public Sprite scopeIcon;
+    public Sprite handleIcon;
+    public Sprite coatingIcon;
 
     public UIPageSwitch uiPageSwitch;
 
@@ -452,6 +455,29 @@ public class CraftingManager : MonoBehaviour
             CreateInventoryButtonForCraftingItem(inv, slotHasEquipment, slotIndex);
         }
     }
+
+    public void OpenMeleeWeaponPartsInventory(ItemType itemType, WeaponPartType weaponPartType)
+    {
+        if (!craftingPartsToggleGroup.AnyTogglesOn() || weaponColorBlock.activeSelf)
+            return;
+
+        ClearInventoryButton();
+
+        int slotIndex = GetSelectedSlotIndex();
+        HideAllRemoveButtonsOnCraftingSlots();
+        bool slotHasEquipment = SlotHasEquipment(slotIndex);
+
+        foreach (var inv in InventoryManager.Instance.inventory)
+        {
+            if (inv == null || inv.item == null || inv.item.type != itemType)
+                continue;
+
+            if (!(inv.item is MeleeWeaponPart mwp) || mwp.partType != weaponPartType)
+                continue;
+
+            CreateInventoryButtonForCraftingItem(inv, slotHasEquipment, slotIndex);
+        }
+    }
     //打開 Melee Weapon 清單
     public void OpenMeleeWeaponInventory()
     {
@@ -545,8 +571,60 @@ public class CraftingManager : MonoBehaviour
                     t.interactable = true;
                 }
             }
-        }else if (item.item is MeleeWeaponPart mwp)
+        }else if (item.item is MeleeWeapon mw)
         {
+            // 先清掉舊預覽與舊插槽（避免重複產生 part slot）
+            if (weaponPreview != null)
+                Destroy(weaponPreview);
+            CleanCraftingSlots();   // 清左側 UI + craftingSlots
+            RefreshMeleeDefaultHandleState();
+            // 建立新的武器預覽
+
+            GameObject weapon = Instantiate(mw.weaponPrefab, weaponPreviewTransform);
+            weaponPreview = weapon;
+            meleeWeapon = mw;
+
+            // 槽 0：整把武器本體
+            craftingSlots.Add(new CraftingSlot
+            {
+                assembledPart = weapon,
+                attachmentPointTransform = null,
+                equipmentType = WeaponPartType.Blade,
+                item = item
+            });
+
+            if (item is MeleeWeaponInstance mwi)
+            {
+                newWeaponName.text = !string.IsNullOrEmpty(mwi.newWeaponName)
+                    ? mwi.newWeaponName
+                    : item.item.itemName;
+            }
+
+            // 之後的槽：各個掛點
+            foreach (var at in mw.attachmentPoints)
+            {
+                string slotName = at.pointTransform.name;
+                craftingSlots.Add(new CraftingSlot
+                {
+                    assembledPart = null,
+                    attachmentPointTransform = FindChildRecursive(weaponPreview.transform, slotName),
+                    equipmentType = at.allowPart,
+                    item = null
+                });
+            }
+            // 依照新的 craftingSlots 重新產生左側插槽按鈕
+            CreateCraftingSlots();
+
+            // 右側只留下這把武器為選中
+            foreach (var t in itemsButtonParent.GetComponentsInChildren<Toggle>(true))
+            {
+                if (t != btn)
+                {
+                    t.isOn = false;
+                    t.interactable = true;
+                }
+            }
+
 
         }
         // 武器零件
@@ -578,6 +656,36 @@ public class CraftingManager : MonoBehaviour
                     t.interactable = true;
                 }
             }
+        }
+        else if (item.item is MeleeWeaponPart mwp)
+        {
+            if (meleeWeapon == null || weaponPreview == null)
+                return;
+
+            foreach (var attachmentPoint in craftingSlots)
+            {
+                if (mwp.partType != attachmentPoint.equipmentType ||
+                    attachmentPoint.attachmentPointTransform == null)
+                    continue;
+                if (attachmentPoint.assembledPart != null)
+                {
+                    Destroy(attachmentPoint.assembledPart);
+                }
+
+                GameObject part = Instantiate(mwp.meleeWeaponPartPrefab, attachmentPoint.attachmentPointTransform);
+                attachmentPoint.assembledPart = part;
+                attachmentPoint.item = item;
+            }
+            // 右側只留下這把武器為選中
+            foreach (var t in itemsButtonParent.GetComponentsInChildren<Toggle>(true))
+            {
+                if (t != btn)
+                {
+                    t.isOn = false;
+                    t.interactable = true;
+                }
+            }
+            RefreshMeleeDefaultHandleState();
         }
 
         // 更新左側插槽圖示
@@ -1179,6 +1287,7 @@ public class CraftingManager : MonoBehaviour
 
             RefreshCraftingStatBlock();
             RefreshTooltipIfVisible();
+            RefreshMeleeDefaultHandleState();
         }
         else
         {
@@ -1199,6 +1308,7 @@ public class CraftingManager : MonoBehaviour
 
             RefreshCraftingStatBlock();
             RefreshTooltipIfVisible();
+            RefreshMeleeDefaultHandleState();
         }
     }
 
@@ -1239,6 +1349,10 @@ public class CraftingManager : MonoBehaviour
                     icon.sprite = barrelIcon;
                 else if (slot.equipmentType == WeaponPartType.Scope)
                     icon.sprite = scopeIcon;
+                else if (slot.equipmentType == WeaponPartType.Handle)
+                    icon.sprite = handleIcon;
+                else if(slot.equipmentType == WeaponPartType.Coating)
+                    icon.sprite = coatingIcon;
             }
 
             var btn = slotButton.GetComponent<Toggle>();
@@ -1258,8 +1372,13 @@ public class CraftingManager : MonoBehaviour
                         ClearInventoryButton();
                         return;
                     }
-
-                    OpenRangeWeaponPartsInventory(ItemType.WeaponPart, capturedSlot.equipmentType);
+                    if (craftingType == 0)
+                    {
+                        OpenRangeWeaponPartsInventory(ItemType.WeaponPart, capturedSlot.equipmentType);
+                    }else if (craftingType == 1)
+                    {
+                        OpenMeleeWeaponPartsInventory(ItemType.WeaponPart, capturedSlot.equipmentType);
+                    }
                     SelectWeaponPartToColor(slotIndex);
                 });
             }
@@ -1570,5 +1689,47 @@ public class CraftingManager : MonoBehaviour
             rangeWeaponCraftingSlotPage.SetActive(false);
             meleeWeaponCraftingSlotPage.SetActive(true);
         }
+    }
+    private void SetDefaultMeleeHandleActive(bool active)
+    {
+        if (meleeWeapon == null || weaponPreview == null) return;
+
+        // ScriptableObject 參考的是 prefab 資產，不是 runtime clone
+        // 所以要用 name 去 weaponPreview 裡找對應 child
+        if (meleeWeapon.defaultHandle != null)
+        {
+            var t = FindChildRecursive(weaponPreview.transform, meleeWeapon.defaultHandle.name);
+            if (t != null) t.gameObject.SetActive(active);
+        }
+        else
+        {
+            // 保底：如果主人沒填 defaultHandle，就嘗試用常見名字找
+            var t = FindChildRecursive(weaponPreview.transform, "default handle");
+            if (t != null) t.gameObject.SetActive(active);
+        }
+    }
+    // 依照 Handle slot 有沒有裝零件，自動刷新 default handle 顯示
+    private void RefreshMeleeDefaultHandleState()
+    {
+        if (meleeWeapon == null || weaponPreview == null) return;
+
+        bool hasHandlePart = false;
+
+        if (craftingSlots != null)
+        {
+            foreach (var slot in craftingSlots)
+            {
+                if (slot == null) continue;
+                if (slot.equipmentType != WeaponPartType.Handle) continue;
+                if (slot.item == null || slot.item.item == null) continue;
+
+                hasHandlePart = true;
+                break;
+            }
+        }
+
+        // 有選 Handle 零件 -> 關掉 default handle
+        // 沒選 Handle 零件 -> 打開 default handle
+        SetDefaultMeleeHandleActive(!hasHandlePart);
     }
 }

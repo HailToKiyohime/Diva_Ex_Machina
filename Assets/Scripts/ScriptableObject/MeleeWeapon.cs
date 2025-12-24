@@ -24,7 +24,7 @@ public enum MeleeWeaponPartAttribute {
 [CreateAssetMenu(fileName = "New Melee Weapon", menuName = "Inventory/MeleeWeapon")]
 public class MeleeWeapon : ItemObject
 {
-    public GameObject meleeWeaponPartPrefab;
+    public GameObject weaponPrefab;
     public MeleeWeaponStance meleeWeaponStance;
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
     public List<RandomBuff> randomBuffs = new List<RandomBuff>();
