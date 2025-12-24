@@ -12,13 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 76655638c1f9059499a47cfb94789d2d, type: 3}
   m_Name: Handle 1
   m_EditorClassIdentifier: Assembly-CSharp::MeleeWeaponPart
-  itemName: 
-  type: 0
+  itemName: Handle 1
+  type: 9
   icon: {fileID: 0}
   maxStack: 0
   dropPrefab: {fileID: 0}
-  meleeWeaponPartPrefab: {fileID: 0}
-  partType: 0
+  meleeWeaponPartPrefab: {fileID: 3692955859251412108, guid: ef68e8d1b1706ce46b213bf11697c799, type: 3}
+  partType: 4
   buffs: []
   randomBuffs: []
-  meshRenderer: {fileID: 0}
+  meshRenderer: {fileID: -7511558181221131132, guid: fc999e70dbd3bc848895170d06c2bd51, type: 3}
