@@ -60,6 +60,14 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 18bfdaf667c8f95448f8d2bc457295fe, type: 2}
+    - target: {fileID: -2949545643137184875, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      propertyPath: m_Layer
+      value: 8
+      objectReference: {fileID: 0}
+    - target: {fileID: -1110591320675855361, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      propertyPath: m_Layer
+      value: 8
+      objectReference: {fileID: 0}
     - target: {fileID: 416611133860630451, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
       propertyPath: m_Materials.Array.size
       value: 2
@@ -75,6 +83,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
       propertyPath: m_Name
       value: Blade1
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      propertyPath: m_Layer
+      value: 8
       objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 6024410274549503570, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}

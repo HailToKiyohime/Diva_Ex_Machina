@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 4763076824932729096}
   - component: {fileID: 4233527866817074450}
   - component: {fileID: 2595562065573041915}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: default handle
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -98,7 +98,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 884232072107340063}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: Handle Attachment Point
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -131,7 +131,7 @@ GameObject:
   - component: {fileID: 7378029717664768195}
   - component: {fileID: 467115080070306195}
   - component: {fileID: 451579318726542796}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: Lance 1
   m_TagString: Untagged
   m_Icon: {fileID: 0}

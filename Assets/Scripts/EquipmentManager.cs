@@ -7,9 +7,32 @@ using UnityEngine;
 public class EquipmentSlot
 {
     public GameObject equipedItem;
-    public ItemType equipmentType;
+
+    // ✅ 新：允許多種 ItemType
+    [SerializeField] public List<ItemType> equipmentTypes = new List<ItemType>();
+
+    // ✅ 舊：先保留，避免你原本 Inspector 設定立刻丟失（遷移用）
+    [SerializeField, HideInInspector] public ItemType equipmentType;
 
     public ItemInstance item;
+
+    public bool Accepts(ItemType t)
+    {
+        if (equipmentTypes != null && equipmentTypes.Count > 0)
+            return equipmentTypes.Contains(t);
+
+        // 若主人還沒填新 list，就用舊欄位當 fallback
+        return equipmentType == t;
+    }
+
+#if UNITY_EDITOR
+    // 自動把舊值塞進 list（只在 list 是空的時候）
+    public void MigrateIfNeeded()
+    {
+        if ((equipmentTypes == null || equipmentTypes.Count == 0) && equipmentType != 0)
+            equipmentTypes = new List<ItemType> { equipmentType };
+    }
+#endif
 }
 
 
@@ -132,7 +155,7 @@ public class EquipmentManager : MonoBehaviour
         {
             var slot = equipmentSlots[i];
 
-            if (slot.equipmentType != item.item.type) continue;
+            if (!slot.Accepts(item.item.type)) continue;
 
             // ²M±¼ÂÂ¹ê¨Ò
             if (slot.equipedItem) Destroy(slot.equipedItem);
@@ -205,7 +228,7 @@ public class EquipmentManager : MonoBehaviour
 
         var slot = equipmentSlots[slotIndex];
 
-        if (slot.equipmentType != item.item.type)
+        if (!slot.Accepts(item.item.type))
         {
             Debug.LogWarning(
                 $"TryEquipWeaponFromInventory: slot[{slotIndex}].equipmentType = {slot.equipmentType}, item.type = {item.item.type}"
@@ -213,117 +236,212 @@ public class EquipmentManager : MonoBehaviour
             return false;
         }
 
-        // ²M±¼³o¤@®æ­ì¥»ªºªZ¾¹
         if (slot.equipedItem) Destroy(slot.equipedItem);
 
-        // ¥u³B²z RangeWeaponInstance
-        if (item is not RangeWeaponInstance rwi || rwi.item is not RangeWeapon rw)
-        {
-            Debug.LogWarning("TryEquipWeaponFromInventory: item is not RangeWeaponInstance/RangeWeapon");
-            return false;
-        }
 
-        // 1) ¥DªZ¾¹±¾¦b mountPoint¡]³õ´ºª«¥ó¡^
-        slot.equipedItem = Instantiate(rw.weaponPrefab, mountPoint, false);
-        slot.equipedItem.transform.localRotation = Quaternion.Euler(new Vector3(-90, 90, 0));
-        slot.item = item;
-        if (FindChildRecursive(slot.equipedItem.transform, "MuzzlePoint") != null)
+        if (item is RangeWeaponInstance rwi && rwi.item is RangeWeapon rw)
         {
-            rwi.muzzlePoint = FindChildRecursive(slot.equipedItem.transform, "MuzzlePoint");
-        }
-
-
-        // 1-1) §â RangeWeaponInstance ¤W¦sªºÃC¦â®M¦^¥h
-        if (rwi.colors != null && rwi.colors.Count > 0 && !string.IsNullOrEmpty(rwi.shaderName))
-        {
-            var rend = slot.equipedItem.GetComponentInChildren<Renderer>();
-            if (rend)
+            // 1) ¥DªZ¾¹±¾¦b mountPoint¡]³õ´ºª«¥ó¡^
+            slot.equipedItem = Instantiate(rw.weaponPrefab, mountPoint, false);
+            slot.equipedItem.transform.localRotation = Quaternion.Euler(new Vector3(-90, 90, 0));
+            slot.item = item;
+            if (FindChildRecursive(slot.equipedItem.transform, "MuzzlePoint") != null)
             {
-                var mat = rend.material; // ¹ê¨Ò§÷½è
-                if (rwi.shaderName.Contains("Mix 3") && rwi.colors.Count >= 3)
+                rwi.muzzlePoint = FindChildRecursive(slot.equipedItem.transform, "MuzzlePoint");
+            }
+
+
+            // 1-1) §â RangeWeaponInstance ¤W¦sªºÃC¦â®M¦^¥h
+            if (rwi.colors != null && rwi.colors.Count > 0 && !string.IsNullOrEmpty(rwi.shaderName))
+            {
+                var rend = slot.equipedItem.GetComponentInChildren<Renderer>();
+                if (rend)
                 {
-                    mat.SetColor("_BaseColor", rwi.colors[0]);
-                    mat.SetColor("_Layer1Color", rwi.colors[1]);
-                    mat.SetColor("_Layer2Color", rwi.colors[2]);
-                }
-                else if (rwi.shaderName.Contains("Mix 4") && rwi.colors.Count >= 4)
-                {
-                    mat.SetColor("_BaseColor", rwi.colors[0]);
-                    mat.SetColor("_Layer1Color", rwi.colors[1]);
-                    mat.SetColor("_Layer2Color", rwi.colors[2]);
-                    mat.SetColor("_Layer3Color", rwi.colors[3]);
-                }
-                else if (rwi.shaderName.Contains("Mix 5") && rwi.colors.Count >= 5)
-                {
-                    mat.SetColor("_BaseColor", rwi.colors[0]);
-                    for (int k = 1; k < 5; k++)
-                        mat.SetColor($"_Layer{k}Color", rwi.colors[k]);
+                    var mat = rend.material; // ¹ê¨Ò§÷½è
+                    if (rwi.shaderName.Contains("Mix 3") && rwi.colors.Count >= 3)
+                    {
+                        mat.SetColor("_BaseColor", rwi.colors[0]);
+                        mat.SetColor("_Layer1Color", rwi.colors[1]);
+                        mat.SetColor("_Layer2Color", rwi.colors[2]);
+                    }
+                    else if (rwi.shaderName.Contains("Mix 4") && rwi.colors.Count >= 4)
+                    {
+                        mat.SetColor("_BaseColor", rwi.colors[0]);
+                        mat.SetColor("_Layer1Color", rwi.colors[1]);
+                        mat.SetColor("_Layer2Color", rwi.colors[2]);
+                        mat.SetColor("_Layer3Color", rwi.colors[3]);
+                    }
+                    else if (rwi.shaderName.Contains("Mix 5") && rwi.colors.Count >= 5)
+                    {
+                        mat.SetColor("_BaseColor", rwi.colors[0]);
+                        for (int k = 1; k < 5; k++)
+                            mat.SetColor($"_Layer{k}Color", rwi.colors[k]);
+                    }
                 }
             }
-        }
 
-        // 2) ªþ¥ó±¾¦b¡u¥DªZ¾¹¹ê¨Ò¡v¤Wªº¦P¦W±¾ÂI¡A¨Ã®M¦^ÃC¦â
-        if (rwi.attachment != null)
-        {
-            foreach (var attach in rwi.attachment)
+            // 2) ªþ¥ó±¾¦b¡u¥DªZ¾¹¹ê¨Ò¡v¤Wªº¦P¦W±¾ÂI¡A¨Ã®M¦^ÃC¦â
+            if (rwi.attachment != null)
             {
-                if (attach?.item is not RangeWeaponPart rwp) continue;
-
-                foreach (var ap in rw.attachmentPoints)
+                foreach (var attach in rwi.attachment)
                 {
-                    if (ap.allowPart != attach.partType) continue;
+                    if (attach?.item is not RangeWeaponPart rwp) continue;
 
-                    var target = FindChildRecursive(slot.equipedItem.transform, ap.pointTransform.name);
-                    if (target == null)
+                    foreach (var ap in rw.attachmentPoints)
                     {
-                        Debug.LogWarning($"Equip: cannot find mount '{ap.pointTransform.name}' on weapon instance");
-                        continue;
-                    }
+                        if (ap.allowPart != attach.partType) continue;
 
-                    var part = Instantiate(rwp.rangeWeaponPartPrefab, target, false);
-                    part.transform.localPosition = Vector3.zero;
-                    part.transform.localRotation = Quaternion.identity;
-                    part.transform.localScale = Vector3.one;
-                    if (FindChildRecursive(part.transform, "MuzzlePoint") != null)
-                    {
-                        rwi.muzzlePoint = FindChildRecursive(part.transform, "MuzzlePoint");
-                    }
-
-                    if (attach.colors != null && attach.colors.Count > 0 && !string.IsNullOrEmpty(attach.shaderName))
-                    {
-                        var partRend = part.GetComponentInChildren<Renderer>();
-                        if (partRend)
+                        var target = FindChildRecursive(slot.equipedItem.transform, ap.pointTransform.name);
+                        if (target == null)
                         {
-                            var mat = partRend.material;
-                            if (attach.shaderName.Contains("Mix 3") && attach.colors.Count >= 3)
+                            Debug.LogWarning($"Equip: cannot find mount '{ap.pointTransform.name}' on weapon instance");
+                            continue;
+                        }
+
+                        var part = Instantiate(rwp.rangeWeaponPartPrefab, target, false);
+                        part.transform.localPosition = Vector3.zero;
+                        part.transform.localRotation = Quaternion.identity;
+                        part.transform.localScale = Vector3.one;
+                        if (FindChildRecursive(part.transform, "MuzzlePoint") != null)
+                        {
+                            rwi.muzzlePoint = FindChildRecursive(part.transform, "MuzzlePoint");
+                        }
+
+                        if (attach.colors != null && attach.colors.Count > 0 && !string.IsNullOrEmpty(attach.shaderName))
+                        {
+                            var partRend = part.GetComponentInChildren<Renderer>();
+                            if (partRend)
                             {
-                                mat.SetColor("_BaseColor", attach.colors[0]);
-                                mat.SetColor("_Layer1Color", attach.colors[1]);
-                                mat.SetColor("_Layer2Color", attach.colors[2]);
-                            }
-                            else if (attach.shaderName.Contains("Mix 4") && attach.colors.Count >= 4)
-                            {
-                                mat.SetColor("_BaseColor", attach.colors[0]);
-                                mat.SetColor("_Layer1Color", attach.colors[1]);
-                                mat.SetColor("_Layer2Color", attach.colors[2]);
-                                mat.SetColor("_Layer3Color", attach.colors[3]);
-                            }
-                            else if (attach.shaderName.Contains("Mix 5") && attach.colors.Count >= 5)
-                            {
-                                mat.SetColor("_BaseColor", attach.colors[0]);
-                                for (int k = 1; k < 5; k++)
-                                    mat.SetColor($"_Layer{k}Color", attach.colors[k]);
+                                var mat = partRend.material;
+                                if (attach.shaderName.Contains("Mix 3") && attach.colors.Count >= 3)
+                                {
+                                    mat.SetColor("_BaseColor", attach.colors[0]);
+                                    mat.SetColor("_Layer1Color", attach.colors[1]);
+                                    mat.SetColor("_Layer2Color", attach.colors[2]);
+                                }
+                                else if (attach.shaderName.Contains("Mix 4") && attach.colors.Count >= 4)
+                                {
+                                    mat.SetColor("_BaseColor", attach.colors[0]);
+                                    mat.SetColor("_Layer1Color", attach.colors[1]);
+                                    mat.SetColor("_Layer2Color", attach.colors[2]);
+                                    mat.SetColor("_Layer3Color", attach.colors[3]);
+                                }
+                                else if (attach.shaderName.Contains("Mix 5") && attach.colors.Count >= 5)
+                                {
+                                    mat.SetColor("_BaseColor", attach.colors[0]);
+                                    for (int k = 1; k < 5; k++)
+                                        mat.SetColor($"_Layer{k}Color", attach.colors[k]);
+                                }
                             }
                         }
                     }
                 }
             }
-        }
 
-        PlayerStats.Instance?.RecalculateFromEquipment();
-        RefreshEquipmentStatBlock();
-        Debug.Log($"Equipped weapon '{rw.itemName}' to slot index {slotIndex}");
-        return true;
+            PlayerStats.Instance?.RecalculateFromEquipment();
+            RefreshEquipmentStatBlock();
+            Debug.Log($"Equipped weapon '{rw.itemName}' to slot index {slotIndex}");
+            return true;
+        }else if (item is MeleeWeaponInstance mwi && mwi.item is MeleeWeapon mw)
+        {
+            // 1) ¥DªZ¾¹±¾¦b mountPoint¡]³õ´ºª«¥ó¡^
+            slot.equipedItem = Instantiate(mw.weaponPrefab, mountPoint, false);
+            slot.equipedItem.transform.localRotation = Quaternion.Euler(new Vector3(-90, 90, 0));
+            slot.item = item;
+
+
+            // 1-1) RangeWeaponInstance 
+            if (mwi.colors != null && mwi.colors.Count > 0 && !string.IsNullOrEmpty(mwi.shaderName))
+            {
+                var rend = slot.equipedItem.GetComponentInChildren<Renderer>();
+                if (rend)
+                {
+                    var mat = rend.material;
+                    if (mwi.shaderName.Contains("Mix 3") && mwi.colors.Count >= 3)
+                    {
+                        mat.SetColor("_BaseColor", mwi.colors[0]);
+                        mat.SetColor("_Layer1Color", mwi.colors[1]);
+                        mat.SetColor("_Layer2Color", mwi.colors[2]);
+                    }
+                    else if (mwi.shaderName.Contains("Mix 4") && mwi.colors.Count >= 4)
+                    {
+                        mat.SetColor("_BaseColor", mwi.colors[0]);
+                        mat.SetColor("_Layer1Color", mwi.colors[1]);
+                        mat.SetColor("_Layer2Color", mwi.colors[2]);
+                        mat.SetColor("_Layer3Color", mwi.colors[3]);
+                    }
+                    else if (mwi.shaderName.Contains("Mix 5") && mwi.colors.Count >= 5)
+                    {
+                        mat.SetColor("_BaseColor", mwi.colors[0]);
+                        for (int k = 1; k < 5; k++)
+                            mat.SetColor($"_Layer{k}Color", mwi.colors[k]);
+                    }
+                }
+            }
+
+            // 2) ªþ¥ó±¾¦b¡u¥DªZ¾¹¹ê¨Ò¡v¤Wªº¦P¦W±¾ÂI¡A¨Ã®M¦^ÃC¦â
+            if (mwi.attachment != null)
+            {
+                foreach (var attach in mwi.attachment)
+                {
+                    if (attach?.item is not MeleeWeaponPart mwp) continue;
+
+                    foreach (var ap in mw.attachmentPoints)
+                    {
+                        if (ap.allowPart != attach.partType) continue;
+
+                        var target = FindChildRecursive(slot.equipedItem.transform, ap.pointTransform.name);
+                        if (target == null)
+                        {
+                            Debug.LogWarning($"Equip: cannot find mount '{ap.pointTransform.name}' on weapon instance");
+                            continue;
+                        }
+
+                        var part = Instantiate(mwp.meleeWeaponPartPrefab, target, false);
+                        part.transform.localPosition = Vector3.zero;
+                        part.transform.localRotation = Quaternion.identity;
+                        part.transform.localScale = Vector3.one;
+
+                        if (attach.colors != null && attach.colors.Count > 0 && !string.IsNullOrEmpty(attach.shaderName))
+                        {
+                            var partRend = part.GetComponentInChildren<Renderer>();
+                            if (partRend)
+                            {
+                                var mat = partRend.material;
+                                if (attach.shaderName.Contains("Mix 3") && attach.colors.Count >= 3)
+                                {
+                                    mat.SetColor("_BaseColor", attach.colors[0]);
+                                    mat.SetColor("_Layer1Color", attach.colors[1]);
+                                    mat.SetColor("_Layer2Color", attach.colors[2]);
+                                }
+                                else if (attach.shaderName.Contains("Mix 4") && attach.colors.Count >= 4)
+                                {
+                                    mat.SetColor("_BaseColor", attach.colors[0]);
+                                    mat.SetColor("_Layer1Color", attach.colors[1]);
+                                    mat.SetColor("_Layer2Color", attach.colors[2]);
+                                    mat.SetColor("_Layer3Color", attach.colors[3]);
+                                }
+                                else if (attach.shaderName.Contains("Mix 5") && attach.colors.Count >= 5)
+                                {
+                                    mat.SetColor("_BaseColor", attach.colors[0]);
+                                    for (int k = 1; k < 5; k++)
+                                        mat.SetColor($"_Layer{k}Color", attach.colors[k]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            PlayerStats.Instance?.RecalculateFromEquipment();
+            RefreshEquipmentStatBlock();
+            Debug.Log($"Equipped weapon '{mw.itemName}' to slot index {slotIndex}");
+            return true;
+        }
+        else
+        {
+            return false;
+        }
     }
 
 
@@ -346,5 +464,14 @@ public class EquipmentManager : MonoBehaviour
         }
         return null;
     }
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        if (equipmentSlots == null) return;
+        foreach (var s in equipmentSlots)
+            s?.MigrateIfNeeded();
+    }
+#endif
 }
 

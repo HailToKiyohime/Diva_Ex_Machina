@@ -410,6 +410,35 @@ public class InventoryManager : MonoBehaviour
         inventory.Add(newInst);
     }
 
+    public void AddCraftedMeleeWeaponToInventory(MeleeWeaponInstance baseWeaponInstance, List<PartInstance> meleeWeaponParts)
+    {
+        if (baseWeaponInstance == null)
+        {
+            Debug.LogWarning("AddCraftedMeleeWeaponToInventory: baseWeaponInstance is null");
+            return;
+        }
+
+        var newInst = new MeleeWeaponInstance
+        {
+            item = baseWeaponInstance.item,
+            amount = 1,
+            newWeaponName = baseWeaponInstance.newWeaponName,
+            buffs = new List<EquipmentBuff>(baseWeaponInstance.buffs),
+            attachment = new List<PartInstance>(),
+            shaderName = baseWeaponInstance.shaderName,
+            colors = baseWeaponInstance.colors != null ? new List<UnityEngine.Color>(baseWeaponInstance.colors) : new List<UnityEngine.Color>()
+        };
+
+        if (meleeWeaponParts != null)
+        {
+            foreach (var part in meleeWeaponParts)
+                if (part != null) newInst.attachment.Add(part);
+        }
+
+        inventory.Add(newInst);
+    }
+
+
     #endregion
 
     #region Inventory Page Openers (keep for Inspector)
@@ -441,7 +470,7 @@ public class InventoryManager : MonoBehaviour
             SetAllRemoveButtonsActive(false);
             return;
         }
-        OpenPartsInventory(slots[index].equipmentType);
+        OpenPartsInventory(slots[index].equipmentTypes);
     }
 
     public void OpenPartsInventory(ItemType itemType)
@@ -513,7 +542,82 @@ public class InventoryManager : MonoBehaviour
 
         ShowInventoryPage();
     }
+    public void OpenPartsInventory(List<ItemType> allowedTypes)
+    {
+        if (IsColorMode) return;
 
+        bool anySlotSelected = inventoryToggleGroup != null && inventoryToggleGroup.AnyTogglesOn();
+        if (!anySlotSelected)
+        {
+            ClearInventoryButton();
+            ShowStatPage();
+            SetAllRemoveButtonsActive(false);
+            return;
+        }
+
+        if (allowedTypes == null || allowedTypes.Count == 0)
+        {
+            ClearInventoryButton();
+            ShowStatPage();
+            SetAllRemoveButtonsActive(false);
+            return;
+        }
+
+        ClearInventoryButton();
+        int slotIndex = GetSelectedSlotIndex();
+
+        SetAllRemoveButtonsActive(false);
+
+        bool slotHasEquipment = false;
+        if (slotIndex >= 0 &&
+            EquipmentManager.Instance != null &&
+            slotIndex < EquipmentManager.Instance.equipmentSlots.Count)
+        {
+            slotHasEquipment = EquipmentManager.Instance.equipmentSlots[slotIndex].equipedItem != null;
+        }
+
+        if (slotHasEquipment)
+            SetRemoveButtonForSlot(slotIndex, true);
+
+        // 用 HashSet 提升 Contains 效率
+        var allowed = new HashSet<ItemType>(allowedTypes);
+
+        foreach (var inv in inventory)
+        {
+            if (inv == null || inv.item == null) continue;
+            if (!allowed.Contains(inv.item.type)) continue;
+
+            var button = Instantiate(buttonPrefab, itemsButtonParent);
+
+            var icon = button.transform.Find("Item Icon")?.GetComponent<UnityEngine.UI.Image>();
+            if (icon != null) icon.sprite = inv.item.icon;
+
+            var label = button.transform.Find("Item Name")?.GetComponent<TMPro.TMP_Text>();
+            if (label != null)
+            {
+                if (inv is RangeWeaponInstance rwi && !string.IsNullOrEmpty(rwi.newWeaponName))
+                    label.text = rwi.newWeaponName;
+                else
+                    label.text = inv.item.itemName;
+            }
+
+            var tgl = button.GetComponent<UnityEngine.UI.Toggle>();
+            if (tgl == null) continue;
+
+            ItemInstance capturedItem = inv;
+            toggleItemMap[tgl] = capturedItem;
+
+            tgl.interactable = !IsItemEquippedAnywhere(capturedItem);
+
+            tgl.onValueChanged.AddListener(isOn =>
+            {
+                if (!isOn) return;
+                OnClickInventoryItem(capturedItem, tgl);
+            });
+        }
+
+        ShowInventoryPage();
+    }
     public void ClearInventoryButton()
     {
         if (itemsButtonParent != null)
@@ -571,7 +675,42 @@ public class InventoryManager : MonoBehaviour
             btn.interactable = false;
             return;
         }
+        if (item is MeleeWeaponInstance)
+        {
+            int slotIndex = GetSelectedSlotIndex();
+            if (slotIndex < 0)
+            {
+                Debug.LogWarning("OnClickInventoryItem (weapon): no equipment slot selected");
+                btn.isOn = false;
+                return;
+            }
 
+            var slotButton = inventoryButtonParent.GetChild(slotIndex);
+            var weaponTransform = slotButton.GetComponentInChildren<WeaponTransform>();
+            if (weaponTransform == null || weaponTransform.weaponTransform == null)
+            {
+                Debug.LogWarning($"OnClickInventoryItem (weapon): WeaponTransform missing on slot {slotIndex}");
+                btn.isOn = false;
+                return;
+            }
+            Transform mountPoint = weaponTransform.weaponTransform;
+
+            if (!EquipmentManager.Instance.TryEquipWeaponFromInventory(item, mountPoint, slotIndex))
+            {
+                btn.isOn = false;
+                return;
+            }
+
+            // UI 更新
+            SetEquipmentSlotIcon(slotIndex, item.item.icon);
+            SetRemoveButtonForSlot(slotIndex, true);
+
+            RefreshItemListLockStates(btn);
+
+            // 鎖住當前已裝備的按鈕
+            btn.interactable = false;
+            return;
+        }
         // Armor / other equip
         if (!EquipmentManager.Instance.TryEquipFromInventory(item))
         {
@@ -579,7 +718,8 @@ public class InventoryManager : MonoBehaviour
             return;
         }
 
-        if( item.item.type == ItemType.LegsArmor){
+        if (item.item.type == ItemType.LegsArmor)
+        {
             BoneCombiner.Instance.HideLegs();
         }
         // UI 更新
@@ -636,7 +776,11 @@ public class InventoryManager : MonoBehaviour
         int index = GetSelectedSlotIndex();
         if (index < 0) return;
 
-        if (EquipmentManager.Instance.equipmentSlots[index].equipmentType == ItemType.LegsArmor)
+        var equippedType = EquipmentManager.Instance.equipmentSlots[index].item?.item != null
+            ? EquipmentManager.Instance.equipmentSlots[index].item.item.type
+            : (ItemType?)null;
+
+        if (equippedType == ItemType.LegsArmor)
         {
             BoneCombiner.Instance.ShowLegs();
         }
