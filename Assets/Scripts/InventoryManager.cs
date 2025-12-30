@@ -370,7 +370,53 @@ public class InventoryManager : MonoBehaviour
             inventory.Add(inst);
             return;
         }
+        if (item is MeleeWeaponPart mwp)
+        {
+            var inst = new PartInstance
+            {
+                item = item,
+                amount = 1,
+                partType = mwp.partType
+            };
 
+            // 讀顏色（跟 RangeWeaponPart 同規格：Mix3/4/5）
+            if (mwp.meshRenderer && mwp.meshRenderer.sharedMaterial)
+            {
+                var mat = mwp.meshRenderer.sharedMaterial;
+                inst.shaderName = mat.shader.name;
+
+                if (inst.shaderName.Contains("Mix 3"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                }
+                else if (inst.shaderName.Contains("Mix 4"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                    inst.colors.Add(mat.GetColor("_Layer3Color"));
+                }
+                else if (inst.shaderName.Contains("Mix 5"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    for (int i = 1; i < 5; i++)
+                        inst.colors.Add(mat.GetColor($"_Layer{i}Color"));
+                }
+            }
+
+            // buffs + random buff
+            foreach (EquipmentBuff buff in mwp.buffs)
+                inst.buffs.Add(buff);
+
+            var pickedBuff = mwp.GetRandomBuff();
+            if (pickedBuff != null)
+                inst.buffs.Add(pickedBuff.buff);
+
+            inventory.Add(inst);
+            return;
+        }
         inventory.Add(new ItemInstance { item = item, amount = 1 });
     }
 

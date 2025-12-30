@@ -64,6 +64,34 @@ PrefabInstance:
       propertyPath: m_Layer
       value: 8
       objectReference: {fileID: 0}
+    - target: {fileID: -2732574941072478389, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: -2732574941072478389, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: -2732574941072478389, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -2732574941072478389, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -2732574941072478389, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: -90
+      objectReference: {fileID: 0}
+    - target: {fileID: -2732574941072478389, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -2732574941072478389, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: -1110591320675855361, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
       propertyPath: m_Layer
       value: 8
@@ -91,6 +119,10 @@ PrefabInstance:
     m_RemovedComponents:
     - {fileID: 6024410274549503570, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
     - {fileID: -155801271417213339, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+    - {fileID: 234759672159543008, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+    - {fileID: -5080856735557386112, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+    - {fileID: -5474537667748300501, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+    - {fileID: 535015393957032615, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []

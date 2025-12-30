@@ -31,6 +31,17 @@ public class PlayerMovement : MonoBehaviour
     private Vector3 dashDir = Vector3.forward;
     private float dashAccel = 0f;        // 固定加速度（m/s^2）
     private float dashTargetSpeed = 0f;  // 目標 dash 速度
+
+    [Header("Melee Dash")]
+    [SerializeField] private float meleeDashMaxDuration = 1.5f; // 超過這時間仍未達距離就停（例如撞牆）
+    private bool meleeDashActive = false;
+    private Vector3 meleeDashDir = Vector3.forward;
+    private float meleeDashSpeed = 0f;
+    private float meleeDashDistance = 0f;
+    private float meleeDashStartTime = 0f;
+    private Vector3 meleeDashStartPos = Vector3.zero;
+    private bool meleeDashSavedUseGravity;
+    private bool meleeDashHasSavedGravity = false;
     [Header("Attack Facing")]
     [SerializeField] private float attackRotateSpeed = 25;         // 轉身速度
     [SerializeField] private float attackAngleThreshold = 6f;       // 允許開火的角度誤差
@@ -62,10 +73,12 @@ public class PlayerMovement : MonoBehaviour
         GroundCheck();
         ApplyHorizontalMovementFixed(Time.fixedDeltaTime);
         ApplyFlyFixed(Time.fixedDeltaTime); // 新增
+        ApplyMeleeDashFixed(Time.fixedDeltaTime); // 新增（近戰衝刺）
         ApplyDashFixed(Time.fixedDeltaTime); // 新增
     }
     private void ApplyHorizontalMovementFixed(float dt)
     {
+        if (meleeDashActive) return; // 近戰衝刺期間忽略所有移動輸入
         if (Time.time <= dashActiveUntil) return;
         Vector3 v = playerRigidbody.velocity;
         Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
@@ -124,12 +137,29 @@ public class PlayerMovement : MonoBehaviour
         if (stats.currentEnergy <= 0f)
             flyRequestUntil = 0f;
     }
-    public void ProcessAttackFacingAndShoot(AttackManager attackManager, Weapon w, InputAction attackInput)
+    public void ProcessAttackFacingAndAttack(AttackManager attackManager, Weapon w, InputAction attackInput)
     {
         if (attackManager == null || w == null || attackInput == null) return;
         if (PlayerAiming.Instance == null || characterModel == null) return;
 
-        bool isSingle = (w.firingMode == 0);
+        // 判斷這次攻擊是遠程還是近戰（不改 PlayerController 的呼叫方式）
+        var stats = PlayerStats.Instance;
+        bool isLeft = (attackManager != null && w == attackManager.leftWeapon);
+        bool isRight = (attackManager != null && w == attackManager.rightWeapon);
+        bool isMelee = false;
+
+        // 近戰衝刺距離目前統一使用 PlayerStats.meleeDashDistance（避免依手/武器欄位不一致造成編譯問題）
+        float meleeDashDistance = (stats != null) ? stats.meleeDashDistance : 0f;
+
+        if (stats != null && (isLeft || isRight))
+        {
+            var hand = isLeft ? stats.leftHand : stats.rightHand;
+            isMelee = (hand.weaponKind == HandWeaponKind.Melee);
+        }
+
+        // 近戰目前先視為「單發」：按一下觸發一次（之後要連段再擴充）
+        bool isSingle = isMelee ? true : (w.range.firingMode == 0);
+
 
         // 1) 收集「想射擊」意圖（單發需要緩存，否則轉完身就不是 this frame 了）
         if (isSingle)
@@ -188,16 +218,35 @@ public class PlayerMovement : MonoBehaviour
 
         if (aligned || timedOut)
         {
-            // 4) 真正觸發射擊（由 AttackManager 管理 cooldown/bullets）
-            bool didShoot = attackManager.TryStartShoot(w);
-
-            // 單發：一旦成功開火就消耗掉這次請求
-            if (didShoot && isSingle)
+            if (isMelee)
             {
-                pendingSingleUntil.Remove(w);
-                alignStartTime.Remove(w);
+                // Step 2（先做最簡單）：對準後衝刺到目標方向
+                bool didMelee = attackManager.TryStartMeleeAttack(w);
+                if (didMelee)
+                {
+                    StartMeleeDash(targetPoint, stats != null ? stats.dashSpeed : 0f, meleeDashDistance);
+
+                    if (isSingle)
+                    {
+                        pendingSingleUntil.Remove(w);
+                        alignStartTime.Remove(w);
+                    }
+                }
+            }
+            else
+            {
+                // 4) 真正觸發射擊（由 AttackManager 管理 cooldown/bullets）
+                bool didShoot = attackManager.TryStartShoot(w);
+
+                // 單發：一旦成功開火就消耗掉這次請求
+                if (didShoot && isSingle)
+                {
+                    pendingSingleUntil.Remove(w);
+                    alignStartTime.Remove(w);
+                }
             }
         }
+
     }
     private void SetAttackFacingOwner(Weapon w, Vector3 desiredForward)
     {
@@ -215,6 +264,9 @@ public class PlayerMovement : MonoBehaviour
     }
     public void HorizontalMovement(float moveX, float moveZ)
     {
+        // 衝刺期間忽略所有移動輸入（包含朝向/動畫用的 moveDirection）
+        if (meleeDashActive || Time.time <= dashActiveUntil) return;
+
         // 只更新 moveDirection（給 RotateCharacter / 動畫用），不要在 Update 內碰剛體
         Vector3 forward = characterOrientation.forward;
         forward.y = 0f;
@@ -235,19 +287,91 @@ public class PlayerMovement : MonoBehaviour
     }
     public bool JumpAction()
     {
-        if(grounded && readyToJump)
+        if (grounded && readyToJump)
         {
             readyToJump = false;
             playerRigidbody.velocity = new Vector3(playerRigidbody.velocity.x, 0, playerRigidbody.velocity.z);
             playerRigidbody.AddForceWithoutLimit(Vector3.up * convertJumpHeightToForce(PlayerStats.Instance.jumpHeight), ForceMode.Impulse);
             Invoke("ResetJump", jumpCooldown);
             return true;
-        }else if(!grounded && readyToJump && PlayerStats.Instance.currentEnergy > 0)
+        }
+        else if (!grounded && readyToJump && PlayerStats.Instance.currentEnergy > 0)
         {
             FlyAction();
         }
         return false;
     }
+    private void ApplyMeleeDashFixed(float dt)
+    {
+        if (!meleeDashActive) return;
+
+        // 1) 超時保護：撞牆或卡住，最多持續 meleeDashMaxDuration
+        if (Time.time - meleeDashStartTime > meleeDashMaxDuration)
+        {
+            StopMeleeDash();
+            return;
+        }
+
+        // 2) 距離判定（真 3D 距離：包含垂直）
+        Vector3 delta = transform.position - meleeDashStartPos;
+        if (meleeDashDistance > 0f && delta.magnitude >= meleeDashDistance)
+        {
+            StopMeleeDash();
+            return;
+        }
+
+        // 3) 施加衝刺速度（真 3D：X/Y/Z 全吃方向）
+        Vector3 dashVel = meleeDashDir * meleeDashSpeed;
+        playerRigidbody.velocity = dashVel;
+    }
+
+    private void StartMeleeDash(Vector3 targetPoint, float dashSpeed, float dashDistance)
+    {
+        if (playerRigidbody == null) return;
+        if (dashSpeed <= 0f || dashDistance <= 0f) return;
+
+        // 已在衝刺中就不重新開（避免連點造成狀態抖動）
+        if (meleeDashActive) return;
+
+        if (!meleeDashHasSavedGravity)
+        {
+            // 這行要依你的 BetterRigidbody 實際暴露欄位改一下
+            meleeDashSavedUseGravity = playerRigidbody.useGravity;
+            meleeDashHasSavedGravity = true;
+        }
+        playerRigidbody.useGravity = false;
+
+        Vector3 dir = targetPoint - transform.position;
+        //dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f) return;
+        dir.Normalize();
+
+        meleeDashActive = true;
+        meleeDashDir = dir;
+        meleeDashSpeed = Mathf.Max(0f, dashSpeed);
+        meleeDashDistance = Mathf.Max(0f, dashDistance);
+        meleeDashStartTime = Time.time;
+        meleeDashStartPos = transform.position;
+
+        // 近戰衝刺期間不回能（與一般 dash 同步）
+        CancelInvoke("ResetEnergyRegenerate");
+        canRegenerateEnergy = false;
+    }
+
+    private void StopMeleeDash()
+    {
+        if (meleeDashHasSavedGravity)
+        {
+            playerRigidbody.useGravity = meleeDashSavedUseGravity;
+            meleeDashHasSavedGravity = false;
+        }
+        meleeDashActive = false;
+
+        // 衝刺結束後允許回能（依你現有邏輯：立刻允許；若想延遲可 Invoke）
+        canRegenerateEnergy = true;
+    }
+
+
     private void ApplyDashFixed(float dt)
     {
         if (Time.time > dashRequestUntil) return;

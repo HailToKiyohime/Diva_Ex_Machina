@@ -18,7 +18,7 @@ public class PlayerController : MonoBehaviour
             return;
         }
         Instance = this;
-        playerControls = new PlayerControllers();  
+        playerControls = new PlayerControllers();
     }
 
     private void OnEnable()
@@ -36,30 +36,48 @@ public class PlayerController : MonoBehaviour
     {
         Vector2 movementInput = playerControls.Player.Move.ReadValue<Vector2>();
         playerMovement.HorizontalMovement(movementInput.x, movementInput.y);
-        bool jumpPressed = playerControls.Player.Jump.IsPressed();
-        if (jumpPressed)
+
+        if (playerControls.Player.Jump.IsPressed())
         {
             playerMovement.JumpAction();
         }
+
         if (playerControls.Player.Sprint.WasPressedThisFrame())
         {
             playerMovement.DashAction();
         }
-        if (playerControls.Player.Reload.IsPressed())
+
+        // Reload gate:
+        // - If Reload is held and Attack is pressed on a hand:
+        //     * Range weapon -> Reload
+        //     * Melee/None   -> treat as normal attack (so melee still works while holding Reload)
+        bool reloadHeld = playerControls.Player.Reload.IsPressed();
+        bool leftPressed = playerControls.Player.LeftHandAttack.WasPressedThisFrame();
+        bool rightPressed = playerControls.Player.RightHandAttack.WasPressedThisFrame();
+
+        var stats = PlayerStats.Instance;
+
+        if (reloadHeld && (leftPressed || rightPressed))
         {
-            if (playerControls.Player.LeftHandAttack.WasPressedThisFrame())
+            if (leftPressed)
             {
-                attackManager.StartReload(attackManager.leftWeapon);
+                bool leftIsRange = (stats != null && stats.leftHand.weaponKind == HandWeaponKind.Range);
+                if (leftIsRange) attackManager.StartReload(attackManager.leftWeapon);
+                else playerMovement.ProcessAttackFacingAndAttack(attackManager, attackManager.leftWeapon, playerControls.Player.LeftHandAttack);
             }
-            else if (playerControls.Player.RightHandAttack.WasPressedThisFrame())
+
+            if (rightPressed)
             {
-                attackManager.StartReload(attackManager.rightWeapon);
+                bool rightIsRange = (stats != null && stats.rightHand.weaponKind == HandWeaponKind.Range);
+                if (rightIsRange) attackManager.StartReload(attackManager.rightWeapon);
+                else playerMovement.ProcessAttackFacingAndAttack(attackManager, attackManager.rightWeapon, playerControls.Player.RightHandAttack);
             }
+
+            return;
         }
-        else
-        {
-            playerMovement.ProcessAttackFacingAndShoot(attackManager, attackManager.leftWeapon, playerControls.Player.LeftHandAttack);
-            playerMovement.ProcessAttackFacingAndShoot(attackManager, attackManager.rightWeapon, playerControls.Player.RightHandAttack);
-        }
+
+        // Normal attack (range or melee is decided inside PlayerMovement.ProcessAttackFacingAndAttack)
+        playerMovement.ProcessAttackFacingAndAttack(attackManager, attackManager.leftWeapon, playerControls.Player.LeftHandAttack);
+        playerMovement.ProcessAttackFacingAndAttack(attackManager, attackManager.rightWeapon, playerControls.Player.RightHandAttack);
     }
 }

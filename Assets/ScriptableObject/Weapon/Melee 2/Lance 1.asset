@@ -17,12 +17,15 @@ MonoBehaviour:
   icon: {fileID: 0}
   maxStack: 0
   dropPrefab: {fileID: 0}
-  weaponPrefab: {fileID: 8758967448955558671, guid: e2651b38ba01f4642b1bd3136b4822cc, type: 3}
+  weaponPrefab: {fileID: 5643778843091575527, guid: 670829966aaed864ca3e64f137b87d74, type: 3}
   meleeWeaponStance: 0
   buffs: []
   randomBuffs: []
   attachmentPoints:
   - pointTransform: {fileID: 7689432590055944984, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
     allowPart: 4
-  meshRenderer: {fileID: 451579318726542796, guid: e2651b38ba01f4642b1bd3136b4822cc, type: 3}
+  meshRenderer: {fileID: -7511558181221131132, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
   defaultHandle: {fileID: 4136720172559166523, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
+  attribute: 0
+  mainHandGrip: {fileID: 3088508940731471166, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
+  offHandGrip: {fileID: 4621839270243896663, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}

@@ -201,7 +201,7 @@ public class CraftingManager : MonoBehaviour
 
             if (slot.item is RangeWeaponInstance rwi)
             {
-                ws.weapon = rwi;
+                ws.rangeweapon = rwi;
                 if (rwi.buffs != null) ws.buffs.AddRange(rwi.buffs);
             }
             else if (slot.item is PartInstance pi)
@@ -1081,7 +1081,6 @@ public class CraftingManager : MonoBehaviour
                     var slot = craftingSlots[i];
                     if (slot == null || slot.item == null)
                         continue;
-
                     if (slot.item is PartInstance pi)
                     {
                         if (slot.assembledPart != null)
@@ -1138,6 +1137,7 @@ public class CraftingManager : MonoBehaviour
             Debug.Log("Forge: success");
         }else if(baseSlot.item is MeleeWeaponInstance meleeWeaponInstance)
         {
+            Debug.Log("Running");
             // 先把「預覽武器本體」上改好的顏色，回寫到 RangeWeaponInstance
             if (baseSlot.assembledPart != null)
             {

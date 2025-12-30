@@ -243,7 +243,7 @@ public class EquipmentManager : MonoBehaviour
         {
             // 1) ¥DªZ¾¹±¾¦b mountPoint¡]³õ´ºª«¥ó¡^
             slot.equipedItem = Instantiate(rw.weaponPrefab, mountPoint, false);
-            slot.equipedItem.transform.localRotation = Quaternion.Euler(new Vector3(-90, 90, 0));
+            //slot.equipedItem.transform.localRotation = Quaternion.Euler(new Vector3(-90, 90, 0));
             slot.item = item;
             if (FindChildRecursive(slot.equipedItem.transform, "MuzzlePoint") != null)
             {
@@ -344,13 +344,28 @@ public class EquipmentManager : MonoBehaviour
             return true;
         }else if (item is MeleeWeaponInstance mwi && mwi.item is MeleeWeapon mw)
         {
-            // 1) ¥DªZ¾¹±¾¦b mountPoint¡]³õ´ºª«¥ó¡^
             slot.equipedItem = Instantiate(mw.weaponPrefab, mountPoint, false);
-            slot.equipedItem.transform.localRotation = Quaternion.Euler(new Vector3(-90, 90, 0));
+
+            // 找到 instance 內的 grip（用 SO 的名字）
+            var gripName = mw.mainHandGrip != null ? mw.mainHandGrip.name : null;
+            var grip = !string.IsNullOrEmpty(gripName) ? FindChildRecursive(slot.equipedItem.transform, gripName) : null;
+
+            if (grip != null)
+            {
+                // 如果主人需要額外修正握把朝向，就改這個 offset
+                // 先給 identity，確認位置/旋轉都能貼合，再慢慢調
+                Quaternion gripOffset = Quaternion.identity;
+
+                SnapRootSoChildMatches(slot.equipedItem.transform, grip, mountPoint, gripOffset);
+
+                // 接著把武器設為 mountPoint 子物件（保持當前世界姿態）
+                slot.equipedItem.transform.SetParent(mountPoint, true);
+            }
+            else
+            {
+                Debug.LogWarning($"Equip (Melee): cannot find grip by name '{gripName}' under '{slot.equipedItem.name}'");
+            }
             slot.item = item;
-
-
-            // 1-1) RangeWeaponInstance 
             if (mwi.colors != null && mwi.colors.Count > 0 && !string.IsNullOrEmpty(mwi.shaderName))
             {
                 var rend = slot.equipedItem.GetComponentInChildren<Renderer>();
@@ -379,7 +394,7 @@ public class EquipmentManager : MonoBehaviour
                 }
             }
 
-            // 2) ªþ¥ó±¾¦b¡u¥DªZ¾¹¹ê¨Ò¡v¤Wªº¦P¦W±¾ÂI¡A¨Ã®M¦^ÃC¦â
+
             if (mwi.attachment != null)
             {
                 foreach (var attach in mwi.attachment)
@@ -444,7 +459,6 @@ public class EquipmentManager : MonoBehaviour
         }
     }
 
-
     public void CleanEquipmentSlot(int equipmentSlotsIndex)
     {
         EquipmentSlot slot = equipmentSlots[equipmentSlotsIndex];
@@ -453,6 +467,19 @@ public class EquipmentManager : MonoBehaviour
         slot.item = null;
         PlayerStats.Instance?.RecalculateFromEquipment();
         RefreshEquipmentStatBlock();
+    }
+    private static void SnapRootSoChildMatches(Transform root, Transform child, Transform target, Quaternion childRotationOffset)
+    {
+        if (root == null || child == null || target == null) return;
+
+        // 1) 先對齊旋轉：把 child 轉到 target（可加 offset）
+        Quaternion desiredChildRot = target.rotation * childRotationOffset;
+        Quaternion deltaRot = desiredChildRot * Quaternion.Inverse(child.rotation);
+        root.rotation = deltaRot * root.rotation;
+
+        // 2) 再對齊位置：把 child 拉到 target
+        Vector3 deltaPos = target.position - child.position;
+        root.position += deltaPos;
     }
     private static Transform FindChildRecursive(Transform root, string name)
     {

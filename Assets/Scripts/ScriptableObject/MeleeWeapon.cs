@@ -31,6 +31,10 @@ public class MeleeWeapon : ItemObject
     public List<AttachmentPoint> attachmentPoints = new List<AttachmentPoint>();
     public MeshRenderer meshRenderer;
     public Transform defaultHandle;
+    public MeleeWeaponPartAttribute attribute;
+    public Transform mainHandGrip;
+    public Transform offHandGrip;
+
     public RandomBuff GetRandomBuff()
     {
         if (randomBuffs == null || randomBuffs.Count == 0)

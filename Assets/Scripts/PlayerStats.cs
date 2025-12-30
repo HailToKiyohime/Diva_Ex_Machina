@@ -54,6 +54,10 @@ public enum Attributes
     AimingDistance,
     //Weight,
     Weight,
+    //Melee Weapon Specific
+    MeleeOutput,
+    MeleeSpeed,
+    MeleeDashDistance,
 }
 
 public enum AnimationType
@@ -62,11 +66,25 @@ public enum AnimationType
     Hover,
 }
 
+public enum HandWeaponKind
+{
+    None = 0,
+    Range = 1,
+    Melee = 2
+}
+
 [System.Serializable]
 public class WeaponStats
 {
-    // 目前這隻手拿的武器（如果沒有就 null）
-    public RangeWeaponInstance weapon;
+    // 目前這隻手拿的武器種類（None / Range / Melee）
+    public HandWeaponKind weaponKind = HandWeaponKind.None;
+
+    // 目前這隻手拿的遠程武器（如果沒有就 null）
+    // 注意：目前為了保持與 AttackManager 的相容性，近戰武器時會保持 weapon == null
+    public RangeWeaponInstance rangeweapon;
+
+    // 目前這隻手拿的近戰武器（如果沒有就 null）
+    public MeleeWeaponInstance meleeWeapon;
 
     // 目前這隻手穿的手甲（LeftHandArmor / RightHandArmor）
     public ArmorInstance handArmor;
@@ -74,9 +92,14 @@ public class WeaponStats
     // 這隻手「總共」吃到的 Buff（武器本體 + 武器零件 + 手甲）
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
 
+
+    public bool HasWeapon => rangeweapon != null || meleeWeapon != null;
+
     public void Reset()
     {
-        weapon = null;
+        weaponKind = HandWeaponKind.None;
+        rangeweapon = null;
+        meleeWeapon = null;
         handArmor = null;
         buffs.Clear();
     }
@@ -109,6 +132,10 @@ public class BaseStats
     public float energyDefense = 0f;
     public float coldDefense = 0f;
 
+    [Header("Base Melee")]
+    public float meleeOutput = 1f; //The final damage is calculated by multiplying this value with weapon damage
+    public float meleeSpeed = 1f;//The final attack speed is calculated by multiplying this value with weapon attack speed
+    public float meleeDashDistance = 5f; //The distance covered during a melee dash attack
     [Header("Base Critical")]
     public float criticalChance = 0.05f;
     public float criticalMultiplier = 1.5f;
@@ -134,7 +161,6 @@ public class BaseStats
     [Header("Base Aiming")]
     public float lockOnRange = 300f;
     public float aimingDistance = 50f;
-
 }
 
 
@@ -153,6 +179,10 @@ public class PlayerStats : MonoBehaviour
     public float explosionDefense;
     public float energyDefense;
     public float coldDefense;
+    [Header("MeleeWeapon")]
+    public float meleeOutput;
+    public float meleeSpeed;
+    public float meleeDashDistance;
     [Header("RangeWeapon")]
     public float reloadTime;
     public float bulletPerShot;
@@ -228,7 +258,7 @@ public class PlayerStats : MonoBehaviour
     public float GetHandExpectedDps(bool isLeftHand)
     {
         WeaponStats hand = isLeftHand ? leftHand : rightHand;
-        if (hand == null || hand.weapon == null) return 0f;
+        if (hand == null || hand.rangeweapon == null) return 0f;
 
         float D =
             hand.GetAttribute(Attributes.PhysicalDamage) +
@@ -254,7 +284,7 @@ public class PlayerStats : MonoBehaviour
     public int GetDisplayLhAttack() => Mathf.RoundToInt(GetHandExpectedDps(true));
     public int GetDisplayRhAttack() => Mathf.RoundToInt(GetHandExpectedDps(false));
 
-    public float GetLockedOnRange() => lockOnRange/2;
+    public float GetLockedOnRange() => lockOnRange / 2;
 
     public float GetAimingDistance() => aimingDistance;
     /// <summary>
@@ -364,6 +394,10 @@ public class PlayerStats : MonoBehaviour
         energyDefense = baseStats.energyDefense;
         coldDefense = baseStats.coldDefense;
 
+        meleeOutput = baseStats.meleeOutput;
+        meleeSpeed = baseStats.meleeSpeed;
+        meleeDashDistance = baseStats.meleeDashDistance;
+
         criticalChance = baseStats.criticalChance;
         criticalMultiplier = baseStats.criticalMultiplier;
 
@@ -383,6 +417,7 @@ public class PlayerStats : MonoBehaviour
         maxHealth = baseStats.maxHealth;
         lockOnRange = baseStats.lockOnRange;
         aimingDistance = baseStats.aimingDistance;
+
     }
     public void RecalculateFromEquipment()
     {
@@ -444,15 +479,39 @@ public class PlayerStats : MonoBehaviour
                     }
                 }
             }
-            else if (inst is RangeWeaponInstance rangeWeaponInst && i == leftWeaponSlotIndex)
+            else if (i == leftWeaponSlotIndex)
             {
-                leftHand.weapon = rangeWeaponInst;
-                AddWeaponAndAttachmentBuffs(leftHand, rangeWeaponInst);
+                if (inst is RangeWeaponInstance rangeWeaponInst)
+                {
+                    leftHand.weaponKind = HandWeaponKind.Range;
+                    leftHand.rangeweapon = rangeWeaponInst;
+                    leftHand.meleeWeapon = null;
+                    AddWeaponAndAttachmentBuffs(leftHand, rangeWeaponInst);
+                }
+                else if (inst is MeleeWeaponInstance meleeWeaponInst)
+                {
+                    leftHand.weaponKind = HandWeaponKind.Melee;
+                    leftHand.meleeWeapon = meleeWeaponInst;
+                    leftHand.rangeweapon = null; // 保持與 AttackManager 相容：近戰時讓 ranged weapon 為 null
+                    AddWeaponAndAttachmentBuffs(leftHand, meleeWeaponInst);
+                }
             }
-            else if (inst is RangeWeaponInstance rangeWeaponInst2 && i == rightWeaponSlotIndex)
+            else if (i == rightWeaponSlotIndex)
             {
-                rightHand.weapon = rangeWeaponInst2;
-                AddWeaponAndAttachmentBuffs(rightHand, rangeWeaponInst2);
+                if (inst is RangeWeaponInstance rangeWeaponInst2)
+                {
+                    rightHand.weaponKind = HandWeaponKind.Range;
+                    rightHand.rangeweapon = rangeWeaponInst2;
+                    rightHand.meleeWeapon = null;
+                    AddWeaponAndAttachmentBuffs(rightHand, rangeWeaponInst2);
+                }
+                else if (inst is MeleeWeaponInstance meleeWeaponInst2)
+                {
+                    rightHand.weaponKind = HandWeaponKind.Melee;
+                    rightHand.meleeWeapon = meleeWeaponInst2;
+                    rightHand.rangeweapon = null; // 保持與 AttackManager 相容：近戰時讓 ranged weapon 為 null
+                    AddWeaponAndAttachmentBuffs(rightHand, meleeWeaponInst2);
+                }
             }
         }
 
@@ -469,8 +528,8 @@ public class PlayerStats : MonoBehaviour
         AddBuffListToWeapon(rightHand, rightHandArmorWeaponBuffs);
 
         // 3) 單持規則：若只有一把武器，另一手手甲的武器側 buffs 也要疊加到唯一武器
-        bool hasLeftWeapon = leftHand.weapon != null;
-        bool hasRightWeapon = rightHand.weapon != null;
+        bool hasLeftWeapon = leftHand.HasWeapon;
+        bool hasRightWeapon = rightHand.HasWeapon;
         if (hasLeftWeapon && !hasRightWeapon)
         {
             AddBuffListToWeapon(leftHand, rightHandArmorWeaponBuffs);
@@ -509,6 +568,9 @@ public class PlayerStats : MonoBehaviour
             case Attributes.ExplosionDamage:
             case Attributes.EnergyDamage:
             case Attributes.ColdDamage:
+            case Attributes.MeleeOutput:
+            case Attributes.MeleeSpeed:
+            case Attributes.MeleeDashDistance:
             case Attributes.ReloadTime:
             case Attributes.BulletPerShot:
             case Attributes.RoundPerPull:
@@ -559,6 +621,10 @@ public class PlayerStats : MonoBehaviour
             case Attributes.EnergyDefense: energyDefense += buff.value; break;
             case Attributes.ColdDefense: coldDefense += buff.value; break;
 
+            case Attributes.MeleeOutput: meleeOutput += buff.value; break;
+            case Attributes.MeleeSpeed: meleeSpeed += buff.value; break;
+            case Attributes.MeleeDashDistance: meleeDashDistance += buff.value; break;
+
             case Attributes.MaxEnergy: maxEnergy += buff.value; break;
             case Attributes.EnergyRegen: energyRegen += buff.value; break;
             case Attributes.DashEnergyCost: dashEnergyCost += buff.value; break;
@@ -591,6 +657,10 @@ public class PlayerStats : MonoBehaviour
             case Attributes.EnergyDefense: energyDefense *= m; break;
             case Attributes.ColdDefense: coldDefense *= m; break;
 
+            case Attributes.MeleeOutput: meleeOutput *= m; break;
+            case Attributes.MeleeSpeed: meleeSpeed *= m; break;
+            case Attributes.MeleeDashDistance: meleeDashDistance *= m; break;
+
             case Attributes.MaxEnergy: maxEnergy *= m; break;
             case Attributes.EnergyRegen: energyRegen *= m; break;
             case Attributes.DashEnergyCost: dashEnergyCost *= m; break;
@@ -620,7 +690,24 @@ public class PlayerStats : MonoBehaviour
         animationType = default // 依你 AnimationType 的預設值
     };
 
-    private void AddWeaponAndAttachmentBuffs(WeaponStats target, RangeWeaponInstance weaponInst)
+    private void AddWeaponAndAttachmentBuffs(WeaponStats target, MeleeWeaponInstance weaponInst)
+    {
+        if (weaponInst == null) return;
+
+        // 武器本體 buffs
+        AddBuffListToWeapon(target, weaponInst.buffs);
+
+        // 零件 buffs（attachment 裡每個 PartInstance）
+        if (weaponInst.attachment == null) return;
+
+        foreach (var part in weaponInst.attachment)
+        {
+            if (part == null || part.item == null) continue;
+            AddBuffListToWeapon(target, part.buffs);
+        }
+    }
+
+    void AddWeaponAndAttachmentBuffs(WeaponStats target, RangeWeaponInstance weaponInst)
     {
         if (weaponInst == null) return;
 

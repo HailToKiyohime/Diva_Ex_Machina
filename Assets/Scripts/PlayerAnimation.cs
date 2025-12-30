@@ -155,8 +155,8 @@ public class PlayerAnimation : MonoBehaviour
     {
         if (anim == null || PlayerStats.Instance == null) return;
 
-        bool hasLeft = PlayerStats.Instance.leftHand.weapon != null;
-        bool hasRight = PlayerStats.Instance.rightHand.weapon != null; // leftHand/rightHand.weapon ¬O RangeWeaponInstance :contentReference[oaicite:3]{index=3}
+        bool hasLeft = PlayerStats.Instance.leftHand.rangeweapon != null;
+        bool hasRight = PlayerStats.Instance.rightHand.rangeweapon != null; // leftHand/rightHand.weapon ¬O RangeWeaponInstance :contentReference[oaicite:3]{index=3}
 
         SetWeaponHoldAllLayersOff();
 
