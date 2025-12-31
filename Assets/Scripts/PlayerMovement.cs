@@ -40,6 +40,15 @@ public class PlayerMovement : MonoBehaviour
     private float meleeDashDistance = 0f;
     private float meleeDashStartTime = 0f;
     private Vector3 meleeDashStartPos = Vector3.zero;
+    private Vector3 meleeDashTargetPoint = Vector3.zero;
+    private Transform meleeDashTarget = null; // dash 期間追蹤的敵人（可為 null）
+    private bool meleeDashChasingTarget = false; // 只有 lockOn 時才追人 / 才用「距離目標<=1」停止
+
+    // 用於 dash 結束後啟動 melee reload
+    private AttackManager meleeDashOwnerManager = null;
+    private Weapon meleeDashOwnerWeapon = null;
+    [SerializeField] private float meleeDashStopWithin = 3f; // 目標距離 <= 1 時停止
+
     private bool meleeDashSavedUseGravity;
     private bool meleeDashHasSavedGravity = false;
     [Header("Attack Facing")]
@@ -148,7 +157,7 @@ public class PlayerMovement : MonoBehaviour
         bool isRight = (attackManager != null && w == attackManager.rightWeapon);
         bool isMelee = false;
 
-        // 近戰衝刺距離目前統一使用 PlayerStats.meleeDashDistance（避免依手/武器欄位不一致造成編譯問題）
+        // 近戰衝刺距離目前統一使用 PlayerStats.meleeDashDistance
         float meleeDashDistance = (stats != null) ? stats.meleeDashDistance : 0f;
 
         if (stats != null && (isLeft || isRight))
@@ -224,7 +233,7 @@ public class PlayerMovement : MonoBehaviour
                 bool didMelee = attackManager.TryStartMeleeAttack(w);
                 if (didMelee)
                 {
-                    StartMeleeDash(targetPoint, stats != null ? stats.dashSpeed : 0f, meleeDashDistance);
+                    StartMeleeDash(attackManager, w, targetPoint, stats != null ? stats.dashSpeed : 0f, meleeDashDistance);
 
                     if (isSingle)
                     {
@@ -312,6 +321,27 @@ public class PlayerMovement : MonoBehaviour
             return;
         }
 
+        // 2) 只有 lockOn 追人時才：
+        //    - 距離目標 <= meleeDashStopWithin 就停
+        //    - 每個 FixedUpdate 重新校正方向去追目標
+        if (meleeDashChasingTarget && meleeDashStopWithin > 0f)
+        {
+            Vector3 targetPos = (meleeDashTarget != null) ? meleeDashTarget.position : meleeDashTargetPoint;
+            float distToTarget = Vector3.Distance(transform.position, targetPos);
+            if (distToTarget <= meleeDashStopWithin)
+            {
+                StopMeleeDash();
+                return;
+            }
+
+            // 追人：每個 FixedUpdate 重新校正方向
+            if (meleeDashTarget != null)
+            {
+                Vector3 toTarget = targetPos - transform.position;
+                if (toTarget.sqrMagnitude > 0.0001f) meleeDashDir = toTarget.normalized;
+            }
+        }
+
         // 2) 距離判定（真 3D 距離：包含垂直）
         Vector3 delta = transform.position - meleeDashStartPos;
         if (meleeDashDistance > 0f && delta.magnitude >= meleeDashDistance)
@@ -325,7 +355,7 @@ public class PlayerMovement : MonoBehaviour
         playerRigidbody.velocity = dashVel;
     }
 
-    private void StartMeleeDash(Vector3 targetPoint, float dashSpeed, float dashDistance)
+    private void StartMeleeDash(AttackManager attackManager, Weapon ownerWeapon, Vector3 targetPoint, float dashSpeed, float dashDistance)
     {
         if (playerRigidbody == null) return;
         if (dashSpeed <= 0f || dashDistance <= 0f) return;
@@ -333,18 +363,51 @@ public class PlayerMovement : MonoBehaviour
         // 已在衝刺中就不重新開（避免連點造成狀態抖動）
         if (meleeDashActive) return;
 
+        // 只有 lockOn 時才追敵人；未 lockOn 就直接往前衝（不要朝 ray/targetPoint）
+        bool lockOn = (PlayerAiming.Instance != null && PlayerAiming.Instance.lockOn);
+
+        Transform targetTf = null;
+        bool chasing = false;
+        if (lockOn)
+        {
+            var targetRb = PlayerAiming.Instance.GetTargetRigidbody();
+            if (targetRb != null)
+            {
+                targetTf = targetRb.transform;
+                chasing = true;
+            }
+        }
+
+        Vector3 dir;
+        if (chasing && targetTf != null)
+        {
+            dir = (targetTf.position - transform.position);
+        }
+        else
+        {
+            // 未 lockOn：只往角色前方衝（水平）
+            dir = (characterModel != null ? characterModel.forward : transform.forward);
+            dir.y = 0f;
+        }
+
+        if (dir.sqrMagnitude < 0.0001f) return;
+        dir.Normalize();
+
+        // 記住本次 dash 的來源（用於結束後啟動 melee reload）
+        meleeDashOwnerManager = attackManager;
+        meleeDashOwnerWeapon = ownerWeapon;
+
+        // 到這裡才真正開始 dash：先關重力
         if (!meleeDashHasSavedGravity)
         {
-            // 這行要依你的 BetterRigidbody 實際暴露欄位改一下
             meleeDashSavedUseGravity = playerRigidbody.useGravity;
             meleeDashHasSavedGravity = true;
         }
         playerRigidbody.useGravity = false;
 
-        Vector3 dir = targetPoint - transform.position;
-        //dir.y = 0f;
-        if (dir.sqrMagnitude < 0.0001f) return;
-        dir.Normalize();
+        meleeDashTargetPoint = targetPoint;
+        meleeDashTarget = targetTf;
+        meleeDashChasingTarget = chasing;
 
         meleeDashActive = true;
         meleeDashDir = dir;
@@ -352,6 +415,7 @@ public class PlayerMovement : MonoBehaviour
         meleeDashDistance = Mathf.Max(0f, dashDistance);
         meleeDashStartTime = Time.time;
         meleeDashStartPos = transform.position;
+        // meleeDashTargetPoint/meleeDashTarget/meleeDashChasingTarget 已在上面設定
 
         // 近戰衝刺期間不回能（與一般 dash 同步）
         CancelInvoke("ResetEnergyRegenerate");
@@ -366,6 +430,14 @@ public class PlayerMovement : MonoBehaviour
             meleeDashHasSavedGravity = false;
         }
         meleeDashActive = false;
+
+        // dash 結束後：進入 melee reload（cooldown），連結 UI
+        if (meleeDashOwnerManager != null && meleeDashOwnerWeapon != null)
+        {
+            meleeDashOwnerManager.StartMeleeReload(meleeDashOwnerWeapon);
+        }
+        meleeDashOwnerManager = null;
+        meleeDashOwnerWeapon = null;
 
         // 衝刺結束後允許回能（依你現有邏輯：立刻允許；若想延遲可 Invoke）
         canRegenerateEnergy = true;

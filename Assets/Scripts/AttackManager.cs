@@ -42,6 +42,12 @@ public class RangeWeaponRuntimeState
 }
 
 [System.Serializable]
+public class MeleeWeaponRuntimeState
+{
+    public bool reloading;
+}
+
+[System.Serializable]
 public class Weapon
 {
     public Transform muzzle;
@@ -53,11 +59,20 @@ public class Weapon
     // Range Weapon Specific (Foldout)
     public RangeWeaponSettings range = new RangeWeaponSettings();
 
+    // Melee Weapon Specific (Foldout)
+    public MeleeWeaponSettings melee = new MeleeWeaponSettings();
+
     // Runtime State (Foldout)
     public RangeWeaponRuntimeState runtime = new RangeWeaponRuntimeState();
 
+    // Melee Runtime State (Foldout)
+    public MeleeWeaponRuntimeState meleeRuntime = new MeleeWeaponRuntimeState();
+
     // Reload UI runtime (0~1). When reloading, ammo bar shows this value.
     [HideInInspector] public float reloadNormalized;
+
+    // Melee reload UI runtime (0~1). When melee reloading, ammo bar shows this value.
+    [HideInInspector] public float meleeReloadNormalized;
 }
 
 public class AttackManager : MonoBehaviour
@@ -71,6 +86,10 @@ public class AttackManager : MonoBehaviour
     // 用來判斷「是否換了一把武器」，以便重置子彈等 runtime state
     private RangeWeaponInstance _leftSource;
     private RangeWeaponInstance _rightSource;
+
+    // Melee source cache
+    private MeleeWeaponInstance _leftMeleeSource;
+    private MeleeWeaponInstance _rightMeleeSource;
 
     private void OnEnable()
     {
@@ -92,14 +111,15 @@ public class AttackManager : MonoBehaviour
         var stats = PlayerStats.Instance;
         if (stats == null) return;
 
-        ApplyHand(stats.leftHand, leftWeapon, ref _leftSource);
-        ApplyHand(stats.rightHand, rightWeapon, ref _rightSource);
+        ApplyHand(stats.leftHand, leftWeapon, ref _leftSource, ref _leftMeleeSource);
+        ApplyHand(stats.rightHand, rightWeapon, ref _rightSource, ref _rightMeleeSource);
         PushAmmoUI();
     }
 
-    private static void ClearWeaponOutput(Weapon outWeapon, ref RangeWeaponInstance cachedSource)
+    private static void ClearWeaponOutput(Weapon outWeapon, ref RangeWeaponInstance cachedSource, ref MeleeWeaponInstance cachedMeleeSource)
     {
         cachedSource = null;
+        cachedMeleeSource = null;
 
         outWeapon.bullet = null;
         outWeapon.muzzle = null;
@@ -119,7 +139,15 @@ public class AttackManager : MonoBehaviour
         outWeapon.range.bulletSpeed = 0f;
         outWeapon.range.firingMode = 0;
 
+        // melee settings
+        outWeapon.melee.reloadTime = 0f;
+        outWeapon.melee.item = null;
+        outWeapon.melee.weaponObject = null;
+
         outWeapon.reloadNormalized = 0f;
+        outWeapon.meleeReloadNormalized = 0f;
+
+        outWeapon.meleeRuntime.reloading = false;
 
         // runtime 不一定要清，但清咗 Inspector 會更直觀
         outWeapon.runtime.bulletsLeft = 0;
@@ -129,51 +157,116 @@ public class AttackManager : MonoBehaviour
         outWeapon.runtime.allowInvoke = false;
     }
 
-    private static void ApplyHand(WeaponStats hand, Weapon outWeapon, ref RangeWeaponInstance cachedSource)
+    private static void ApplyHand(WeaponStats hand, Weapon outWeapon, ref RangeWeaponInstance cachedSource, ref MeleeWeaponInstance cachedMeleeSource)
     {
         if (outWeapon == null) return;
 
         // 沒武器：清空輸出（也可以改成 disable 該手射擊）
-        if (hand == null || hand.rangeweapon == null)
+        if (hand == null || hand.weaponKind == HandWeaponKind.None || (!hand.HasWeapon))
         {
-            ClearWeaponOutput(outWeapon, ref cachedSource);
+            ClearWeaponOutput(outWeapon, ref cachedSource, ref cachedMeleeSource);
             return;
         }
 
-        // 如果換武器：重置 runtime state（子彈/裝填狀態等）
-        bool changedWeapon = cachedSource != hand.rangeweapon;
-        cachedSource = hand.rangeweapon;
-
-        // 1) 子彈 prefab / muzzle
-        var rw = hand.rangeweapon.item as RangeWeapon;
-        outWeapon.bullet = (rw != null) ? rw.bullet : null;
-        outWeapon.muzzle = hand.rangeweapon.muzzlePoint;
-
-        // 2) 把該手「總 Buff」轉成射擊數值
-        outWeapon.damage.physicalDamage = hand.GetAttribute(Attributes.PhysicalDamage);
-        outWeapon.damage.explosionDamage = hand.GetAttribute(Attributes.ExplosionDamage);
-        outWeapon.damage.energyDamage = hand.GetAttribute(Attributes.EnergyDamage);
-        outWeapon.damage.coldDamage = hand.GetAttribute(Attributes.ColdDamage);
-
-        outWeapon.range.reloadTime = hand.GetAttribute(Attributes.ReloadTime);
-        outWeapon.range.bulletPerShot = Mathf.Max(1, Mathf.RoundToInt(hand.GetAttribute(Attributes.BulletPerShot)));
-        outWeapon.range.roundPerTap = Mathf.Max(1, Mathf.RoundToInt(hand.GetAttribute(Attributes.RoundPerPull)));
-        outWeapon.range.timeBetweenShooting = hand.GetAttribute(Attributes.TimeBetweenShooting);
-        outWeapon.range.timeBetweenShots = hand.GetAttribute(Attributes.TimeBetweenShots);
-        outWeapon.range.spread = hand.GetAttribute(Attributes.Spread);
-        outWeapon.range.magazineSize = Mathf.Max(1, Mathf.RoundToInt(hand.GetAttribute(Attributes.MagazineSize)));
-        outWeapon.range.bulletSpeed = hand.GetAttribute(Attributes.BulletSpeed);
-        outWeapon.range.firingMode = Mathf.RoundToInt(hand.GetAttribute(Attributes.FiringMode));
-
-        if (changedWeapon)
+        // 分流：遠程 / 近戰
+        if (hand.weaponKind == HandWeaponKind.Range)
         {
-            outWeapon.runtime.bulletsLeft = outWeapon.range.magazineSize;
+            if (hand.rangeweapon == null)
+            {
+                ClearWeaponOutput(outWeapon, ref cachedSource, ref cachedMeleeSource);
+                return;
+            }
+
+            // 如果換武器：重置 runtime state（子彈/裝填狀態等）
+            bool changedWeapon = cachedSource != hand.rangeweapon;
+            cachedSource = hand.rangeweapon;
+            cachedMeleeSource = null;
+
+            // 1) 子彈 prefab / muzzle
+            var rw = hand.rangeweapon.item as RangeWeapon;
+            outWeapon.bullet = (rw != null) ? rw.bullet : null;
+            outWeapon.muzzle = hand.rangeweapon.muzzlePoint;
+
+            // 2) 把該手「總 Buff」轉成射擊數值
+            outWeapon.damage.physicalDamage = hand.GetAttribute(Attributes.PhysicalDamage);
+            outWeapon.damage.explosionDamage = hand.GetAttribute(Attributes.ExplosionDamage);
+            outWeapon.damage.energyDamage = hand.GetAttribute(Attributes.EnergyDamage);
+            outWeapon.damage.coldDamage = hand.GetAttribute(Attributes.ColdDamage);
+
+            outWeapon.range.reloadTime = hand.GetAttribute(Attributes.ReloadTime);
+            outWeapon.range.bulletPerShot = Mathf.Max(1, Mathf.RoundToInt(hand.GetAttribute(Attributes.BulletPerShot)));
+            outWeapon.range.roundPerTap = Mathf.Max(1, Mathf.RoundToInt(hand.GetAttribute(Attributes.RoundPerPull)));
+            outWeapon.range.timeBetweenShooting = hand.GetAttribute(Attributes.TimeBetweenShooting);
+            outWeapon.range.timeBetweenShots = hand.GetAttribute(Attributes.TimeBetweenShots);
+            outWeapon.range.spread = hand.GetAttribute(Attributes.Spread);
+            outWeapon.range.magazineSize = Mathf.Max(1, Mathf.RoundToInt(hand.GetAttribute(Attributes.MagazineSize)));
+            outWeapon.range.bulletSpeed = hand.GetAttribute(Attributes.BulletSpeed);
+            outWeapon.range.firingMode = Mathf.RoundToInt(hand.GetAttribute(Attributes.FiringMode));
+
+            // melee 清空
+            outWeapon.melee.reloadTime = 0f;
+            outWeapon.melee.item = null;
+            outWeapon.melee.weaponObject = null;
+            outWeapon.meleeRuntime.reloading = false;
+            outWeapon.meleeReloadNormalized = 0f;
+
+            if (changedWeapon)
+            {
+                outWeapon.runtime.bulletsLeft = outWeapon.range.magazineSize;
+                outWeapon.runtime.shooting = false;
+                outWeapon.runtime.reloading = false;
+                outWeapon.runtime.readyToShoot = true;
+                outWeapon.runtime.allowInvoke = true;
+                outWeapon.reloadNormalized = 0f;
+            }
+            return;
+        }
+        else if (hand.weaponKind == HandWeaponKind.Melee)
+        {
+            if (hand.meleeWeapon == null)
+            {
+                ClearWeaponOutput(outWeapon, ref cachedSource, ref cachedMeleeSource);
+                return;
+            }
+
+            bool changedMelee = cachedMeleeSource != hand.meleeWeapon;
+            cachedMeleeSource = hand.meleeWeapon;
+            cachedSource = null;
+
+            // range 清空（避免錯用）
+            outWeapon.bullet = null;
+            outWeapon.muzzle = null;
+            outWeapon.range.reloadTime = 0f;
+            outWeapon.range.bulletPerShot = 0;
+            outWeapon.range.roundPerTap = 0;
+            outWeapon.range.timeBetweenShooting = 0f;
+            outWeapon.range.timeBetweenShots = 0f;
+            outWeapon.range.spread = 0f;
+            outWeapon.range.magazineSize = 0;
+            outWeapon.range.bulletSpeed = 0f;
+            outWeapon.range.firingMode = 0;
+            outWeapon.runtime.bulletsLeft = 0;
             outWeapon.runtime.shooting = false;
             outWeapon.runtime.reloading = false;
-            outWeapon.runtime.readyToShoot = true;
-            outWeapon.runtime.allowInvoke = true;
+            outWeapon.runtime.readyToShoot = false;
+            outWeapon.runtime.allowInvoke = false;
             outWeapon.reloadNormalized = 0f;
+
+            // melee 設定：暫時用 hand 的 ReloadTime 當作近戰 cooldown（可以被裝備/零件 buff）
+            outWeapon.melee.reloadTime = hand.GetAttribute(Attributes.ReloadTime);
+            outWeapon.melee.item = hand.meleeWeapon.item as MeleeWeapon;
+            // weaponObject：MeleeWeaponInstance 目前沒有提供 Transform，這裡保持 null（需要的話之後再接）
+            outWeapon.melee.weaponObject = null;
+
+            if (changedMelee)
+            {
+                outWeapon.meleeRuntime.reloading = false;
+                outWeapon.meleeReloadNormalized = 0f;
+            }
+            return;
         }
+
+
     }
 
     private void PushAmmoUI()
@@ -181,19 +274,31 @@ public class AttackManager : MonoBehaviour
         var ui = UIManager.Instance;
         if (ui == null) return;
 
-        float leftFill = CalcAmmoBarFill(leftWeapon);
-        float rightFill = CalcAmmoBarFill(rightWeapon);
+        var stats = PlayerStats.Instance;
+        bool leftIsMelee = stats != null && stats.leftHand != null && stats.leftHand.weaponKind == HandWeaponKind.Melee && stats.leftHand.meleeWeapon != null;
+        bool rightIsMelee = stats != null && stats.rightHand != null && stats.rightHand.weaponKind == HandWeaponKind.Melee && stats.rightHand.meleeWeapon != null;
+
+        float leftFill = CalcAmmoBarFill(leftWeapon, leftIsMelee);
+        float rightFill = CalcAmmoBarFill(rightWeapon, rightIsMelee);
+
+        bool leftReloading = leftIsMelee ? (leftWeapon != null && leftWeapon.meleeRuntime.reloading) : (leftWeapon != null && leftWeapon.runtime.reloading);
+        bool rightReloading = rightIsMelee ? (rightWeapon != null && rightWeapon.meleeRuntime.reloading) : (rightWeapon != null && rightWeapon.runtime.reloading);
 
         // Also drive reload color + flashing (UIManager stores the colors)
-        ui.SetAmmoState(
-            leftFill, leftWeapon != null && leftWeapon.runtime.reloading,
-            rightFill, rightWeapon != null && rightWeapon.runtime.reloading
-        );
+        ui.SetAmmoState(leftFill, leftReloading, rightFill, rightReloading);
     }
 
-    private static float CalcAmmoBarFill(Weapon w)
+    private static float CalcAmmoBarFill(Weapon w, bool isMelee)
     {
         if (w == null) return 0f;
+
+        if (isMelee)
+        {
+            // Melee: bar shows cooldown progress (0~1). When not reloading, show full.
+            if (w.meleeRuntime.reloading)
+                return Mathf.Clamp01(w.meleeReloadNormalized);
+            return 1f;
+        }
 
         // Reload mode: fillAmount means reload progress
         if (w.runtime.reloading)
@@ -267,7 +372,11 @@ public class AttackManager : MonoBehaviour
         if (hand.weaponKind != HandWeaponKind.Melee || hand.meleeWeapon == null)
             return false;
 
-        // Later: cooldown / attack speed / animation trigger / hit detection / stamina, etc.
+        // cooldown：近戰 reload 期間禁止再觸發
+        if (w.meleeRuntime != null && w.meleeRuntime.reloading)
+            return false;
+
+        // Later: attack speed / animation trigger / hit detection / stamina, etc.
         Debug.Log($"[AttackManager] Melee attack triggered: {(isLeft ? "Left" : "Right")}");
 
         return true;
@@ -348,6 +457,70 @@ public class AttackManager : MonoBehaviour
             StartCoroutine(ResetShotCooldown(w));
         }
     }
+
+
+    // Melee reload (cooldown) - after dash.
+    public void StartMeleeReload(Weapon w)
+    {
+        if (w == null) return;
+
+        // 只有真的裝備近戰時才允許進入 melee reload
+        var stats = PlayerStats.Instance;
+        if (stats == null) return;
+
+        bool isLeft = (w == leftWeapon);
+        bool isRight = (w == rightWeapon);
+        if (!isLeft && !isRight) return;
+
+        var hand = isLeft ? stats.leftHand : stats.rightHand;
+        if (hand == null || hand.weaponKind != HandWeaponKind.Melee || hand.meleeWeapon == null)
+            return;
+
+        if (w.meleeRuntime.reloading) return;
+
+        w.meleeRuntime.reloading = true;
+        w.meleeReloadNormalized = 0f;
+        PushAmmoUI();
+
+        float rt = Mathf.Max(0f, w.melee.reloadTime);
+
+        if (rt <= 0f)
+        {
+            w.meleeReloadNormalized = 1f;
+            PushAmmoUI();
+            FinishMeleeReload(w);
+            PushAmmoUI();
+            return;
+        }
+
+        StartCoroutine(MeleeReloadCoroutine(w, rt));
+    }
+
+    private IEnumerator MeleeReloadCoroutine(Weapon w, float reloadTime)
+    {
+        float elapsed = 0f;
+
+        while (elapsed < reloadTime)
+        {
+            elapsed += Time.deltaTime;
+            w.meleeReloadNormalized = Mathf.Clamp01(elapsed / reloadTime);
+            PushAmmoUI();
+            yield return null;
+        }
+
+        w.meleeReloadNormalized = 1f;
+        PushAmmoUI();
+
+        FinishMeleeReload(w);
+        PushAmmoUI();
+    }
+
+    private void FinishMeleeReload(Weapon w)
+    {
+        w.meleeRuntime.reloading = false;
+        w.meleeReloadNormalized = 0f;
+    }
+
 
     public void StartReload(Weapon w)
     {

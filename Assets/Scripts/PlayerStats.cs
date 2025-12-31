@@ -58,6 +58,7 @@ public enum Attributes
     MeleeOutput,
     MeleeSpeed,
     MeleeDashDistance,
+    MeleeReloadTime,
 }
 
 public enum AnimationType
@@ -136,6 +137,7 @@ public class BaseStats
     public float meleeOutput = 1f; //The final damage is calculated by multiplying this value with weapon damage
     public float meleeSpeed = 1f;//The final attack speed is calculated by multiplying this value with weapon attack speed
     public float meleeDashDistance = 5f; //The distance covered during a melee dash attack
+    public float meleeReloadTime = 0.75f; //Cooldown after melee dash/attack
     [Header("Base Critical")]
     public float criticalChance = 0.05f;
     public float criticalMultiplier = 1.5f;
@@ -183,6 +185,7 @@ public class PlayerStats : MonoBehaviour
     public float meleeOutput;
     public float meleeSpeed;
     public float meleeDashDistance;
+    public float meleeReloadTime;
     [Header("RangeWeapon")]
     public float reloadTime;
     public float bulletPerShot;
@@ -394,10 +397,6 @@ public class PlayerStats : MonoBehaviour
         energyDefense = baseStats.energyDefense;
         coldDefense = baseStats.coldDefense;
 
-        meleeOutput = baseStats.meleeOutput;
-        meleeSpeed = baseStats.meleeSpeed;
-        meleeDashDistance = baseStats.meleeDashDistance;
-
         criticalChance = baseStats.criticalChance;
         criticalMultiplier = baseStats.criticalMultiplier;
 
@@ -410,6 +409,8 @@ public class PlayerStats : MonoBehaviour
         accelerationSpeed = baseStats.accelerationSpeed;
         decelerationSpeed = baseStats.decelerationSpeed;
         dashSpeed = baseStats.dashSpeed;
+        meleeDashDistance = baseStats.meleeDashDistance;
+        meleeReloadTime = baseStats.meleeReloadTime;
 
         jumpHeight = baseStats.jumpHeight;
         flySpeed = baseStats.flySpeed;
@@ -417,7 +418,6 @@ public class PlayerStats : MonoBehaviour
         maxHealth = baseStats.maxHealth;
         lockOnRange = baseStats.lockOnRange;
         aimingDistance = baseStats.aimingDistance;
-
     }
     public void RecalculateFromEquipment()
     {
@@ -621,10 +621,6 @@ public class PlayerStats : MonoBehaviour
             case Attributes.EnergyDefense: energyDefense += buff.value; break;
             case Attributes.ColdDefense: coldDefense += buff.value; break;
 
-            case Attributes.MeleeOutput: meleeOutput += buff.value; break;
-            case Attributes.MeleeSpeed: meleeSpeed += buff.value; break;
-            case Attributes.MeleeDashDistance: meleeDashDistance += buff.value; break;
-
             case Attributes.MaxEnergy: maxEnergy += buff.value; break;
             case Attributes.EnergyRegen: energyRegen += buff.value; break;
             case Attributes.DashEnergyCost: dashEnergyCost += buff.value; break;
@@ -645,6 +641,9 @@ public class PlayerStats : MonoBehaviour
             case Attributes.MaxHealth: maxHealth += buff.value; break;
             case Attributes.AimingDistance: aimingDistance += buff.value; break;
             case Attributes.LockOnRange: lockOnRange += buff.value; break;
+
+            case Attributes.MeleeDashDistance: meleeDashDistance += buff.value; break;
+            case Attributes.MeleeReloadTime: meleeReloadTime += buff.value; break;
         }
     }
     void ApplyMultiplierToGlobal(EquipmentBuff buff)
@@ -656,10 +655,6 @@ public class PlayerStats : MonoBehaviour
             case Attributes.ExplosionDefense: explosionDefense *= m; break;
             case Attributes.EnergyDefense: energyDefense *= m; break;
             case Attributes.ColdDefense: coldDefense *= m; break;
-
-            case Attributes.MeleeOutput: meleeOutput *= m; break;
-            case Attributes.MeleeSpeed: meleeSpeed *= m; break;
-            case Attributes.MeleeDashDistance: meleeDashDistance *= m; break;
 
             case Attributes.MaxEnergy: maxEnergy *= m; break;
             case Attributes.EnergyRegen: energyRegen *= m; break;
