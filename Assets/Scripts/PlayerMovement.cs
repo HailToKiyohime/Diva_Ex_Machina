@@ -47,7 +47,7 @@ public class PlayerMovement : MonoBehaviour
     // 用於 dash 結束後啟動 melee reload
     private AttackManager meleeDashOwnerManager = null;
     private Weapon meleeDashOwnerWeapon = null;
-    [SerializeField] private float meleeDashStopWithin = 3f; // 目標距離 <= 1 時停止
+    [SerializeField] private float meleeDashStopWithin = 3f; // 目標距離 <= meleeDashStopWithin 時停止
 
     private bool meleeDashSavedUseGravity;
     private bool meleeDashHasSavedGravity = false;
@@ -70,7 +70,28 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float movementBlendSpeed = 3f; // 控制 0↔1 的快慢
     private float animX = 0f; // 水平（左右）動畫輸入
     private float animY = 0f; // 垂直（前後）動畫輸入
-    // Update is called once per frame
+    [Header("Aim Facing Hold (Anti Jitter)")]
+    [SerializeField] private float aimHoldAfterLockLost = 2f;
+
+    private bool _prevLockOn;
+    private float _aimHoldUntil;
+    private Vector3 _lastAimHoldForward = Vector3.forward;
+    private void OnEnable()
+    {
+        if (playerAnimation != null)
+            playerAnimation.OnStopAttacking += HandleStopAttacking;
+    }
+
+    private void OnDisable()
+    {
+        if (playerAnimation != null)
+            playerAnimation.OnStopAttacking -= HandleStopAttacking;
+    }
+
+    private void HandleStopAttacking()
+    {
+        StopMeleeDash();
+    }
     public void Update()
     {
         EnergyRegenerationCheck();
@@ -317,7 +338,8 @@ public class PlayerMovement : MonoBehaviour
         // 1) 超時保護：撞牆或卡住，最多持續 meleeDashMaxDuration
         if (Time.time - meleeDashStartTime > meleeDashMaxDuration)
         {
-            StopMeleeDash();
+            Debug.Log(" 超時保護");
+            playerAnimation.StartAttack();
             return;
         }
 
@@ -330,7 +352,8 @@ public class PlayerMovement : MonoBehaviour
             float distToTarget = Vector3.Distance(transform.position, targetPos);
             if (distToTarget <= meleeDashStopWithin)
             {
-                StopMeleeDash();
+                Debug.Log(" 距離目標 <= meleeDashStopWithin");
+                playerAnimation.StartAttack();
                 return;
             }
 
@@ -346,7 +369,8 @@ public class PlayerMovement : MonoBehaviour
         Vector3 delta = transform.position - meleeDashStartPos;
         if (meleeDashDistance > 0f && delta.magnitude >= meleeDashDistance)
         {
-            StopMeleeDash();
+            Debug.Log(" delta.magnitude >= meleeDashDistance");
+            playerAnimation.StartAttack();
             return;
         }
 
@@ -417,29 +441,46 @@ public class PlayerMovement : MonoBehaviour
         meleeDashStartPos = transform.position;
         // meleeDashTargetPoint/meleeDashTarget/meleeDashChasingTarget 已在上面設定
 
+        playerAnimation.SetToAttackLayer();
         // 近戰衝刺期間不回能（與一般 dash 同步）
         CancelInvoke("ResetEnergyRegenerate");
         canRegenerateEnergy = false;
+        bool isLeftHand = (attackManager != null && ownerWeapon != null && attackManager.leftWeapon == ownerWeapon);
+
+        // For now: stance is decided only by the melee weapon's attribute (ignore attachments/handles)
+        MeleeWeaponPartAttribute attr = default;
+        var stats = PlayerStats.Instance;
+        if (stats != null)
+        {
+            var hand = isLeftHand ? stats.leftHand : stats.rightHand;
+            if (hand != null && hand.meleeWeapon != null && hand.meleeWeapon.item is MeleeWeapon mw)
+                attr = mw.attribute;
+        }
+        playerAnimation.BeginMeleeDash(isLeftHand, attr);
+
     }
 
     private void StopMeleeDash()
     {
+        if (!meleeDashActive) return; // 沒在近戰衝刺就不用做事
+
         if (meleeDashHasSavedGravity)
         {
             playerRigidbody.useGravity = meleeDashSavedUseGravity;
             meleeDashHasSavedGravity = false;
         }
+
         meleeDashActive = false;
 
-        // dash 結束後：進入 melee reload（cooldown），連結 UI
         if (meleeDashOwnerManager != null && meleeDashOwnerWeapon != null)
         {
             meleeDashOwnerManager.StartMeleeReload(meleeDashOwnerWeapon);
         }
+
+        playerAnimation.StopDashing();
         meleeDashOwnerManager = null;
         meleeDashOwnerWeapon = null;
 
-        // 衝刺結束後允許回能（依你現有邏輯：立刻允許；若想延遲可 Invoke）
         canRegenerateEnergy = true;
     }
 
@@ -584,6 +625,14 @@ public class PlayerMovement : MonoBehaviour
     }
     private void RotateCharacter()
     {
+        // 監控 lockOn 狀態變化：剛失去 lockOn 時啟動保留
+        bool lockOnNow = (PlayerAiming.Instance != null && PlayerAiming.Instance.lockOn);
+        if (_prevLockOn && !lockOnNow)
+        {
+            StartAimHold(aimHoldAfterLockLost);
+        }
+        _prevLockOn = lockOnNow;
+
         // 先處理角色朝向（攻擊優先，其次 lockOn，其次移動）
         Vector3? desiredForward = null;
 
@@ -597,6 +646,19 @@ public class PlayerMovement : MonoBehaviour
             lookDirection.y = 0f;
             if (lookDirection.sqrMagnitude > 0.001f)
                 desiredForward = lookDirection.normalized;
+        }
+        // 新增：剛失去鎖定 or 剛單發射擊後，短時間內仍面向「準星」方向（允許蟹行）
+        else if (Time.time < _aimHoldUntil)
+        {
+            if (TryGetAimForwardFlat(out var aimFwd))
+            {
+                desiredForward = aimFwd;
+                _lastAimHoldForward = aimFwd; // 記住一份 fallback
+            }
+            else if (_lastAimHoldForward.sqrMagnitude > 0.001f)
+            {
+                desiredForward = _lastAimHoldForward;
+            }
         }
         else
         {
@@ -642,5 +704,33 @@ public class PlayerMovement : MonoBehaviour
 
         // 統一送進動畫：animX = 左右，animY = 前後
         playerAnimation.SetMovementParameters(animX, animY);
+    }
+    private void StartAimHold(float seconds)
+    {
+        if (seconds <= 0f) return;
+        _aimHoldUntil = Mathf.Max(_aimHoldUntil, Time.time + seconds);
+    }
+
+    // 取得「準星/鎖定」在水平面的目標朝向（跟你射擊對準算法一致）
+    private bool TryGetAimForwardFlat(out Vector3 flatForward)
+    {
+        flatForward = Vector3.zero;
+
+        if (PlayerAiming.Instance == null || characterModel == null) return false;
+
+        Vector3 targetPoint;
+
+        if (PlayerAiming.Instance.lockOn && PlayerAiming.Instance.aimingPoint != null)
+            targetPoint = PlayerAiming.Instance.aimingPoint.position;
+        else
+            targetPoint = PlayerAiming.Instance.GetRay().GetPoint(attackAimRayDistance);
+
+        Vector3 dir = targetPoint - characterModel.position;
+        dir.y = 0f;
+
+        if (dir.sqrMagnitude <= 0.001f) return false;
+
+        flatForward = dir.normalized;
+        return true;
     }
 }

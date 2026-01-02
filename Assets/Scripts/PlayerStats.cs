@@ -570,7 +570,6 @@ public class PlayerStats : MonoBehaviour
             case Attributes.ColdDamage:
             case Attributes.MeleeOutput:
             case Attributes.MeleeSpeed:
-            case Attributes.MeleeDashDistance:
             case Attributes.ReloadTime:
             case Attributes.BulletPerShot:
             case Attributes.RoundPerPull:
@@ -676,6 +675,9 @@ public class PlayerStats : MonoBehaviour
             case Attributes.MaxHealth: maxHealth *= m; break;
             case Attributes.AimingDistance: aimingDistance *= m; break;
             case Attributes.LockOnRange: lockOnRange *= m; break;
+
+            case Attributes.MeleeDashDistance: meleeDashDistance *= m; break;
+            case Attributes.MeleeReloadTime: meleeReloadTime *= m; break;
         }
     }
 

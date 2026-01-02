@@ -34,6 +34,16 @@ public class PlayerController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        // Lock gameplay input when in Equipment / Crafting UI
+        if (UIManager.Instance != null && UIManager.Instance.currentCameraSet != 0)
+        {
+            // 清掉移動輸入，避免角色持續被上一幀輸入推動
+            if (playerMovement != null)
+                playerMovement.HorizontalMovement(0f, 0f);
+
+            return; // 直接阻止 Jump / Dash / Attack / Reload 等所有操作
+        }
+
         Vector2 movementInput = playerControls.Player.Move.ReadValue<Vector2>();
         playerMovement.HorizontalMovement(movementInput.x, movementInput.y);
 

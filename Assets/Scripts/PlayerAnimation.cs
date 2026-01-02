@@ -12,17 +12,23 @@ public class PlayerAnimation : MonoBehaviour
     int BarehandedLayer; // 未持有武器
     int Wielding_Gun_LeftLayer; // 持有單手槍（左手）
     int Wielding_Gun_RightLayer; // 持有單手槍（右手）
-    int Dual_Wielding_Gun_LeftLayer; // 持有雙手槍（左手）
-    int Dual_Wielding_Gun_RightLayer; // 持有雙手槍（右手）
+    int Dual_Wielding_Weapon_LeftLayer; // 雙手持有武器（左手）
+    int Dual_Wielding_Weapon_RightLayer; // 雙手持有武器（右手）
+    int One_Hand_Melee_AttackLayer; // 持有單手近戰武器
 
     private float baseHeight;
     private Vector3 baseCenter;
     private float baseGroundPointY;
 
+    // ===== Attack Layer Blend (Smooth) =====
+    [SerializeField] private float attackLayerBlendInTime = 0.12f;   // 可調：進入 Attack Layer 的時間
+    [SerializeField] private float attackLayerBlendOutTime = 0.18f;  // 可調：退出 Attack Layer 的時間
+    private Coroutine _attackLayerBlendRoutine;
+    public event Action OnStopAttacking;
     void Awake()
     {
         anim = anim != null ? anim : GetComponent<Animator>();
-        capsuleCollider = GetComponent<CapsuleCollider>();
+        capsuleCollider = capsuleCollider!=null ? capsuleCollider: GetComponent<CapsuleCollider>();
 
         if (anim != null)
         {
@@ -31,8 +37,9 @@ public class PlayerAnimation : MonoBehaviour
             BarehandedLayer = anim.GetLayerIndex("Barehanded");
             Wielding_Gun_LeftLayer = anim.GetLayerIndex("Wielding_Gun_Left");
             Wielding_Gun_RightLayer = anim.GetLayerIndex("Wielding_Gun_Right");
-            Dual_Wielding_Gun_LeftLayer = anim.GetLayerIndex("Dual_Wielding_Gun_Left");
-            Dual_Wielding_Gun_RightLayer = anim.GetLayerIndex("Dual_Wielding_Gun_Right");
+            Dual_Wielding_Weapon_LeftLayer = anim.GetLayerIndex("Dual_Wielding_Weapon_Left");
+            Dual_Wielding_Weapon_RightLayer = anim.GetLayerIndex("Dual_Wielding_Weapon_Right");
+            One_Hand_Melee_AttackLayer = anim.GetLayerIndex("One_Hand_Melee_Attack");
         }
 
         if (capsuleCollider != null)
@@ -140,6 +147,78 @@ public class PlayerAnimation : MonoBehaviour
         anim.SetBool("onGround", onGround);
     }
 
+    public void SetToAttackLayer()
+    {
+        SmoothSetLayerWeight(One_Hand_Melee_AttackLayer, 1f, attackLayerBlendInTime);
+    }
+    public void SetOffAttackLayer()
+    {
+        SmoothSetLayerWeight(One_Hand_Melee_AttackLayer, 0f, attackLayerBlendOutTime);
+    }
+    public void BeginMeleeDash(bool isLeftHand, MeleeWeaponPartAttribute weaponAttribute)
+    {
+        anim.SetTrigger("startAttack");
+        anim.SetBool("dashing", true);
+        int stance = (weaponAttribute == MeleeWeaponPartAttribute.LanceHead) ? 0 : 1;
+        anim.SetInteger("stance", stance);
+        anim.SetBool("leftHandAttack", isLeftHand);
+    }
+
+
+    public void StartAttack()
+    {
+        anim.SetBool("attacking", true);
+    }
+    public void StopDashing()
+    {
+        anim.SetBool("dashing", false);
+    }
+    public void InvokeStopAttacking()
+    {
+        CancelInvoke(nameof(StopAttacking));
+        Invoke("StopAttacking", 0.5f);
+    }
+    public void StopAttacking()
+    {
+        Debug.Log("PlayerAnimation: StopAttacking invoked");
+        anim.SetBool("attacking", false);
+        SetOffAttackLayer();
+        // 通知外界：攻擊已停止（誰想聽就訂閱）
+        OnStopAttacking?.Invoke();
+    }
+
+    private void SmoothSetLayerWeight(int layerIndex, float target, float duration)
+    {
+        if (anim == null) return;
+        if (layerIndex < 0) return;
+
+        if (_attackLayerBlendRoutine != null)
+            StopCoroutine(_attackLayerBlendRoutine);
+
+        _attackLayerBlendRoutine = StartCoroutine(SmoothSetLayerWeightRoutine(layerIndex, target, duration));
+    }
+
+    private System.Collections.IEnumerator SmoothSetLayerWeightRoutine(int layerIndex, float target, float duration)
+    {
+        float start = anim.GetLayerWeight(layerIndex);
+
+        if (duration <= 0f)
+        {
+            anim.SetLayerWeight(layerIndex, target);
+            yield break;
+        }
+
+        float t = 0f;
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            float a = Mathf.Clamp01(t / duration);
+            anim.SetLayerWeight(layerIndex, Mathf.Lerp(start, target, a));
+            yield return null;
+        }
+
+        anim.SetLayerWeight(layerIndex, target);
+    }
     private void SetWeaponHoldAllLayersOff()
     {
         if (anim == null) return;
@@ -147,16 +226,16 @@ public class PlayerAnimation : MonoBehaviour
         if (BarehandedLayer >= 0) anim.SetLayerWeight(BarehandedLayer, 0f);
         if (Wielding_Gun_LeftLayer >= 0) anim.SetLayerWeight(Wielding_Gun_LeftLayer, 0f);
         if (Wielding_Gun_RightLayer >= 0) anim.SetLayerWeight(Wielding_Gun_RightLayer, 0f);
-        if (Dual_Wielding_Gun_LeftLayer >= 0) anim.SetLayerWeight(Dual_Wielding_Gun_LeftLayer, 0f);
-        if (Dual_Wielding_Gun_RightLayer >= 0) anim.SetLayerWeight(Dual_Wielding_Gun_RightLayer, 0f);
+        if (Dual_Wielding_Weapon_LeftLayer >= 0) anim.SetLayerWeight(Dual_Wielding_Weapon_LeftLayer, 0f);
+        if (Dual_Wielding_Weapon_RightLayer >= 0) anim.SetLayerWeight(Dual_Wielding_Weapon_RightLayer, 0f);
     }
 
     private void RefreshWeaponHoldLayers()
     {
         if (anim == null || PlayerStats.Instance == null) return;
 
-        bool hasLeft = PlayerStats.Instance.leftHand.rangeweapon != null;
-        bool hasRight = PlayerStats.Instance.rightHand.rangeweapon != null; // leftHand/rightHand.weapon 是 RangeWeaponInstance :contentReference[oaicite:3]{index=3}
+        bool hasLeft = PlayerStats.Instance.leftHand.HasWeapon;
+        bool hasRight = PlayerStats.Instance.rightHand.HasWeapon; // leftHand/rightHand.weapon 是 RangeWeaponInstance :contentReference[oaicite:3]{index=3}
 
         SetWeaponHoldAllLayersOff();
 
@@ -170,8 +249,27 @@ public class PlayerAnimation : MonoBehaviour
         // 2 把武器（Dual Wield）
         if (hasLeft && hasRight)
         {
-            if (Dual_Wielding_Gun_LeftLayer >= 0) anim.SetLayerWeight(Dual_Wielding_Gun_LeftLayer, 1f);
-            if (Dual_Wielding_Gun_RightLayer >= 0) anim.SetLayerWeight(Dual_Wielding_Gun_RightLayer, 1f);
+            if (Dual_Wielding_Weapon_LeftLayer >= 0) anim.SetLayerWeight(Dual_Wielding_Weapon_LeftLayer, 1f);
+            if (Dual_Wielding_Weapon_RightLayer >= 0) anim.SetLayerWeight(Dual_Wielding_Weapon_RightLayer, 1f);
+            int leftHnadWeapon = 0; // 0: none, 1: melee, 2: range
+            if (PlayerStats.Instance.leftHand.meleeWeapon != null)
+            {
+                leftHnadWeapon = 1;
+            }else if (PlayerStats.Instance.leftHand.rangeweapon != null)
+            {
+                leftHnadWeapon = 2;
+            }
+            anim.SetInteger("leftHandWeaponType", leftHnadWeapon);
+            int rightHnadWeapon = 0; // 0: none, 1: melee, 2: range
+            if (PlayerStats.Instance.rightHand.meleeWeapon != null)
+            {
+                rightHnadWeapon = 1;
+            }
+            else if (PlayerStats.Instance.rightHand.rangeweapon != null)
+            {
+                rightHnadWeapon = 2;
+            }
+            anim.SetInteger("rightHandWeaponType", rightHnadWeapon);
             return;
         }
 

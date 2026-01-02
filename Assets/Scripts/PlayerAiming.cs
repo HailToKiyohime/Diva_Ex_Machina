@@ -57,6 +57,10 @@ public class PlayerAiming : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        // Stop aiming & camera rotation when in Equipment / Crafting UI
+        if (UIManager.Instance != null && UIManager.Instance.currentCameraSet != 0)
+            return;
+
         float mouseX = Input.GetAxis("Mouse X");
         float mouseY = Input.GetAxis("Mouse Y");
         if (Mathf.Abs(mouseX) > 0.001f || Mathf.Abs(mouseY) > 0.001f)
