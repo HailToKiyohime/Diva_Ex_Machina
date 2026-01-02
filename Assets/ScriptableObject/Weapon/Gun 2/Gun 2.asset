@@ -20,28 +20,39 @@ MonoBehaviour:
   weaponPrefab: {fileID: 401324664704972914, guid: 4895dc18a95f9194eb80bb47d531ac9d, type: 3}
   buffs:
   - attribute: 0
+    mode: 0
     value: 10
   - attribute: 8
+    mode: 0
     value: 2.2
   - attribute: 9
+    mode: 0
     value: 1
   - attribute: 10
+    mode: 0
     value: 1
   - attribute: 11
+    mode: 0
     value: 0.2
   - attribute: 12
+    mode: 0
     value: 0
   - attribute: 13
+    mode: 0
     value: 0.8
   - attribute: 14
+    mode: 0
     value: 30
   - attribute: 15
+    mode: 0
     value: 160
   - attribute: 16
-    value: 1
+    mode: 0
+    value: 0
   randomBuffs:
   - buff:
       attribute: 0
+      mode: 0
       value: 0
     weight: 0
   attachmentPoints:

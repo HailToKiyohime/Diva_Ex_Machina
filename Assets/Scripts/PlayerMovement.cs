@@ -72,7 +72,7 @@ public class PlayerMovement : MonoBehaviour
     private float animY = 0f; // 垂直（前後）動畫輸入
     [Header("Aim Facing Hold (Anti Jitter)")]
     [SerializeField] private float aimHoldAfterLockLost = 2f;
-
+    [SerializeField] private float aimHoldAfterShootNoLock = 2f;
     private bool _prevLockOn;
     private float _aimHoldUntil;
     private Vector3 _lastAimHoldForward = Vector3.forward;
@@ -265,9 +265,17 @@ public class PlayerMovement : MonoBehaviour
             }
             else
             {
+                // 新增：未 lockOn 時，射擊後保留準星朝向一段時間（允許邊走邊朝準星）
+                if ((PlayerAiming.Instance != null) && !PlayerAiming.Instance.lockOn)
+                {
+                    // 記一份 fallback，避免極端情況 ray/dir 失效時抖動
+                    if (TryGetAimForwardFlat(out var aimFwd))
+                        _lastAimHoldForward = aimFwd;
+
+                    StartAimHold(aimHoldAfterShootNoLock);
+                }
                 // 4) 真正觸發射擊（由 AttackManager 管理 cooldown/bullets）
                 bool didShoot = attackManager.TryStartShoot(w);
-
                 // 單發：一旦成功開火就消耗掉這次請求
                 if (didShoot && isSingle)
                 {
