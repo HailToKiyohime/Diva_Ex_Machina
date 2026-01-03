@@ -159,6 +159,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: vfx_Projectile_01 2
       objectReference: {fileID: 0}
+    - target: {fileID: 1536130679692287362, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.size
       value: 3
