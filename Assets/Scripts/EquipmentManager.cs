@@ -411,7 +411,20 @@ public class EquipmentManager : MonoBehaviour
                             Debug.LogWarning($"Equip: cannot find mount '{ap.pointTransform.name}' on weapon instance");
                             continue;
                         }
-
+                        if (attach.partType == WeaponPartType.Handle)
+                        {
+                            if (mw.defaultHandle != null)
+                            {
+                                var t = FindChildRecursive(slot.equipedItem.transform, mw.defaultHandle.name);
+                                if (t != null) t.gameObject.SetActive(false);
+                            }
+                            else
+                            {
+                                // 保底：如果主人沒填 defaultHandle，就嘗試用常見名字找
+                                var t = FindChildRecursive(slot.equipedItem.transform, "default handle");
+                                if (t != null) t.gameObject.SetActive(false);
+                            }
+                        }
                         var part = Instantiate(mwp.meleeWeaponPartPrefab, target, false);
                         part.transform.localPosition = Vector3.zero;
                         part.transform.localRotation = Quaternion.identity;

@@ -344,20 +344,17 @@ public class PlayerMovement : MonoBehaviour
         if (!meleeDashActive) return;
 
         // 1) 超時保護：撞牆或卡住，最多持續 meleeDashMaxDuration
-        if (Time.time - meleeDashStartTime > meleeDashMaxDuration)
-        {
-            Debug.Log(" 超時保護");
-            playerAnimation.StartAttack();
-            return;
-        }
 
         // 2) 只有 lockOn 追人時才：
         //    - 距離目標 <= meleeDashStopWithin 就停
         //    - 每個 FixedUpdate 重新校正方向去追目標
         if (meleeDashChasingTarget && meleeDashStopWithin > 0f)
         {
+            Debug.Log("meleeDashStopWithin");
             Vector3 targetPos = (meleeDashTarget != null) ? meleeDashTarget.position : meleeDashTargetPoint;
             float distToTarget = Vector3.Distance(transform.position, targetPos);
+            Debug.Log("distToTarget" + distToTarget);
+            Debug.Log("meleeDashStopWithin" + meleeDashStopWithin);
             if (distToTarget <= meleeDashStopWithin)
             {
                 Debug.Log(" 距離目標 <= meleeDashStopWithin");
@@ -381,7 +378,12 @@ public class PlayerMovement : MonoBehaviour
             playerAnimation.StartAttack();
             return;
         }
-
+        if (Time.time - meleeDashStartTime > meleeDashMaxDuration)
+        {
+            Debug.Log(" 超時保護");
+            playerAnimation.StartAttack();
+            return;
+        }
         // 3) 施加衝刺速度（真 3D：X/Y/Z 全吃方向）
         Vector3 dashVel = meleeDashDir * meleeDashSpeed;
         playerRigidbody.velocity = dashVel;
