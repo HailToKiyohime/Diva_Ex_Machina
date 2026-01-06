@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6af54504d4a2b864bb9fa59e0f1118a9, type: 3}
+  m_Name: Fire Coating
+  m_EditorClassIdentifier: Assembly-CSharp::MeleeWeaponCoating
+  itemName: Fire Coating
+  type: 9
+  icon: {fileID: 0}
+  maxStack: 0
+  dropPrefab: {fileID: 0}
+  meleeCoatingPrefab: {fileID: 7011655065883924470, guid: 716435be39a64aa47b9bf01dc7c1ce1e, type: 3}
+  partType: 5
+  buffs: []
+  randomBuffs: []
+  effectColorController: {fileID: 8818316354551033983, guid: 716435be39a64aa47b9bf01dc7c1ce1e, type: 3}

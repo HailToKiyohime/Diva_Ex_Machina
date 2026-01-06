@@ -33,7 +33,8 @@ public class MeleeWeapon : ItemObject
     public Transform defaultHandle;
     public MeleeWeaponPartAttribute attribute;
     public Transform mainHandGrip;
-    public Transform offHandGrip;
+    public GameObject defaultCoatingEffect;
+    public float swordLength = 1.0f;
 
     public RandomBuff GetRandomBuff()
     {

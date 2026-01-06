@@ -27,8 +27,11 @@ MonoBehaviour:
   attachmentPoints:
   - pointTransform: {fileID: 7689432590055944984, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
     allowPart: 4
+  - pointTransform: {fileID: 4449487210523686389, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
+    allowPart: 5
   meshRenderer: {fileID: -7511558181221131132, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
   defaultHandle: {fileID: 4136720172559166523, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
   attribute: 6
-  mainHandGrip: {fileID: 3088508940731471166, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
-  offHandGrip: {fileID: 4621839270243896663, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
+  mainHandGrip: {fileID: -2732574941072478389, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
+  defaultCoatingEffect: {fileID: 2123748689605059989, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
+  swordLength: 1

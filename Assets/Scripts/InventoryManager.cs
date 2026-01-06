@@ -78,6 +78,9 @@ public class InventoryManager : MonoBehaviour
     public Sprite scopeIconImage;
     public Sprite barrelIconImage;
     public Sprite gunIconImage;
+    public Sprite melIconImage;
+    public Sprite handleIconImage;
+    public Sprite coatingIconImage;
 
     [Header("Color Block/ Inventory Block")]
     public GameObject inventoryBlock;
@@ -417,6 +420,61 @@ public class InventoryManager : MonoBehaviour
             inventory.Add(inst);
             return;
         }
+        if (item is MeleeWeaponCoating mwc)
+        {
+            var inst = new PartInstance
+            {
+                item = item,
+                amount = 1,
+                partType = mwc.partType
+            };
+
+            // -------------------------
+            // 讀粒子顏色（從 EffectColorController）
+            // -------------------------
+            EffectColorController ecc = null;
+
+            // 如果主人有在 SO 上手動指定，就直接用（你 SO 裡有這個欄位）
+            if (mwc.effectColorController != null)
+            {
+                ecc = mwc.effectColorController;
+            }
+            else if (mwc.meleeCoatingPrefab != null)
+            {
+                // 主人說 controller 在 prefab 的 parent 物件上，所以優先 InParent
+                ecc = mwc.meleeCoatingPrefab.GetComponentInParent<EffectColorController>();
+
+                // 保險：如果主人其實拖的是 root 或結構不同，就再找 children
+                if (ecc == null)
+                    ecc = mwc.meleeCoatingPrefab.GetComponentInChildren<EffectColorController>(true);
+            }
+
+            if (ecc != null)
+            {
+                // prefab 沒有跑 Start()，所以要手動 cache
+                ecc.CacheColorsFromGroups();
+
+                // 把顏色 snapshot 存進 instance（避免之後 prefab 顏色改了影響已入庫物品）
+                inst.colors = new List<Color>(ecc.colors);
+
+                // shaderName 對粒子沒意義，但可以當 marker（避免你之後誤判 Mix3/4/5）
+                inst.shaderName = "EffectColorController";
+            }
+
+            // -------------------------
+            // buffs + random buff（你原本的）
+            // -------------------------
+            foreach (EquipmentBuff buff in mwc.buffs)
+                inst.buffs.Add(buff);
+
+            var pickedBuff = mwc.GetRandomBuff();
+            if (pickedBuff != null)
+                inst.buffs.Add(pickedBuff.buff);
+
+            inventory.Add(inst);
+            return;
+        }
+
         inventory.Add(new ItemInstance { item = item, amount = 1 });
     }
 
@@ -873,28 +931,60 @@ public class InventoryManager : MonoBehaviour
         // 預設先選本體（非武器也適用）
         SelectPartToColor(equippedGO, slot.item);
 
+
         // 只有 RangeWeapon 才生成零件按鈕
-        if (slot.item is not RangeWeaponInstance rwi || rwi.item is not RangeWeapon rw)
-            return;
-
-        if (partsButtonParent == null || partButtonPrefab == null || WeaponPartsColorToggleGroup == null)
-            return;
-
-        // 建立按鈕：Gun 本體（預設選中）
-        CreatePartToggle(gunIconImage, equippedGO, rwi, true);
-
-        // 已裝上的 attachment 逐一建按鈕
-        if (rwi.attachment == null) return;
-
-        foreach (var attach in rwi.attachment)
+        if (slot.item is RangeWeaponInstance rwi)
         {
-            if (attach?.item == null) continue;
+            if (rwi.item is not RangeWeapon rw)
+                return; // 理論上不該發生，但保險
 
-            WeaponPartType partType = attach.partType;
-            GameObject partGO = FindEquippedPartGO(equippedGO, rw, partType);
-            Sprite icon = GetPartIcon(partType);
+            if (partsButtonParent == null || partButtonPrefab == null || WeaponPartsColorToggleGroup == null)
+                return;
 
-            CreatePartToggle(icon, partGO, attach, false);
+            // 建立按鈕：Gun 本體（預設選中）
+            CreatePartToggle(gunIconImage, equippedGO, rwi, true);
+
+            // 已裝上的 attachment 逐一建按鈕
+            if (rwi.attachment == null)
+                return;
+
+            foreach (var attach in rwi.attachment)
+            {
+                if (attach?.item == null) continue;
+
+                WeaponPartType partType = attach.partType;
+                GameObject partGO = FindEquippedPartGO(equippedGO, rw, partType);
+                Sprite icon = GetPartIcon(partType);
+
+                CreatePartToggle(icon, partGO, attach, false);
+            }
+        }
+        // MeleeWeapon：主人之後要做的分支
+        else if (slot.item is MeleeWeaponInstance mwi)
+        {
+            if (mwi.item is not MeleeWeapon mw)
+                return;
+            if (partsButtonParent == null || partButtonPrefab == null || WeaponPartsColorToggleGroup == null)
+                return;
+            CreatePartToggle(melIconImage, equippedGO, mwi, true);
+            // 已裝上的 attachment 逐一建按鈕
+            if (mwi.attachment == null)
+                return;
+
+            foreach (var attach in mwi.attachment)
+            {
+                if (attach?.item == null) continue;
+
+                WeaponPartType partType = attach.partType;
+                GameObject partGO = FindEquippedPartGO(equippedGO, mw, partType);
+                Sprite icon = GetPartIcon(partType);
+
+                CreatePartToggle(icon, partGO, attach, false);
+            }
+        }
+        else
+        {
+            return;
         }
     }
 
@@ -921,7 +1011,10 @@ public class InventoryManager : MonoBehaviour
             if (!isOn) return;
 
             if (targetPart != null)
+            {
+                Debug.Log($"Select part to color: {targetPart.name}");
                 SelectPartToColor(targetPart, instanceToSave);
+            }
         });
 
         // 最後才設 isOn（確保事件/顏色都已綁好）
@@ -948,10 +1041,13 @@ public class InventoryManager : MonoBehaviour
     {
         if (partType == WeaponPartType.Barrel) return barrelIconImage;
         if (partType == WeaponPartType.Scope) return scopeIconImage;
+        if (partType == WeaponPartType.Handle) return handleIconImage;
+        if (partType == WeaponPartType.Coating) return coatingIconImage;
+
         return null; // 主人要擴充更多零件 icon，就在這裡加
     }
 
-    // partType -> 找 attachmentPoints 的掛點名 -> FindChild -> 取該掛點下第一個 child
+    // partType -> 找 attachmentPoints 的掛點名 -> FindChild -> 找掛點下第一個有 Renderer 的 child(或其子孫)
     private GameObject FindEquippedPartGO(GameObject weaponRoot, RangeWeapon rw, WeaponPartType partType)
     {
         if (weaponRoot == null || rw == null) return null;
@@ -970,10 +1066,67 @@ public class InventoryManager : MonoBehaviour
         var mountGO = FindChild(weaponRoot, mountName);
         if (mountGO == null) return null;
 
-        if (mountGO.transform.childCount <= 0) return null;
-        return mountGO.transform.GetChild(0).gameObject;
-    }
+        // 1) 優先：掛點底下找「有 Renderer」的 child（避免拿到 MuzzlePoint/空物件）
+        for (int i = 0; i < mountGO.transform.childCount; i++)
+        {
+            var child = mountGO.transform.GetChild(i);
+            if (child == null) continue;
 
+            // 跳過常見的 helper
+            if (child.name == "MuzzlePoint") continue;
+
+            // 這個 child 本身或子孫有 Renderer 就算可上色目標
+            if (child.GetComponentInChildren<Renderer>(true) != null)
+                return child.gameObject;
+        }
+
+        // 2) fallback：如果掛點自己底下某處有 Renderer，就回傳掛點（讓 ColorPicker 往下找）
+        if (mountGO.GetComponentInChildren<Renderer>(true) != null)
+            return mountGO;
+
+        return null;
+    }
+    private GameObject FindEquippedPartGO(GameObject weaponRoot, MeleeWeapon mw, WeaponPartType partType)
+    {
+        if (weaponRoot == null || mw == null) return null;
+        string mountName = null;
+        foreach (var ap in mw.attachmentPoints)
+        {
+            if (ap.allowPart != partType) continue;
+            if (ap.pointTransform == null) continue;
+            mountName = ap.pointTransform.name;
+            break;
+        }
+        if (string.IsNullOrEmpty(mountName)) return null;
+
+        var mountGO = FindChild(weaponRoot, mountName);
+        if (mountGO == null) return null;
+
+        // 1) 優先：掛點底下找「有 Renderer」的 child（避免拿到 MuzzlePoint/空物件）
+        for (int i = 0; i < mountGO.transform.childCount; i++)
+        {
+            var child = mountGO.transform.GetChild(i);
+            if (child == null) continue;
+
+            // 跳過常見的 helper
+            if (child.name == "MuzzlePoint") continue;
+            if (child.name == "NormalSwordEffect") continue;
+            if (partType == WeaponPartType.Coating)
+            {
+                Debug.Log($"Looking for Melee Coating EffectColorController under {child.name}");
+                if (child.GetComponent<EffectColorController>())
+                    // Melee Coating 特例：直接回傳掛點（因為粒子特效通常掛在掛點上）
+                    return child.gameObject;
+            }
+
+
+            // 這個 child 本身或子孫有 Renderer 就算可上色目標
+            if (child.GetComponentInChildren<Renderer>(true) != null)
+                return child.gameObject;
+        }
+
+        return null;
+    }
     private void ClearColorPickerState()
     {
         if (characterEquipmentColorPicker == null) return;

@@ -51,6 +51,8 @@ public class PlayerMovement : MonoBehaviour
 
     private bool meleeDashSavedUseGravity;
     private bool meleeDashHasSavedGravity = false;
+
+    private bool meleeDashReachedStopWithin = false;
     [Header("Attack Facing")]
     [SerializeField] private float attackRotateSpeed = 25;         // 轉身速度
     [SerializeField] private float attackAngleThreshold = 6f;       // 允許開火的角度誤差
@@ -355,10 +357,17 @@ public class PlayerMovement : MonoBehaviour
             float distToTarget = Vector3.Distance(transform.position, targetPos);
             Debug.Log("distToTarget" + distToTarget);
             Debug.Log("meleeDashStopWithin" + meleeDashStopWithin);
+
             if (distToTarget <= meleeDashStopWithin)
             {
-                Debug.Log(" 距離目標 <= meleeDashStopWithin");
-                playerAnimation.StartAttack();
+                if (!meleeDashReachedStopWithin)
+                {
+                    playerAnimation.ChangeFOVtoAttack();
+                    meleeDashReachedStopWithin = true;
+                    Debug.Log(" 距離目標 <= meleeDashStopWithin");
+                    playerAnimation.InvokeStartAttack(0.1f);
+                    playerAnimation.SmoothSetFOV();
+                }
                 return;
             }
 
@@ -376,12 +385,14 @@ public class PlayerMovement : MonoBehaviour
         {
             Debug.Log(" delta.magnitude >= meleeDashDistance");
             playerAnimation.StartAttack();
+            playerAnimation.SmoothSetFOV();
             return;
         }
         if (Time.time - meleeDashStartTime > meleeDashMaxDuration)
         {
             Debug.Log(" 超時保護");
             playerAnimation.StartAttack();
+            playerAnimation.SmoothSetFOV();
             return;
         }
         // 3) 施加衝刺速度（真 3D：X/Y/Z 全吃方向）
@@ -419,13 +430,30 @@ public class PlayerMovement : MonoBehaviour
         }
         else
         {
-            // 未 lockOn：只往角色前方衝（水平）
-            dir = (characterModel != null ? characterModel.forward : transform.forward);
+            // 未 lockOn：用準星 ray 的 targetPoint 當 dash 方向（水平）
+            dir = (targetPoint - transform.position);
             dir.y = 0f;
+
+            // fallback：如果 targetPoint 太近 / 幾何異常，就用角色前方
+            if (dir.sqrMagnitude < 0.0001f)
+            {
+                dir = (characterModel != null ? characterModel.forward : transform.forward);
+                dir.y = 0f;
+            }
         }
 
         if (dir.sqrMagnitude < 0.0001f) return;
         dir.Normalize();
+
+        // 立刻讓模型對齊 dash 方向（避免第一幀視覺錯位）
+        if (characterModel != null)
+            characterModel.forward = dir;
+
+        // 同步給 RotateCharacter 的攻擊面向（確保 dash 期間不被 moveDirection 蓋掉）
+        attackFacingActive = true;
+        attackDesiredForward = dir;
+        attackFacingOwner = ownerWeapon;
+
 
         // 記住本次 dash 的來源（用於結束後啟動 melee reload）
         meleeDashOwnerManager = attackManager;
@@ -468,6 +496,13 @@ public class PlayerMovement : MonoBehaviour
         }
         playerAnimation.BeginMeleeDash(isLeftHand, attr);
 
+        Vector3 targetPos = (meleeDashTarget != null) ? meleeDashTarget.position : meleeDashTargetPoint;
+        float distToTarget = Vector3.Distance(transform.position, targetPos);
+        if (distToTarget >= meleeDashStopWithin*2)
+        {
+            playerAnimation.ChangeFOVtoAttack();
+        }
+
     }
 
     private void StopMeleeDash()
@@ -492,6 +527,9 @@ public class PlayerMovement : MonoBehaviour
         meleeDashOwnerWeapon = null;
 
         canRegenerateEnergy = true;
+        meleeDashReachedStopWithin = false;
+        attackFacingOwner = null;
+        attackFacingActive = false;
     }
 
 
@@ -646,7 +684,14 @@ public class PlayerMovement : MonoBehaviour
         // 先處理角色朝向（攻擊優先，其次 lockOn，其次移動）
         Vector3? desiredForward = null;
 
-        if (attackFacingActive)
+        if (meleeDashActive)
+        {
+            Vector3 fwd = meleeDashDir;
+            fwd.y = 0f;
+            if (fwd.sqrMagnitude > 0.0001f)
+                desiredForward = fwd.normalized;
+        }
+        else if (attackFacingActive)
         {
             desiredForward = attackDesiredForward;
         }

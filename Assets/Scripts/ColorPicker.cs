@@ -1,28 +1,37 @@
 using System.Collections.Generic;
-using UnityEditor.TerrainTools;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
-using UnityEngine.EventSystems;  
 
 public class ColorPicker : MonoBehaviour
 {
-
     public GameObject targetGameObject;
+
+    // When set, ColorPicker writes colors back to this instance.
+    // (InventoryManager already uses this pattern.)
     public ItemInstance targetItemInstance;
-    public List<Material> targetMaterials;
+
+    [Header("Effect (Optional)")]
+    [Tooltip("If the target is a VFX prefab (ParticleSystems), ColorPicker will control this controller instead of materials.")]
+    public EffectColorController targetEffectColorController;
+
+    public List<Material> targetMaterials = new List<Material>();
     public int currentMaterialIndex = -1;
     public int currentTextureIndex = -1;
+
     [Header("UI Elements")]
-    public RawImage hueBar;              // UI RawImage for the hue bar
-    public RawImage colorArea;           // UI RawImage for the color area
-    public RectTransform hueCursor;      // Cursor for the hue bar (horizontal movement only)
-    public RectTransform colorCursor;    // Cursor for the color area
+    public RawImage hueBar;
+    public RawImage colorArea;
+    public RectTransform hueCursor;
+    public RectTransform colorCursor;
+
     [Header("UI Button Prefab")]
     public GameObject buttonPrefab;
     public Transform colorDetailButtonParent;
     public ToggleGroup toggleGroup;
-    public Color normalColor;
-    public Color selectedColor;
+    public Color normalColor = Color.white;
+    public Color selectedColor = Color.white;
+
     [Header("Texture Settings")]
     public int hueTextureWidth = 256;
     public int hueTextureHeight = 16;
@@ -32,70 +41,44 @@ public class ColorPicker : MonoBehaviour
     private Texture2D hueTexture;
     private Texture2D colorTexture;
 
-    // Flags to determine if the user is currently dragging the Hue Bar or Color Area.
     private bool draggingHueBar = false;
     private bool draggingColorArea = false;
-    private float currentHue = 0f; // current hue value (0 to 1)
+    private float currentHue = 0f; // 0..1
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Awake()
+    private bool HasEffectTarget => targetEffectColorController != null;
+
+    private void Awake()
     {
-        // Create and assign the hue bar texture.
         hueTexture = new Texture2D(hueTextureWidth, hueTextureHeight);
         hueTexture.wrapMode = TextureWrapMode.Clamp;
         GenerateHueTexture();
         hueTexture.Apply();
-        hueBar.texture = hueTexture;
+        if (hueBar != null) hueBar.texture = hueTexture;
 
-        // Create and assign the color area texture.
         colorTexture = new Texture2D(colorTextureWidth, colorTextureHeight);
         colorTexture.wrapMode = TextureWrapMode.Clamp;
         GenerateColorTexture();
         colorTexture.Apply();
-        colorArea.texture = colorTexture;
+        if (colorArea != null) colorArea.texture = colorTexture;
 
-        // Set initial HEX color code based on the current color area cursor position.
         UpdateHexColorFromCursor();
-
-        UpdateHueCursor();
-
-        /*
-        // Add listener to the TMP InputField for when the user enters a HEX code.
-        if (hexInputField != null)
-        {
-            hexInputField.onEndEdit.AddListener(OnHexInputChanged);
-        }*/
+        UpdateHueCursor(); // initialize cursor + regenerate color texture once
     }
-    // Update is called once per frame
-    void Update()
+
+    private void Update()
     {
-        // On mouse button down, determine which element is being clicked.
         if (Input.GetMouseButtonDown(0))
         {
-            if (IsPointerOverRect(hueBar.rectTransform))
-            {
-                draggingHueBar = true;
-            }
-            else if (IsPointerOverRect(colorArea.rectTransform))
-            {
-                draggingColorArea = true;
-            }
+            if (hueBar != null && IsPointerOverRect(hueBar.rectTransform)) draggingHueBar = true;
+            else if (colorArea != null && IsPointerOverRect(colorArea.rectTransform)) draggingColorArea = true;
         }
 
-        // While the mouse button is held, update the corresponding cursor even if the pointer leaves the element.
         if (Input.GetMouseButton(0))
         {
-            if (draggingHueBar)
-            {
-                UpdateHueCursor();
-            }
-            if (draggingColorArea)
-            {
-                UpdateColorCursor();
-            }
+            if (draggingHueBar) UpdateHueCursor();
+            if (draggingColorArea) UpdateColorCursor();
         }
 
-        // Reset dragging flags when the mouse button is released.
         if (Input.GetMouseButtonUp(0))
         {
             draggingHueBar = false;
@@ -103,192 +86,122 @@ public class ColorPicker : MonoBehaviour
         }
     }
 
+    // -----------------------------
+    // Public API
+    // -----------------------------
     public void CreateButtons()
     {
         if (targetGameObject == null) return;
 
-        // 先清空舊按鈕
         ClearnButton();
 
-        // 依 shader 產生細節用按鈕
-        for (int x = 0; x < targetMaterials.Count; x++)
+        // Effect target: one toggle per color entry in EffectColorController.colors
+        if (ResolveEffectTarget())
         {
-            string shaderName = targetMaterials[x].shader.name;
-            Debug.Log("shaderName:" + shaderName);
+            // Ensure cache exists
+            if (targetEffectColorController.colors == null)
+                targetEffectColorController.colors = new List<Color>();
 
-            if (shaderName.Contains("Mix 3"))
+            if (targetEffectColorController.colors.Count == 0)
+                targetEffectColorController.CacheColorsFromGroups();
+
+            int count = targetEffectColorController.colors.Count;
+            for (int i = 0; i < count; i++)
             {
-                for (int i = 0; i < 3; i++)
+                var button = Instantiate(buttonPrefab, colorDetailButtonParent);
+                var label = button.transform.Find("Detail Index")?.GetComponent<TMPro.TMP_Text>();
+                if (label) label.text = (i + 1).ToString();
+
+                var t = button.GetComponent<Toggle>();
+                if (t == null) continue;
+
+                int colorIndex = i;
+                t.onValueChanged.AddListener(isOn =>
                 {
-                    var button = Instantiate(buttonPrefab, colorDetailButtonParent);
-                    var label = button.transform.Find("Detail Index")?.GetComponent<TMPro.TMP_Text>();
-                    int num = x + i + 1;
-                    if (label) label.text = "" + num;
-
-                    var btn = button.GetComponent<Toggle>();
-                    if (btn != null)
+                    if (isOn)
                     {
-                        int materialIdx = x;
-                        int textureIdx = i;
-                        btn.onValueChanged.AddListener(isOn =>
-                        {
-                            if (isOn)
-                            {
-                                ColorBlock cb = btn.colors;
-                                cb.normalColor = selectedColor;
-                                cb.selectedColor = selectedColor;
-                                cb.highlightedColor = selectedColor;
-                                cb.pressedColor = selectedColor;
-                                btn.colors = cb;
-                                SelectDetalPart(materialIdx, textureIdx);
+                        SetToggleSelectedVisual(t, true);
+                        SelectDetalPart(0, colorIndex);
 
-                                // 依 textureIndex 決定要讀哪個顏色 property
-                                var mat = targetMaterials[materialIdx];
-                                string propName = textureIdx == 0
-                                    ? "_BaseColor"
-                                    : $"_Layer{textureIdx}Color";
-
-                                Color c = Color.white;
-                                if (mat != null && mat.HasProperty(propName))
-                                    c = mat.GetColor(propName);
-
-                                CursorToColor(c);
-                            }
-                            else
-                            {
-                                ColorBlock cb = btn.colors;
-                                cb.normalColor = normalColor;
-                                cb.selectedColor = normalColor;
-                                cb.highlightedColor = normalColor;
-                                cb.pressedColor = normalColor;
-                                btn.colors = cb;
-                            }
-                        });
-                        btn.group = toggleGroup;
+                        var colors = targetEffectColorController.colors;
+                        Color c = (colors != null && colorIndex >= 0 && colorIndex < colors.Count) ? colors[colorIndex] : Color.white;
+                        CursorToColor(c);
                     }
-                }
+                    else
+                    {
+                        SetToggleSelectedVisual(t, false);
+                    }
+                });
+
+                t.group = toggleGroup;
             }
-            else if (shaderName.Contains("Mix 4"))
+
+            AutoSelectFirstToggle();
+            return;
+        }
+
+        // Material target: build buttons based on shader type
+        if (targetMaterials == null) targetMaterials = new List<Material>();
+        for (int matIndex = 0; matIndex < targetMaterials.Count; matIndex++)
+        {
+            var mat = targetMaterials[matIndex];
+            if (mat == null) continue;
+
+            string shaderName = mat.shader != null ? mat.shader.name : string.Empty;
+            int layerCount = GetLayerCountFromShaderName(shaderName);
+
+            for (int texIndex = 0; texIndex < layerCount; texIndex++)
             {
-                for (int i = 0; i < 4; i++)
+                var button = Instantiate(buttonPrefab, colorDetailButtonParent);
+                var label = button.transform.Find("Detail Index")?.GetComponent<TMPro.TMP_Text>();
+                if (label) label.text = (matIndex + texIndex + 1).ToString();
+
+                var t = button.GetComponent<Toggle>();
+                if (t == null) continue;
+
+                int capturedMatIndex = matIndex;
+                int capturedTexIndex = texIndex;
+
+                t.onValueChanged.AddListener(isOn =>
                 {
-                    var button = Instantiate(buttonPrefab, colorDetailButtonParent);
-                    var label = button.transform.Find("Detail Index")?.GetComponent<TMPro.TMP_Text>();
-                    int num = x + i + 1;
-                    if (label) label.text = "" + num;
-
-                    var btn = button.GetComponent<Toggle>();
-                    if (btn != null)
+                    if (isOn)
                     {
-                        int materialIdx = x;
-                        int textureIdx = i;
-                        btn.onValueChanged.AddListener(isOn =>
+                        SetToggleSelectedVisual(t, true);
+                        SelectDetalPart(capturedMatIndex, capturedTexIndex);
+
+                        string propName = capturedTexIndex == 0 ? "_BaseColor" : $"_Layer{capturedTexIndex}Color";
+                        Color c = Color.white;
+                        if (targetMaterials != null &&
+                            capturedMatIndex >= 0 && capturedMatIndex < targetMaterials.Count &&
+                            targetMaterials[capturedMatIndex] != null &&
+                            targetMaterials[capturedMatIndex].HasProperty(propName))
                         {
-                            if (isOn)
-                            {
-                                ColorBlock cb = btn.colors;
-                                cb.normalColor = selectedColor;
-                                cb.selectedColor = selectedColor;
-                                cb.highlightedColor = selectedColor;
-                                cb.pressedColor = selectedColor;
-                                btn.colors = cb;
-                                SelectDetalPart(materialIdx, textureIdx);
-                                // 依 textureIndex 決定要讀哪個顏色 property
-                                var mat = targetMaterials[materialIdx];
-                                string propName = textureIdx == 0
-                                    ? "_BaseColor"
-                                    : $"_Layer{textureIdx}Color";
+                            c = targetMaterials[capturedMatIndex].GetColor(propName);
+                        }
 
-                                Color c = Color.white;
-                                if (mat != null && mat.HasProperty(propName))
-                                    c = mat.GetColor(propName);
-
-                                CursorToColor(c);
-                            }
-                            else
-                            {
-                                ColorBlock cb = btn.colors;
-                                cb.normalColor = normalColor;
-                                cb.selectedColor = normalColor;
-                                cb.highlightedColor = normalColor;
-                                cb.pressedColor = normalColor;
-                                btn.colors = cb;
-                            }
-                        });
-                        btn.group = toggleGroup;
+                        CursorToColor(c);
                     }
-                }
-            }
-            else if (shaderName.Contains("Mix 5"))
-            {
-                for (int i = 0; i < 5; i++)
-                {
-                    var button2 = Instantiate(buttonPrefab, colorDetailButtonParent);
-                    var label = button2.transform.Find("Detail Index")?.GetComponent<TMPro.TMP_Text>();
-                    int num = x + i + 1;
-                    if (label) label.text = "" + num;
-
-                    var btn = button2.GetComponent<Toggle>();
-                    if (btn != null)
+                    else
                     {
-                        int materialIdx = x;
-                        int textureIdx = i;
-                        btn.onValueChanged.AddListener(isOn =>
-                        {
-                            if (isOn)
-                            {
-                                ColorBlock cb = btn.colors;
-                                cb.normalColor = selectedColor;
-                                cb.selectedColor = selectedColor;
-                                cb.highlightedColor = selectedColor;
-                                cb.pressedColor = selectedColor;
-                                btn.colors = cb;
-                                SelectDetalPart(materialIdx, textureIdx);
-                                // 依 textureIndex 決定要讀哪個顏色 property
-                                var mat = targetMaterials[materialIdx];
-                                string propName = textureIdx == 0
-                                    ? "_BaseColor"
-                                    : $"_Layer{textureIdx}Color";
-
-                                Color c = Color.white;
-                                if (mat != null && mat.HasProperty(propName))
-                                    c = mat.GetColor(propName);
-
-                                CursorToColor(c);
-                            }
-                            else
-                            {
-                                ColorBlock cb = btn.colors;
-                                cb.normalColor = normalColor;
-                                cb.selectedColor = normalColor;
-                                cb.highlightedColor = normalColor;
-                                cb.pressedColor = normalColor;
-                                btn.colors = cb;
-                            }
-                        });
-                        btn.group = toggleGroup;
+                        SetToggleSelectedVisual(t, false);
                     }
-                }
+                });
+
+                t.group = toggleGroup;
             }
         }
 
-        // ★ 在這裡自動勾第一顆按鈕
-        if (colorDetailButtonParent.childCount > 0)
-        {
-            var firstToggle = colorDetailButtonParent.GetChild(0).GetComponent<Toggle>();
-            if (firstToggle != null)
-            {
-                firstToggle.isOn = true;   // 會觸發 onValueChanged → SelectDetalPart()
-            }
-        }
+        AutoSelectFirstToggle();
     }
 
     public void ClearnButton()
     {
-        for (int i = colorDetailButtonParent.childCount - 1; i >= 0; i--)
-            Destroy(colorDetailButtonParent.GetChild(i).gameObject);
+        if (colorDetailButtonParent != null)
+        {
+            for (int i = colorDetailButtonParent.childCount - 1; i >= 0; i--)
+                Destroy(colorDetailButtonParent.GetChild(i).gameObject);
+        }
 
-        // 確保不再觸發舊按鈕的選取狀態
         if (toggleGroup != null)
             toggleGroup.SetAllTogglesOff();
     }
@@ -299,266 +212,78 @@ public class ColorPicker : MonoBehaviour
         currentTextureIndex = textureIndex;
     }
 
-    // Generates the Hue Bar texture using a gradient across hues.
-    void GenerateHueTexture()
-    {
-        for (int x = 0; x < hueTextureWidth; x++)
-        {
-            float h = (float)x / (hueTextureWidth - 1);
-            Color col = Color.HSVToRGB(h, 1f, 1f);
-            for (int y = 0; y < hueTextureHeight; y++)
-            {
-                hueTexture.SetPixel(x, y, col);
-            }
-        }
-    }
-    // Generates the Color Area texture based on the current hue.
-    void GenerateColorTexture()
-    {
-        for (int x = 0; x < colorTextureWidth; x++)
-        {
-            for (int y = 0; y < colorTextureHeight; y++)
-            {
-                float saturation = (float)x / (colorTextureWidth - 1);
-                float brightness = (float)y / (colorTextureHeight - 1);
-                Color col = Color.HSVToRGB(currentHue, saturation, brightness);
-                colorTexture.SetPixel(x, y, col);
-            }
-        }
-    }
-    // Calculates the selected color based on the color cursor's position and updates the HEX string and input field.
-    public Color UpdateHexColorFromCursor()
-    {
-        Rect rect = colorArea.rectTransform.rect;
-        Vector2 pos = colorCursor.anchoredPosition;
-        float saturation = (pos.x - rect.xMin) / rect.width;
-        float brightness = (pos.y - rect.yMin) / rect.height;
-        Color selectedColor = Color.HSVToRGB(currentHue, saturation, brightness);
-        return selectedColor;
-    }
-    // Helper: Converts the mouse screen position into local coordinates of the given RectTransform.
-    bool IsPointerOverRect(RectTransform rectTransform)
-    {
-        Vector2 localMousePos;
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            rectTransform, Input.mousePosition, null, out localMousePos);
-        return rectTransform.rect.Contains(localMousePos);
-    }
-    void UpdateHueCursor()
-    {
-        Vector2 localPoint;
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            hueBar.rectTransform, Input.mousePosition, null, out localPoint);
-        Rect rect = hueBar.rectTransform.rect;
-
-        // Clamp the x position to stay within the hue bar.
-        float clampedX = Mathf.Clamp(localPoint.x, rect.xMin, rect.xMax);
-
-        // Update the hue cursor's anchored position (horizontal only).
-        Vector2 cursorPos = hueCursor.anchoredPosition;
-        cursorPos.x = clampedX;
-        hueCursor.anchoredPosition = cursorPos;
-
-        // Calculate the current hue.
-        float normalizedHue = (clampedX - rect.xMin) / rect.width;
-        currentHue = normalizedHue;
-
-        // Regenerate the color area texture with the updated hue.
-        GenerateColorTexture();
-        colorTexture.Apply();
-
-        // Update the HEX color code.
-        UpdateHexColorFromCursor();
-        ChangeTargetMaterialColor(UpdateHexColorFromCursor(), currentMaterialIndex, currentTextureIndex);
-    }
-    // Updates the color area cursor position based on the mouse, clamped to the area.
-    void UpdateColorCursor()
-    {
-        Vector2 localPoint;
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            colorArea.rectTransform, Input.mousePosition, null, out localPoint);
-        Rect rect = colorArea.rectTransform.rect;
-
-        // Clamp the position so the cursor stays within the color area.
-        float clampedX = Mathf.Clamp(localPoint.x, rect.xMin, rect.xMax);
-        float clampedY = Mathf.Clamp(localPoint.y, rect.yMin, rect.yMax);
-        colorCursor.anchoredPosition = new Vector2(clampedX, clampedY);
-
-        // Update the HEX color code based on the new cursor position.
-        ChangeTargetMaterialColor(UpdateHexColorFromCursor(), currentMaterialIndex, currentTextureIndex);
-    }
-    public void ChangeTargetMaterialColor(Color color, int materialIndex, int textureIndex)
-    {
-        if (targetMaterials == null || materialIndex < 0 || materialIndex >= targetMaterials.Count)
-            return;
-
-        var mat = targetMaterials[materialIndex];
-        if (mat == null) return;
-
-        string propName = textureIndex switch
-        {
-            0 => "_BaseColor",
-            _ => $"_Layer{textureIndex}Color"
-        };
-
-        if (mat.HasProperty(propName))
-            mat.SetColor(propName, color);
-        else
-            Debug.LogWarning($"{mat.name} missing property: {propName}");
-
-        WriteColorBackToItemInstance(color, materialIndex, textureIndex);
-    }
-    private void WriteColorBackToItemInstance(Color color, int materialIndex, int textureIndex)
-    {
-        if (textureIndex < 0) return;
-
-        // 由 InventoryManager 明確指定；沒指定就不要寫（避免誤寫）
-        if (targetItemInstance == null) return;
-
-        // 取出 colors / shaderName（依不同 instance 類型）
-        List<Color> colorsList = null;
-        string shaderName = null;
-
-        if (targetItemInstance is ArmorInstance ai)
-        {
-            colorsList = ai.colors;
-            shaderName = ai.shaderName;
-        }
-        else if (targetItemInstance is RangeWeaponInstance rwi)
-        {
-            colorsList = rwi.colors;
-            shaderName = rwi.shaderName;
-        }
-        else if (targetItemInstance is PartInstance pi)
-        {
-            colorsList = pi.colors;
-            shaderName = pi.shaderName;
-        }
-        else
-        {
-            return;
-        }
-
-        if (colorsList == null) colorsList = new List<Color>();
-
-        // shaderName 沒紀錄就用目前材質補上
-        if (string.IsNullOrEmpty(shaderName))
-        {
-            if (materialIndex >= 0 && targetMaterials != null &&
-                materialIndex < targetMaterials.Count && targetMaterials[materialIndex] != null)
-            {
-                shaderName = targetMaterials[materialIndex].shader.name;
-
-                if (targetItemInstance is ArmorInstance ai2) ai2.shaderName = shaderName;
-                else if (targetItemInstance is RangeWeaponInstance rwi2) rwi2.shaderName = shaderName;
-                else if (targetItemInstance is PartInstance pi2) pi2.shaderName = shaderName;
-            }
-        }
-
-        int requiredCount = 1;
-        if (!string.IsNullOrEmpty(shaderName))
-        {
-            if (shaderName.Contains("Mix 5")) requiredCount = 5;
-            else if (shaderName.Contains("Mix 4")) requiredCount = 4;
-            else if (shaderName.Contains("Mix 3")) requiredCount = 3;
-            else requiredCount = Mathf.Max(requiredCount, textureIndex + 1);
-        }
-        else
-        {
-            requiredCount = Mathf.Max(requiredCount, textureIndex + 1);
-        }
-
-        while (colorsList.Count < requiredCount) colorsList.Add(Color.white);
-        while (colorsList.Count <= textureIndex) colorsList.Add(Color.white);
-
-        colorsList[textureIndex] = color;
-
-        // 把 list 寫回（避免 colorsList 是新建的）
-        if (targetItemInstance is ArmorInstance ai3) ai3.colors = colorsList;
-        else if (targetItemInstance is RangeWeaponInstance rwi3) rwi3.colors = colorsList;
-        else if (targetItemInstance is PartInstance pi3) pi3.colors = colorsList;
-    }
+    // Call this after setting targetGameObject.
+    // For VFX: it will discover EffectColorController automatically.
     public void AddTargetMaterialsToList()
     {
-        targetMaterials.Clear(); // ← 加這行
-        if (targetGameObject.GetComponent<SkinnedMeshRenderer>())
+        if (targetMaterials == null) targetMaterials = new List<Material>();
+        targetMaterials.Clear();
+
+        // If this is an effect prefab, we don't use materials.
+        if (ResolveEffectTarget())
+            return;
+
+        // Helper: add ONLY element 0
+        void AddElement0(Renderer renderer)
         {
-            targetMaterials.Add(targetGameObject.GetComponent<SkinnedMeshRenderer>().materials[0]);
-        }else if (targetGameObject.GetComponent<MeshRenderer>())
-        {
-            targetMaterials.Add(targetGameObject.GetComponent<MeshRenderer>().materials[0]);
+            if (renderer == null) return;
+
+            // Use .materials (not .sharedMaterials) to keep the same behavior as your current code:
+            // modifying color won't permanently change the asset material.
+            var mats = renderer.materials;
+            if (mats != null && mats.Length > 0 && mats[0] != null)
+                targetMaterials.Add(mats[0]);
         }
+
+        var smr = targetGameObject != null ? targetGameObject.GetComponentInChildren<SkinnedMeshRenderer>(true) : null;
+        if (smr != null) { AddElement0(smr); return; }
+
+        var mr = targetGameObject != null ? targetGameObject.GetComponentInChildren<MeshRenderer>(true) : null;
+        if (mr != null) { AddElement0(mr); return; }
+
+        // Fallback: any renderer
+        var r = targetGameObject != null ? targetGameObject.GetComponentInChildren<Renderer>(true) : null;
+        if (r != null) AddElement0(r);
     }
 
-    public void WriteColorBackToArmorInstance(Color color, int materialIndex, int textureIndex)
+
+    public Color UpdateHexColorFromCursor()
     {
-        // 基本防呆
-        if (textureIndex < 0) return;
-        if (InventoryManager.Instance == null || EquipmentManager.Instance == null) return;
+        if (colorArea == null || colorCursor == null) return Color.white;
 
-        int slotIndex = InventoryManager.Instance.GetSelectedSlotIndex();
-        var slots = EquipmentManager.Instance.equipmentSlots;
-        if (slotIndex < 0 || slotIndex >= slots.Count) return;
+        Rect rect = colorArea.rectTransform.rect;
+        Vector2 pos = colorCursor.anchoredPosition;
 
-        // 只處理已裝備且為 Armor 的情況
-        if (slots[slotIndex].item is not ArmorInstance ai) return;
-
-        // 依 shaderName 推斷需要的顏色數量；若未設則以當前目標材質的 shader 推斷
-        string shaderName = ai.shaderName;
-        if (string.IsNullOrEmpty(shaderName))
-        {
-            if (materialIndex >= 0 && targetMaterials != null &&
-                materialIndex < targetMaterials.Count && targetMaterials[materialIndex] != null)
-            {
-                shaderName = targetMaterials[materialIndex].shader.name;
-                ai.shaderName = shaderName; // 補記
-            }
-        }
-
-        int requiredCount = 1;
-        if (!string.IsNullOrEmpty(shaderName))
-        {
-            if (shaderName.Contains("Mix 5")) requiredCount = 5;
-            else if (shaderName.Contains("Mix 4")) requiredCount = 4;
-            else if (shaderName.Contains("Mix 3")) requiredCount = 3;
-            else requiredCount = Mathf.Max(requiredCount, textureIndex + 1); // 非 Mix 系列時，最少容納到當前索引
-        }
-        else
-        {
-            requiredCount = Mathf.Max(requiredCount, textureIndex + 1);
-        }
-
-        // 確保 list 長度足夠（以白色填充）
-        while (ai.colors.Count < requiredCount)
-            ai.colors.Add(Color.white);
-
-        // 若仍不足以覆寫到指定 index，擴充到 textureIndex
-        while (ai.colors.Count <= textureIndex)
-            ai.colors.Add(Color.white);
-
-        // 回寫
-        ai.colors[textureIndex] = color;
+        float saturation = (pos.x - rect.xMin) / rect.width;
+        float brightness = (pos.y - rect.yMin) / rect.height;
+        return Color.HSVToRGB(currentHue, saturation, brightness);
     }
 
     public void CursorToColor(Color targetColor)
     {
-        // 轉換目標顏色到 HSV
+        if (hueBar == null || hueCursor == null || colorArea == null || colorCursor == null) return;
+
         Color.RGBToHSV(targetColor, out float h, out float s, out float v);
         currentHue = h;
-        // 更新 Hue Cursor 位置
+
         Rect hueRect = hueBar.rectTransform.rect;
         float hueX = hueRect.xMin + h * hueRect.width;
         Vector2 hueCursorPos = hueCursor.anchoredPosition;
         hueCursorPos.x = hueX;
         hueCursor.anchoredPosition = hueCursorPos;
-        // 重新生成 Color Texture
+
         GenerateColorTexture();
         colorTexture.Apply();
-        // 更新 Color Cursor 位置
+
         Rect colorRect = colorArea.rectTransform.rect;
         float colorX = colorRect.xMin + s * colorRect.width;
         float colorY = colorRect.yMin + v * colorRect.height;
         colorCursor.anchoredPosition = new Vector2(colorX, colorY);
+    }
+
+    public void ChangeTargetMaterialColor(Color color, int materialIndex, int textureIndex)
+    {
+        ApplyColorToCurrentTarget(color, materialIndex, textureIndex);
     }
 
     public void ApplyCurrentColorToImage(Image buttonImage)
@@ -592,11 +317,273 @@ public class ColorPicker : MonoBehaviour
             return;
         }
 
-        // 讀出按鈕現在的顏色
-        Color buttonColor = buttonImage.color;
+        CursorToColor(buttonImage.color);
+        ApplyColorToCurrentTarget(UpdateHexColorFromCursor(), currentMaterialIndex, currentTextureIndex);
+    }
 
-        // 用這個顏色移動 HueBar / ColorArea 游標
-        CursorToColor(buttonColor);
-        ChangeTargetMaterialColor(UpdateHexColorFromCursor(), currentMaterialIndex, currentTextureIndex);
+    // -----------------------------
+    // Internal: drag logic
+    // -----------------------------
+    private bool IsPointerOverRect(RectTransform rectTransform)
+    {
+        if (rectTransform == null) return false;
+
+        Vector2 localMousePos;
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            rectTransform, Input.mousePosition, null, out localMousePos);
+        return rectTransform.rect.Contains(localMousePos);
+    }
+
+    private void UpdateHueCursor()
+    {
+        if (hueBar == null || hueCursor == null) return;
+
+        Vector2 localPoint;
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            hueBar.rectTransform, Input.mousePosition, null, out localPoint);
+        Rect rect = hueBar.rectTransform.rect;
+
+        float clampedX = Mathf.Clamp(localPoint.x, rect.xMin, rect.xMax);
+
+        Vector2 cursorPos = hueCursor.anchoredPosition;
+        cursorPos.x = clampedX;
+        hueCursor.anchoredPosition = cursorPos;
+
+        currentHue = (clampedX - rect.xMin) / rect.width;
+
+        GenerateColorTexture();
+        colorTexture.Apply();
+
+        ApplyColorToCurrentTarget(UpdateHexColorFromCursor(), currentMaterialIndex, currentTextureIndex);
+    }
+
+    private void UpdateColorCursor()
+    {
+        if (colorArea == null || colorCursor == null) return;
+
+        Vector2 localPoint;
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            colorArea.rectTransform, Input.mousePosition, null, out localPoint);
+        Rect rect = colorArea.rectTransform.rect;
+
+        float clampedX = Mathf.Clamp(localPoint.x, rect.xMin, rect.xMax);
+        float clampedY = Mathf.Clamp(localPoint.y, rect.yMin, rect.yMax);
+        colorCursor.anchoredPosition = new Vector2(clampedX, clampedY);
+
+        ApplyColorToCurrentTarget(UpdateHexColorFromCursor(), currentMaterialIndex, currentTextureIndex);
+    }
+
+    private void GenerateHueTexture()
+    {
+        for (int x = 0; x < hueTextureWidth; x++)
+        {
+            float h = (float)x / (hueTextureWidth - 1);
+            Color col = Color.HSVToRGB(h, 1f, 1f);
+            for (int y = 0; y < hueTextureHeight; y++)
+                hueTexture.SetPixel(x, y, col);
+        }
+    }
+
+    private void GenerateColorTexture()
+    {
+        for (int x = 0; x < colorTextureWidth; x++)
+        {
+            for (int y = 0; y < colorTextureHeight; y++)
+            {
+                float saturation = (float)x / (colorTextureWidth - 1);
+                float brightness = (float)y / (colorTextureHeight - 1);
+                Color col = Color.HSVToRGB(currentHue, saturation, brightness);
+                colorTexture.SetPixel(x, y, col);
+            }
+        }
+    }
+
+    // -----------------------------
+    // Internal: apply + persist
+    // -----------------------------
+    private void ApplyColorToCurrentTarget(Color color, int materialIndex, int textureIndex)
+    {
+        if (textureIndex < 0) return;
+
+        // Effect first
+        if (ResolveEffectTarget())
+        {
+            ApplyEffectColor(color, textureIndex);
+            return;
+        }
+
+        // Materials
+        if (targetMaterials == null || materialIndex < 0 || materialIndex >= targetMaterials.Count) return;
+
+        var mat = targetMaterials[materialIndex];
+        if (mat == null) return;
+
+        string propName = textureIndex == 0 ? "_BaseColor" : $"_Layer{textureIndex}Color";
+        if (mat.HasProperty(propName))
+            mat.SetColor(propName, color);
+        else
+            Debug.LogWarning($"{mat.name} missing property: {propName}");
+
+        WriteColorBackToItemInstance(color, materialIndex, textureIndex);
+    }
+
+    private void ApplyEffectColor(Color color, int colorIndex)
+    {
+        if (targetEffectColorController == null) return;
+
+        if (targetEffectColorController.colors == null)
+            targetEffectColorController.colors = new List<Color>();
+
+        while (targetEffectColorController.colors.Count <= colorIndex)
+            targetEffectColorController.colors.Add(Color.white);
+
+        targetEffectColorController.colors[colorIndex] = color;
+
+        // Apply to particle systems
+        targetEffectColorController.ApplyFromColorsList();
+
+        // Persist
+        WriteColorBackToItemInstance(color, 0, colorIndex);
+    }
+
+    private void WriteColorBackToItemInstance(Color color, int materialIndex, int textureIndex)
+    {
+        if (textureIndex < 0) return;
+        if (targetItemInstance == null) return;
+
+        List<Color> colorsList = null;
+        string shaderName = null;
+
+        if (targetItemInstance is ArmorInstance ai)
+        {
+            colorsList = ai.colors;
+            shaderName = ai.shaderName;
+        }
+        else if (targetItemInstance is RangeWeaponInstance rwi)
+        {
+            colorsList = rwi.colors;
+            shaderName = rwi.shaderName;
+        }
+        else if (targetItemInstance is MeleeWeaponInstance mwi)
+        {
+            colorsList = mwi.colors;
+            shaderName = mwi.shaderName;
+        }
+        else if (targetItemInstance is PartInstance pi)
+        {
+            colorsList = pi.colors;
+            shaderName = pi.shaderName;
+        }
+        else
+        {
+            return;
+        }
+
+        if (colorsList == null) colorsList = new List<Color>();
+
+        // For material targets, try to fill shaderName when missing.
+        if (!HasEffectTarget && string.IsNullOrEmpty(shaderName))
+        {
+            if (materialIndex >= 0 && targetMaterials != null &&
+                materialIndex < targetMaterials.Count && targetMaterials[materialIndex] != null)
+            {
+                shaderName = targetMaterials[materialIndex].shader.name;
+
+                if (targetItemInstance is ArmorInstance ai2) ai2.shaderName = shaderName;
+                else if (targetItemInstance is RangeWeaponInstance rwi2) rwi2.shaderName = shaderName;
+                else if (targetItemInstance is MeleeWeaponInstance mwi2) mwi2.shaderName = shaderName;
+                else if (targetItemInstance is PartInstance pi2) pi2.shaderName = shaderName;
+            }
+        }
+
+        // Required length:
+        // - Material shaders: follow Mix3/4/5
+        // - Effect: store by index (textureIndex == colorIndex)
+        int requiredCount = 1;
+        if (HasEffectTarget)
+        {
+            requiredCount = Mathf.Max(1, textureIndex + 1);
+        }
+        else if (!string.IsNullOrEmpty(shaderName))
+        {
+            if (shaderName.Contains("Mix 5")) requiredCount = 5;
+            else if (shaderName.Contains("Mix 4")) requiredCount = 4;
+            else if (shaderName.Contains("Mix 3")) requiredCount = 3;
+            else requiredCount = Mathf.Max(requiredCount, textureIndex + 1);
+        }
+        else
+        {
+            requiredCount = Mathf.Max(requiredCount, textureIndex + 1);
+        }
+
+        while (colorsList.Count < requiredCount) colorsList.Add(Color.white);
+        while (colorsList.Count <= textureIndex) colorsList.Add(Color.white);
+
+        colorsList[textureIndex] = color;
+
+        if (targetItemInstance is ArmorInstance ai3) ai3.colors = colorsList;
+        else if (targetItemInstance is RangeWeaponInstance rwi3) rwi3.colors = colorsList;
+        else if (targetItemInstance is MeleeWeaponInstance mwi3) mwi3.colors = colorsList;
+        else if (targetItemInstance is PartInstance pi3) pi3.colors = colorsList;
+    }
+
+    // -----------------------------
+    // Helpers
+    // -----------------------------
+    private bool ResolveEffectTarget()
+    {
+        if (targetGameObject == null)
+        {
+            targetEffectColorController = null;
+            return false;
+        }
+
+        // 只把「目標本體」或「其父系」當作 effect 來源
+        // 目標是 weapon root 時：通常自己沒有 ParticleSystem / ParticleSystemRenderer -> false
+        bool targetIsParticleObject =
+            targetGameObject.GetComponent<ParticleSystem>() != null ||
+            targetGameObject.GetComponent<ParticleSystemRenderer>() != null;
+
+        if (!targetIsParticleObject)
+        {
+            targetEffectColorController = null;
+            return false;
+        }
+
+        // 只找自己或父系的 controller（不要找 children）
+        targetEffectColorController = targetGameObject.GetComponentInParent<EffectColorController>(true);
+        return targetEffectColorController != null;
+    }
+
+
+    private int GetLayerCountFromShaderName(string shaderName)
+    {
+        if (string.IsNullOrEmpty(shaderName)) return 1;
+        if (shaderName.Contains("Mix 5")) return 5;
+        if (shaderName.Contains("Mix 4")) return 4;
+        if (shaderName.Contains("Mix 3")) return 3;
+        return 1;
+    }
+
+    private void AutoSelectFirstToggle()
+    {
+        if (colorDetailButtonParent == null) return;
+        if (colorDetailButtonParent.childCount <= 0) return;
+
+        var firstToggle = colorDetailButtonParent.GetChild(0).GetComponent<Toggle>();
+        if (firstToggle != null) firstToggle.isOn = true;
+    }
+
+    private void SetToggleSelectedVisual(Toggle t, bool isSelected)
+    {
+        if (t == null) return;
+
+        Color c = isSelected ? selectedColor : normalColor;
+        ColorBlock cb = t.colors;
+        cb.normalColor = c;
+        cb.selectedColor = c;
+        cb.highlightedColor = c;
+        cb.pressedColor = c;
+        t.colors = cb;
     }
 }

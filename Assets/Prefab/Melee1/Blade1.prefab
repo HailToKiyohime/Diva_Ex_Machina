@@ -6,7 +6,7 @@ PrefabInstance:
   serializedVersion: 2
   m_Modification:
     serializedVersion: 3
-    m_TransformParent: {fileID: 6875261368348746511}
+    m_TransformParent: {fileID: 2966426190728645705}
     m_Modifications:
     - target: {fileID: 835463800643519613, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
       propertyPath: m_Layer
@@ -28,9 +28,13 @@ PrefabInstance:
       propertyPath: m_Layer
       value: 8
       objectReference: {fileID: 0}
+    - target: {fileID: 3072576547980467607, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 3725182451599608233, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.7
+      value: 0.6999999
       objectReference: {fileID: 0}
     - target: {fileID: 3725182451599608233, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
       propertyPath: m_LocalPosition.x
@@ -50,11 +54,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3725182451599608233, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: 3725182451599608233, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: 3725182451599608233, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
       propertyPath: m_LocalRotation.z
@@ -88,12 +92,23 @@ PrefabInstance:
       propertyPath: m_Layer
       value: 8
       objectReference: {fileID: 0}
+    - target: {fileID: 7697466373465175678, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects:
     - {fileID: 835463800643519613, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
+    - {fileID: 3072576547980467607, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
+    - {fileID: 7697466373465175678, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
+--- !u!198 &5655711919391702612 stripped
+ParticleSystem:
+  m_CorrespondingSourceObject: {fileID: 537706690271679280, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
+  m_PrefabInstance: {fileID: 5263425265059917156}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &8843364152323564749 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3725182451599608233, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
@@ -215,6 +230,30 @@ PrefabInstance:
       propertyPath: m_Layer
       value: 8
       objectReference: {fileID: 0}
+    - target: {fileID: 3088508940731471166, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 3088508940731471166, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 3088508940731471166, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3088508940731471166, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3088508940731471166, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: -90
+      objectReference: {fileID: 0}
+    - target: {fileID: 3088508940731471166, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 6024410274549503570, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
     - {fileID: -155801271417213339, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
@@ -224,13 +263,36 @@ PrefabInstance:
     - {fileID: 535015393957032615, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects:
-    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+    - targetCorrespondingSourceObject: {fileID: 8199278469382801581, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8843364152323564749}
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3024569084458038871}
   m_SourcePrefab: {fileID: 100100000, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
---- !u!4 &6875261368348746511 stripped
+--- !u!4 &2966426190728645705 stripped
 Transform:
-  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+  m_CorrespondingSourceObject: {fileID: 8199278469382801581, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
   m_PrefabInstance: {fileID: 6405082618904823012}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &6062413980630317493 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+  m_PrefabInstance: {fileID: 6405082618904823012}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &3024569084458038871
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6062413980630317493}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 798951dc2822bb145805ef6ba88620d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MeleeTrailOnAttack
+  playerAnimation: {fileID: 0}
+  particles:
+  - {fileID: 5655711919391702612}

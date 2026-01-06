@@ -1,8 +1,9 @@
 using UnityEngine;
 using System;
-
+using Unity.Cinemachine;
 public class PlayerAnimation : MonoBehaviour
 {
+
     private Coroutine _initRoutine;
     public Animator anim;
     [SerializeField] private CapsuleCollider capsuleCollider;
@@ -21,10 +22,21 @@ public class PlayerAnimation : MonoBehaviour
     private float baseGroundPointY;
 
     // ===== Attack Layer Blend (Smooth) =====
+    [SerializeField] private float weaponHoldBlendTime = 0.15f; // 主人可調：持槍/雙持切換的混合時間
     [SerializeField] private float attackLayerBlendInTime = 0.12f;   // 可調：進入 Attack Layer 的時間
-    [SerializeField] private float attackLayerBlendOutTime = 0.18f;  // 可調：退出 Attack Layer 的時間
+    [SerializeField] private float attackLayerBlendOutTime = 0.5f;  // 可調：退出 Attack Layer 的時間
     private Coroutine _attackLayerBlendRoutine;
+    private Coroutine _weaponHoldBlendRoutine;
+    public event Action OnStartAttacking;
     public event Action OnStopAttacking;
+    private bool _attackEventFired;
+    // ===== FOV Smooth =====
+    [SerializeField] private float attackFov = 80f;
+    [SerializeField] private float normalFov = 65f;
+    [SerializeField] private float fovBlendInTime = 0.10f;
+    [SerializeField] private float fovBlendOutTime = 0.15f;
+    private Coroutine _fovRoutine;
+    public CinemachineCamera Camera;
     void Awake()
     {
         anim = anim != null ? anim : GetComponent<Animator>();
@@ -162,31 +174,58 @@ public class PlayerAnimation : MonoBehaviour
         int stance = (weaponAttribute == MeleeWeaponPartAttribute.LanceHead) ? 0 : 1;
         anim.SetInteger("stance", stance);
         anim.SetBool("leftHandAttack", isLeftHand);
+
     }
 
-
+    private void EnsureAttackStartEventFired()
+    {
+        if (_attackEventFired) return;
+        _attackEventFired = true;
+        OnStartAttacking?.Invoke(); // Trail/粒子等效果靠這個
+    }
+    public void ChangeFOVtoAttack()
+    {
+        // 需要「攻擊FOV」才呼叫這個
+        EnsureAttackStartEventFired();
+        SmoothSetFov(attackFov, fovBlendInTime);
+    }
     public void StartAttack()
     {
+        // 不管有沒有改FOV，只要開始攻擊就會觸發事件 → Trail 一定會出現
+        EnsureAttackStartEventFired();
         anim.SetBool("attacking", true);
-    }
-    public void StopDashing()
-    {
-        anim.SetBool("dashing", false);
-    }
-    public void InvokeStopAttacking()
-    {
-        CancelInvoke(nameof(StopAttacking));
-        Invoke("StopAttacking", 0.5f);
     }
     public void StopAttacking()
     {
         Debug.Log("PlayerAnimation: StopAttacking invoked");
         anim.SetBool("attacking", false);
         SetOffAttackLayer();
-        // 通知外界：攻擊已停止（誰想聽就訂閱）
+
+        _attackEventFired = false;      // 允許下一次攻擊再觸發 OnStartAttacking
         OnStopAttacking?.Invoke();
     }
-
+    public void InvokeStartAttack(float delay)
+    {
+        if (!IsInvoking(nameof(StartAttack)))
+        {
+            Invoke(nameof(StartAttack), delay);
+        }
+    }
+    public void StopDashing()
+    {
+        anim.SetBool("dashing", false);
+    }
+    public void SmoothSetFOV()
+    {
+        SmoothSetFov(normalFov, fovBlendInTime);
+    }
+    public void InvokeStopAttacking()
+    {
+        if (!IsInvoking(nameof(StopAttacking)))
+        {
+            Invoke("StopAttacking", 0.2f);
+        }
+    }
     private void SmoothSetLayerWeight(int layerIndex, float target, float duration)
     {
         if (anim == null) return;
@@ -235,52 +274,156 @@ public class PlayerAnimation : MonoBehaviour
         if (anim == null || PlayerStats.Instance == null) return;
 
         bool hasLeft = PlayerStats.Instance.leftHand.HasWeapon;
-        bool hasRight = PlayerStats.Instance.rightHand.HasWeapon; // leftHand/rightHand.weapon 是 RangeWeaponInstance :contentReference[oaicite:3]{index=3}
+        bool hasRight = PlayerStats.Instance.rightHand.HasWeapon;
 
-        SetWeaponHoldAllLayersOff();
+        // 先算目標權重（不要先把現有權重清掉，否則會變成從 0 開始硬切）
+        float targetBare = 0f;
+        float targetWL = 0f;
+        float targetWR = 0f;
+        float targetDL = 0f;
+        float targetDR = 0f;
 
-        // 0 把武器（Barehanded）
+        // 0 把武器：徒手
         if (!hasLeft && !hasRight)
         {
-            if (BarehandedLayer >= 0) anim.SetLayerWeight(BarehandedLayer, 1f);
-            return;
+            targetBare = 1f;
         }
-
-        // 2 把武器（Dual Wield）
-        if (hasLeft && hasRight)
+        // 2 把武器：雙持
+        else if (hasLeft && hasRight)
         {
-            if (Dual_Wielding_Weapon_LeftLayer >= 0) anim.SetLayerWeight(Dual_Wielding_Weapon_LeftLayer, 1f);
-            if (Dual_Wielding_Weapon_RightLayer >= 0) anim.SetLayerWeight(Dual_Wielding_Weapon_RightLayer, 1f);
+            targetDL = 1f;
+            targetDR = 1f;
+
             int leftHnadWeapon = 0; // 0: none, 1: melee, 2: range
-            if (PlayerStats.Instance.leftHand.meleeWeapon != null)
-            {
-                leftHnadWeapon = 1;
-            }else if (PlayerStats.Instance.leftHand.rangeweapon != null)
-            {
-                leftHnadWeapon = 2;
-            }
+            if (PlayerStats.Instance.leftHand.meleeWeapon != null) leftHnadWeapon = 1;
+            else if (PlayerStats.Instance.leftHand.rangeweapon != null) leftHnadWeapon = 2;
             anim.SetInteger("leftHandWeaponType", leftHnadWeapon);
-            int rightHnadWeapon = 0; // 0: none, 1: melee, 2: range
-            if (PlayerStats.Instance.rightHand.meleeWeapon != null)
-            {
-                rightHnadWeapon = 1;
-            }
-            else if (PlayerStats.Instance.rightHand.rangeweapon != null)
-            {
-                rightHnadWeapon = 2;
-            }
-            anim.SetInteger("rightHandWeaponType", rightHnadWeapon);
-            return;
-        }
 
-        // 1 把武器（單手）
-        if (hasLeft)
+            int rightHnadWeapon = 0; // 0: none, 1: melee, 2: range
+            if (PlayerStats.Instance.rightHand.meleeWeapon != null) rightHnadWeapon = 1;
+            else if (PlayerStats.Instance.rightHand.rangeweapon != null) rightHnadWeapon = 2;
+            anim.SetInteger("rightHandWeaponType", rightHnadWeapon);
+        }
+        // 1 把武器：單手（左或右）
+        else if (hasLeft)
         {
-            if (Wielding_Gun_LeftLayer >= 0) anim.SetLayerWeight(Wielding_Gun_LeftLayer, 1f);
+            targetWL = 1f;
         }
         else // hasRight
         {
-            if (Wielding_Gun_RightLayer >= 0) anim.SetLayerWeight(Wielding_Gun_RightLayer, 1f);
+            targetWR = 1f;
         }
+
+        // 平滑混合到目標
+        SmoothSetWeaponHoldWeights(
+            targetBare,
+            targetWL,
+            targetWR,
+            targetDL,
+            targetDR,
+            weaponHoldBlendTime);
+    }
+    private void SmoothSetWeaponHoldWeights(
+    float barehanded,
+    float wieldLeft,
+    float wieldRight,
+    float dualLeft,
+    float dualRight,
+    float duration)
+    {
+        if (anim == null) return;
+
+        // 若層不存在（GetLayerIndex = -1），就忽略
+        float startBare = (BarehandedLayer >= 0) ? anim.GetLayerWeight(BarehandedLayer) : 0f;
+        float startWL = (Wielding_Gun_LeftLayer >= 0) ? anim.GetLayerWeight(Wielding_Gun_LeftLayer) : 0f;
+        float startWR = (Wielding_Gun_RightLayer >= 0) ? anim.GetLayerWeight(Wielding_Gun_RightLayer) : 0f;
+        float startDL = (Dual_Wielding_Weapon_LeftLayer >= 0) ? anim.GetLayerWeight(Dual_Wielding_Weapon_LeftLayer) : 0f;
+        float startDR = (Dual_Wielding_Weapon_RightLayer >= 0) ? anim.GetLayerWeight(Dual_Wielding_Weapon_RightLayer) : 0f;
+
+        if (_weaponHoldBlendRoutine != null)
+            StopCoroutine(_weaponHoldBlendRoutine);
+
+        // duration <= 0 就直接設
+        if (duration <= 0f)
+        {
+            if (BarehandedLayer >= 0) anim.SetLayerWeight(BarehandedLayer, barehanded);
+            if (Wielding_Gun_LeftLayer >= 0) anim.SetLayerWeight(Wielding_Gun_LeftLayer, wieldLeft);
+            if (Wielding_Gun_RightLayer >= 0) anim.SetLayerWeight(Wielding_Gun_RightLayer, wieldRight);
+            if (Dual_Wielding_Weapon_LeftLayer >= 0) anim.SetLayerWeight(Dual_Wielding_Weapon_LeftLayer, dualLeft);
+            if (Dual_Wielding_Weapon_RightLayer >= 0) anim.SetLayerWeight(Dual_Wielding_Weapon_RightLayer, dualRight);
+            return;
+        }
+
+        _weaponHoldBlendRoutine = StartCoroutine(WeaponHoldBlendRoutine(
+            startBare, startWL, startWR, startDL, startDR,
+            barehanded, wieldLeft, wieldRight, dualLeft, dualRight,
+            duration));
+    }
+
+    private System.Collections.IEnumerator WeaponHoldBlendRoutine(
+        float startBare, float startWL, float startWR, float startDL, float startDR,
+        float targetBare, float targetWL, float targetWR, float targetDL, float targetDR,
+        float duration)
+    {
+        float t = 0f;
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            float a = Mathf.Clamp01(t / duration);
+
+            if (BarehandedLayer >= 0) anim.SetLayerWeight(BarehandedLayer, Mathf.Lerp(startBare, targetBare, a));
+            if (Wielding_Gun_LeftLayer >= 0) anim.SetLayerWeight(Wielding_Gun_LeftLayer, Mathf.Lerp(startWL, targetWL, a));
+            if (Wielding_Gun_RightLayer >= 0) anim.SetLayerWeight(Wielding_Gun_RightLayer, Mathf.Lerp(startWR, targetWR, a));
+            if (Dual_Wielding_Weapon_LeftLayer >= 0) anim.SetLayerWeight(Dual_Wielding_Weapon_LeftLayer, Mathf.Lerp(startDL, targetDL, a));
+            if (Dual_Wielding_Weapon_RightLayer >= 0) anim.SetLayerWeight(Dual_Wielding_Weapon_RightLayer, Mathf.Lerp(startDR, targetDR, a));
+
+            yield return null;
+        }
+
+        // 最後鎖定到精準值
+        if (BarehandedLayer >= 0) anim.SetLayerWeight(BarehandedLayer, targetBare);
+        if (Wielding_Gun_LeftLayer >= 0) anim.SetLayerWeight(Wielding_Gun_LeftLayer, targetWL);
+        if (Wielding_Gun_RightLayer >= 0) anim.SetLayerWeight(Wielding_Gun_RightLayer, targetWR);
+        if (Dual_Wielding_Weapon_LeftLayer >= 0) anim.SetLayerWeight(Dual_Wielding_Weapon_LeftLayer, targetDL);
+        if (Dual_Wielding_Weapon_RightLayer >= 0) anim.SetLayerWeight(Dual_Wielding_Weapon_RightLayer, targetDR);
+
+        _weaponHoldBlendRoutine = null;
+    }
+
+    private void SmoothSetFov(float targetFov, float duration)
+    {
+        if (Camera == null) return;
+
+        if (_fovRoutine != null)
+            StopCoroutine(_fovRoutine);
+
+        _fovRoutine = StartCoroutine(SmoothSetFovRoutine(targetFov, duration));
+    }
+
+    private System.Collections.IEnumerator SmoothSetFovRoutine(float targetFov, float duration)
+    {
+        if (Camera == null) yield break;
+
+        float startFov = Camera.Lens.FieldOfView;
+
+        if (duration <= 0f)
+        {
+            Camera.Lens.FieldOfView = targetFov;
+            _fovRoutine = null;
+            yield break;
+        }
+
+        float t = 0f;
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            float a = Mathf.Clamp01(t / duration);
+
+            Camera.Lens.FieldOfView = Mathf.Lerp(startFov, targetFov, a);
+            yield return null;
+        }
+
+        Camera.Lens.FieldOfView = targetFov;
+        _fovRoutine = null;
     }
 }

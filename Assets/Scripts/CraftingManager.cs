@@ -454,10 +454,19 @@ public class CraftingManager : MonoBehaviour
 
         foreach (var inv in InventoryManager.Instance.inventory)
         {
-            if (inv == null || inv.item == null || inv.item.type != itemType)
+            if (inv == null || inv.item == null)
                 continue;
 
-            if (!(inv.item is MeleeWeaponPart mwp) || mwp.partType != weaponPartType)
+            // 原本只允許 inv.item.type == itemType
+            // 為了讓 Coating 更穩（避免你未來把 Coating 設成不同 ItemType），這裡對 Coating 放寬一次
+            if (inv.item.type != itemType && inv.item is not MeleeWeaponCoating)
+                continue;
+
+            bool matched =
+                (inv.item is MeleeWeaponPart mwp && mwp.partType == weaponPartType) ||
+                (inv.item is MeleeWeaponCoating mwc && mwc.partType == weaponPartType);
+
+            if (!matched)
                 continue;
 
             CreateInventoryButtonForCraftingItem(inv, slotHasEquipment, slotIndex);
@@ -564,6 +573,7 @@ public class CraftingManager : MonoBehaviour
                 Destroy(weaponPreview);
             CleanCraftingSlots();   // 清左側 UI + craftingSlots
             RefreshMeleeDefaultHandleState();
+            RefreshMeleeDefaultCoatingState();
             // 建立新的武器預覽
 
             GameObject weapon = Instantiate(mw.weaponPrefab, weaponPreviewTransform);
@@ -672,6 +682,37 @@ public class CraftingManager : MonoBehaviour
                 }
             }
             RefreshMeleeDefaultHandleState();
+        }
+        else if (item.item is MeleeWeaponCoating mwc)
+        {
+            if (meleeWeapon == null || weaponPreview == null)
+                return;
+
+            foreach (var attachmentPoint in craftingSlots)
+            {
+                if (mwc.partType != attachmentPoint.equipmentType ||
+                    attachmentPoint.attachmentPointTransform == null)
+                    continue;
+
+                if (attachmentPoint.assembledPart != null)
+                    Destroy(attachmentPoint.assembledPart);
+
+                GameObject part = Instantiate(mwc.meleeCoatingPrefab, attachmentPoint.attachmentPointTransform);
+
+                attachmentPoint.assembledPart = part;
+                attachmentPoint.item = item;
+            }
+
+            // 右側只留下這個 Coating 為選中（跟你其他分支一致）
+            foreach (var t in itemsButtonParent.GetComponentsInChildren<Toggle>(true))
+            {
+                if (t != btn)
+                {
+                    t.isOn = false;
+                    t.interactable = true;
+                }
+            }
+            RefreshMeleeDefaultCoatingState();
         }
 
         // 更新左側插槽圖示
@@ -782,11 +823,12 @@ public class CraftingManager : MonoBehaviour
             spriteImage.sprite = null;
             spriteImage.color = new Color(1, 1, 1, 0);
 
-            OpenRangeWeaponInventory();
+            RefreshInventoryAfterRemove(0, default);
 
             RefreshCraftingStatBlock();
             RefreshTooltipIfVisible();
             RefreshMeleeDefaultHandleState();
+            RefreshMeleeDefaultCoatingState();
         }
         else
         {
@@ -803,11 +845,12 @@ public class CraftingManager : MonoBehaviour
             spriteImage.sprite = null;
             spriteImage.color = new Color(1, 1, 1, 0);
 
-            OpenRangeWeaponPartsInventory(ItemType.WeaponPart, slot.equipmentType);
+            RefreshInventoryAfterRemove(index, slot.equipmentType);
 
             RefreshCraftingStatBlock();
             RefreshTooltipIfVisible();
             RefreshMeleeDefaultHandleState();
+            RefreshMeleeDefaultCoatingState();
         }
     }
 
@@ -846,6 +889,7 @@ public class CraftingManager : MonoBehaviour
             RefreshCraftingStatBlock();
             RefreshTooltipIfVisible();
             RefreshMeleeDefaultHandleState();
+            RefreshMeleeDefaultCoatingState();
         }
         else
         {
@@ -867,6 +911,7 @@ public class CraftingManager : MonoBehaviour
             RefreshCraftingStatBlock();
             RefreshTooltipIfVisible();
             RefreshMeleeDefaultHandleState();
+            RefreshMeleeDefaultCoatingState();
         }
     }
 
@@ -970,12 +1015,14 @@ public class CraftingManager : MonoBehaviour
 
         if (slot != null && slot.assembledPart != null && craftingPartsToggleGroup.AnyTogglesOn())
         {
+            weaponPartColorPicker.targetItemInstance = slot.item;   // ✅ 加這行：回寫顏色用
             weaponPartColorPicker.targetGameObject = slot.assembledPart;
             weaponPartColorPicker.AddTargetMaterialsToList();
             weaponPartColorPicker.CreateButtons();
         }
         else
         {
+            weaponPartColorPicker.targetItemInstance = null;
             weaponPartColorPicker.targetGameObject = null;
             weaponPartColorPicker.targetMaterials = new List<Material>();
             weaponPartColorPicker.currentMaterialIndex = -1;
@@ -1007,10 +1054,10 @@ public class CraftingManager : MonoBehaviour
         }
         else
         {
+            weaponPartColorPicker.targetItemInstance = slots[index].item;  // ✅ 加這行
             weaponPartColorPicker.targetGameObject = go;
             weaponPartColorPicker.AddTargetMaterialsToList();
             weaponPartColorPicker.CreateButtons();
-
             if (slots[index].item is RangeWeaponInstance rwi)
             {
                 // 可選：用材質當作 fallback
@@ -1167,7 +1214,12 @@ public class CraftingManager : MonoBehaviour
                         if (slot.assembledPart != null)
                         {
                             string partShaderName;
-                            var partColors = ExtractColorsFromGameObject(slot.assembledPart, out partShaderName);
+                            List<Color> partColors;
+
+                            if (pi.partType == WeaponPartType.Coating || pi.item is MeleeWeaponCoating)
+                                partColors = ExtractCoatingColorsFromGameObject(slot.assembledPart, out partShaderName);
+                            else
+                                partColors = ExtractColorsFromGameObject(slot.assembledPart, out partShaderName);
 
                             if (partColors.Count > 0)
                             {
@@ -1284,6 +1336,25 @@ public class CraftingManager : MonoBehaviour
 
         return colors;
     }
+    private List<Color> ExtractCoatingColorsFromGameObject(GameObject go, out string shaderName)
+    {
+        shaderName = "EffectColorController";
+        var colors = new List<Color>();
+        if (!go) return colors;
+
+        // coating 的 controller 可能在 prefab parent 或 children
+        var ecc = go.GetComponentInParent<EffectColorController>()
+               ?? go.GetComponentInChildren<EffectColorController>(true);
+
+        if (ecc == null) return colors;
+
+        ecc.CacheColorsFromGroups();              // 讀出每組粒子顏色
+        if (ecc.colors != null && ecc.colors.Count > 0)
+            colors = new List<Color>(ecc.colors); // snapshot
+
+        return colors;
+    }
+
     public void OpenInventoryPage()
     {
         int index = GetSelectedSlotIndex();
@@ -1350,6 +1421,7 @@ public class CraftingManager : MonoBehaviour
             if (t != null) t.gameObject.SetActive(active);
         }
     }
+
     // 依照 Handle slot 有沒有裝零件，自動刷新 default handle 顯示
     private void RefreshMeleeDefaultHandleState()
     {
@@ -1373,5 +1445,65 @@ public class CraftingManager : MonoBehaviour
         // 有選 Handle 零件 -> 關掉 default handle
         // 沒選 Handle 零件 -> 打開 default handle
         SetDefaultMeleeHandleActive(!hasHandlePart);
+    }
+    private void SetDefaultMeleeCoatingActive(bool active)
+    {
+        if (meleeWeapon == null || weaponPreview == null) return;
+
+        // ScriptableObject 參考的是 prefab 資產，不是 runtime clone
+        // 所以用 name 去 weaponPreview 裡找對應 child
+        if (meleeWeapon.defaultCoatingEffect != null)
+        {
+            var t = FindChildRecursive(weaponPreview.transform, meleeWeapon.defaultCoatingEffect.name);
+            if (t != null) t.gameObject.SetActive(active);
+        }
+        else
+        {
+            // 保底：如果主人沒填 defaultCoatingEffect，就嘗試用常見名字找
+            var t = FindChildRecursive(weaponPreview.transform, "default coating");
+            if (t != null) t.gameObject.SetActive(active);
+        }
+    }
+
+    // 依照 Coating slot 有沒有裝零件，自動刷新 default coating 顯示
+    private void RefreshMeleeDefaultCoatingState()
+    {
+        if (meleeWeapon == null || weaponPreview == null) return;
+
+        bool hasCoatingPart = false;
+
+        if (craftingSlots != null)
+        {
+            foreach (var slot in craftingSlots)
+            {
+                if (slot == null) continue;
+                if (slot.equipmentType != WeaponPartType.Coating) continue;
+                if (slot.item == null || slot.item.item == null) continue;
+
+                hasCoatingPart = true;
+                break;
+            }
+        }
+
+        // 有選 Coating -> 關掉 default coating
+        // 沒選 Coating -> 打開 default coating
+        SetDefaultMeleeCoatingActive(!hasCoatingPart);
+    }
+
+    private void RefreshInventoryAfterRemove(int removedIndex, WeaponPartType removedPartType)
+    {
+        // removedIndex == 0：刷新武器清單
+        if (removedIndex == 0)
+        {
+            if (craftingType == 0) OpenRangeWeaponInventory();
+            else if (craftingType == 1) OpenMeleeWeaponInventory();
+            return;
+        }
+
+        // removedIndex > 0：刷新零件清單（依照目前 tab）
+        if (craftingType == 0)
+            OpenRangeWeaponPartsInventory(ItemType.WeaponPart, removedPartType);
+        else if (craftingType == 1)
+            OpenMeleeWeaponPartsInventory(ItemType.WeaponPart, removedPartType);
     }
 }

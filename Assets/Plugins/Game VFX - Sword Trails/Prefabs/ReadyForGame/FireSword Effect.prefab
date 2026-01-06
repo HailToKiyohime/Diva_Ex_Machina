@@ -14606,6 +14606,7 @@ GameObject:
   - component: {fileID: 8692708990652600834}
   - component: {fileID: 8202284320435248138}
   - component: {fileID: 3433181192263662254}
+  - component: {fileID: 1886948015942903538}
   m_Layer: 8
   m_Name: FireSword Effect
   m_TagString: Untagged
@@ -19432,6 +19433,21 @@ ParticleSystemRenderer:
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
   m_MaskInteraction: 0
+--- !u!114 &1886948015942903538
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7011655065883924470}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 798951dc2822bb145805ef6ba88620d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MeleeTrailOnAttack
+  playerAnimation: {fileID: 0}
+  particles:
+  - {fileID: 0}
 --- !u!1 &7845942586756037504
 GameObject:
   m_ObjectHideFlags: 0

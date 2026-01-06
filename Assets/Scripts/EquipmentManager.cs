@@ -56,7 +56,7 @@ public class EquipmentManager : MonoBehaviour
     private bool _hookedPlayerStats;
 
     void Awake()
-    {
+    {   
         // If an instance already exists and it's not this one, destroy this new instance
         if (Instance != null && Instance != this)
         {
@@ -280,7 +280,7 @@ public class EquipmentManager : MonoBehaviour
                 }
             }
 
-            // 2) ªþ¥ó±¾¦b¡u¥DªZ¾¹¹ê¨Ò¡v¤Wªº¦P¦W±¾ÂI¡A¨Ã®M¦^ÃC¦â
+            // 2)
             if (rwi.attachment != null)
             {
                 foreach (var attach in rwi.attachment)
@@ -399,7 +399,7 @@ public class EquipmentManager : MonoBehaviour
             {
                 foreach (var attach in mwi.attachment)
                 {
-                    if (attach?.item is not MeleeWeaponPart mwp) continue;
+                    if (attach?.item == null) continue;
 
                     foreach (var ap in mw.attachmentPoints)
                     {
@@ -408,54 +408,83 @@ public class EquipmentManager : MonoBehaviour
                         var target = FindChildRecursive(slot.equipedItem.transform, ap.pointTransform.name);
                         if (target == null)
                         {
-                            Debug.LogWarning($"Equip: cannot find mount '{ap.pointTransform.name}' on weapon instance");
+                            Debug.LogWarning($"Equip (Melee): cannot find mount '{ap.pointTransform.name}' on weapon instance");
                             continue;
                         }
-                        if (attach.partType == WeaponPartType.Handle)
+
+                        // Handle / other mesh parts
+                        if (attach.item is MeleeWeaponPart mwp)
                         {
-                            if (mw.defaultHandle != null)
+                            if (attach.partType == WeaponPartType.Handle)
                             {
-                                var t = FindChildRecursive(slot.equipedItem.transform, mw.defaultHandle.name);
-                                if (t != null) t.gameObject.SetActive(false);
+                                // hide default handle (optional)
+                                if (mw.defaultHandle != null)
+                                {
+                                    var t = FindChildRecursive(slot.equipedItem.transform, mw.defaultHandle.name);
+                                    if (t != null) t.gameObject.SetActive(false);
+                                }
+                                else
+                                {
+                                    var t = FindChildRecursive(slot.equipedItem.transform, "default handle");
+                                    if (t != null) t.gameObject.SetActive(false);
+                                }
                             }
-                            else
+
+                            var part = Instantiate(mwp.meleeWeaponPartPrefab, target, false);
+                            part.transform.localPosition = Vector3.zero;
+                            part.transform.localRotation = Quaternion.identity;
+                            part.transform.localScale = Vector3.one;
+
+                            // apply saved colors (same as your existing logic)
+                            if (attach.colors != null && attach.colors.Count > 0 && !string.IsNullOrEmpty(attach.shaderName))
                             {
-                                // 保底：如果主人沒填 defaultHandle，就嘗試用常見名字找
-                                var t = FindChildRecursive(slot.equipedItem.transform, "default handle");
+                                var partRend = part.GetComponentInChildren<Renderer>();
+                                if (partRend)
+                                {
+                                    var mat = partRend.material;
+                                    if (attach.shaderName.Contains("Mix 3") && attach.colors.Count >= 3)
+                                    {
+                                        mat.SetColor("_BaseColor", attach.colors[0]);
+                                        mat.SetColor("_Layer1Color", attach.colors[1]);
+                                        mat.SetColor("_Layer2Color", attach.colors[2]);
+                                    }
+                                    else if (attach.shaderName.Contains("Mix 4") && attach.colors.Count >= 4)
+                                    {
+                                        mat.SetColor("_BaseColor", attach.colors[0]);
+                                        mat.SetColor("_Layer1Color", attach.colors[1]);
+                                        mat.SetColor("_Layer2Color", attach.colors[2]);
+                                        mat.SetColor("_Layer3Color", attach.colors[3]);
+                                    }
+                                    else if (attach.shaderName.Contains("Mix 5") && attach.colors.Count >= 5)
+                                    {
+                                        mat.SetColor("_BaseColor", attach.colors[0]);
+                                        for (int k = 1; k < 5; k++)
+                                            mat.SetColor($"_Layer{k}Color", attach.colors[k]);
+                                    }
+                                }
+                            }
+                        }
+                        // Coating particle effect
+                        else if (attach.item is MeleeWeaponCoating mwc)
+                        {
+                            var fx = Instantiate(mwc.meleeCoatingPrefab, target, false);
+                            fx.transform.localPosition = Vector3.zero;
+
+                            // ✅ 先用 identity，再加一個補正旋轉（90 度問題通常在這）
+                            fx.transform.localRotation = Quaternion.Euler(0, 0f, -90f); // 或 +90f，依你實際方向調一次就定
+                            fx.transform.localScale = Vector3.one;
+
+                            ApplyCoatingColors(fx, attach.colors); // ✅ 套用鍛造存下來的顏色
+
+                            if (mw.defaultCoatingEffect!=null)
+                            {
+                                var t = FindChildRecursive(slot.equipedItem.transform, mw.defaultCoatingEffect.name);
                                 if (t != null) t.gameObject.SetActive(false);
                             }
                         }
-                        var part = Instantiate(mwp.meleeWeaponPartPrefab, target, false);
-                        part.transform.localPosition = Vector3.zero;
-                        part.transform.localRotation = Quaternion.identity;
-                        part.transform.localScale = Vector3.one;
-
-                        if (attach.colors != null && attach.colors.Count > 0 && !string.IsNullOrEmpty(attach.shaderName))
+                        else
                         {
-                            var partRend = part.GetComponentInChildren<Renderer>();
-                            if (partRend)
-                            {
-                                var mat = partRend.material;
-                                if (attach.shaderName.Contains("Mix 3") && attach.colors.Count >= 3)
-                                {
-                                    mat.SetColor("_BaseColor", attach.colors[0]);
-                                    mat.SetColor("_Layer1Color", attach.colors[1]);
-                                    mat.SetColor("_Layer2Color", attach.colors[2]);
-                                }
-                                else if (attach.shaderName.Contains("Mix 4") && attach.colors.Count >= 4)
-                                {
-                                    mat.SetColor("_BaseColor", attach.colors[0]);
-                                    mat.SetColor("_Layer1Color", attach.colors[1]);
-                                    mat.SetColor("_Layer2Color", attach.colors[2]);
-                                    mat.SetColor("_Layer3Color", attach.colors[3]);
-                                }
-                                else if (attach.shaderName.Contains("Mix 5") && attach.colors.Count >= 5)
-                                {
-                                    mat.SetColor("_BaseColor", attach.colors[0]);
-                                    for (int k = 1; k < 5; k++)
-                                        mat.SetColor($"_Layer{k}Color", attach.colors[k]);
-                                }
-                            }
+                            Debug.LogWarning($"Equip (Melee): unsupported attach item type: {attach.item.GetType().Name}");
                         }
                     }
                 }
@@ -503,6 +532,18 @@ public class EquipmentManager : MonoBehaviour
             if (c) return c;
         }
         return null;
+    }
+    private void ApplyCoatingColors(GameObject fxRoot, List<Color> colors)
+    {
+        if (fxRoot == null || colors == null || colors.Count == 0) return;
+
+        var ecc = fxRoot.GetComponentInParent<EffectColorController>()
+               ?? fxRoot.GetComponentInChildren<EffectColorController>(true);
+
+        if (ecc == null) return;
+
+        ecc.colors = new List<Color>(colors); // 把存檔色塞回去
+        ecc.ApplyFromColorsList();            // 套用回每組粒子 :contentReference[oaicite:8]{index=8}
     }
 
 #if UNITY_EDITOR
