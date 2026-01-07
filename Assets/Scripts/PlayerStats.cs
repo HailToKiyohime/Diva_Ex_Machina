@@ -169,7 +169,14 @@ public class BaseStats
 public class PlayerStats : MonoBehaviour
 {
     public event Action<VisualChange> OnLegVisualChanged;
+    public event Action<Vector3> OnThrusterFlameOffsetChanged;
+
+    public event Action<Thruster> OnThrusterVisualChanged;
+    public Thruster CurrentThruster { get; private set; }
+    public Vector3 CurrentThrusterFlameOffset { get; private set; } = Vector3.zero;
     public event Action OnHandWeaponDataChanged;
+
+
     public static PlayerStats Instance { get; private set; }
 
     //Buff之前全身基礎屬性 
@@ -441,7 +448,11 @@ public class PlayerStats : MonoBehaviour
         List<EquipmentBuff> leftHandArmorWeaponBuffs = new List<EquipmentBuff>();
         List<EquipmentBuff> rightHandArmorWeaponBuffs = new List<EquipmentBuff>();
 
+        Vector3 thrusterOffset = Vector3.zero;
+        bool hasThruster = false;
+
         List<EquipmentSlot> slots = EquipmentManager.Instance.equipmentSlots;
+        Thruster foundThruster = null;
         for (int i = 0; i < slots.Count; i++)
         {
             var slot = slots[i];
@@ -452,6 +463,13 @@ public class PlayerStats : MonoBehaviour
 
             if (inst is ArmorInstance armorInst)
             {
+                if (armorInst.item is Thruster thr)
+                {
+                    foundThruster = thr;                 // ★記住這顆 Thruster（prefab 也在裡面）
+                    thrusterOffset = thr.thrusterFlameOffset;
+                    hasThruster = true;
+                }
+
                 if (slot.equipmentType == ItemType.LegsArmor && armorInst.item is LegArmor leg && leg.visualChange != null)
                 {
                     CurrentLegVisual.heightOffset = leg.visualChange.heightOffset;
@@ -537,6 +555,14 @@ public class PlayerStats : MonoBehaviour
         else if (!hasLeftWeapon && hasRightWeapon)
         {
             AddBuffListToWeapon(rightHand, leftHandArmorWeaponBuffs);
+        }
+
+        CurrentThrusterFlameOffset = hasThruster ? thrusterOffset : Vector3.zero;
+        OnThrusterFlameOffsetChanged?.Invoke(CurrentThrusterFlameOffset);
+        if (CurrentThruster != foundThruster)
+        {
+            CurrentThruster = foundThruster; // null 代表沒裝（卸下）
+            OnThrusterVisualChanged?.Invoke(CurrentThruster);
         }
 
         OnLegVisualChanged?.Invoke(CurrentLegVisual);

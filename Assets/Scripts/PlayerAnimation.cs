@@ -16,10 +16,17 @@ public class PlayerAnimation : MonoBehaviour
     int Dual_Wielding_Weapon_LeftLayer; // 雙手持有武器（左手）
     int Dual_Wielding_Weapon_RightLayer; // 雙手持有武器（右手）
     int One_Hand_Melee_AttackLayer; // 持有單手近戰武器
-
+    //Character height adjustment
     private float baseHeight;
     private Vector3 baseCenter;
     private float baseGroundPointY;
+    //Thruster flame adjustment
+    public Transform thrusterFlamePointL;
+    public Transform thrusterFlamePointR;
+    public GameObject normalThrusterFlameL;
+    public GameObject normalThrusterFlameR;
+    public GameObject boostedThrusterFlameL;
+    public GameObject boostedThrusterFlameR;
 
     // ===== Attack Layer Blend (Smooth) =====
     [SerializeField] private float weaponHoldBlendTime = 0.15f; // 主人可調：持槍/雙持切換的混合時間
@@ -68,20 +75,25 @@ public class PlayerAnimation : MonoBehaviour
     }
     private System.Collections.IEnumerator InitWhenReady()
     {
-        // 先給一個安全預設：徒手
         SetWeaponHoldAllLayersOff();
         if (BarehandedLayer >= 0) anim.SetLayerWeight(BarehandedLayer, 1f);
 
-        // 等 PlayerStats Instance 準備好
         while (PlayerStats.Instance == null)
             yield return null;
 
         PlayerStats.Instance.OnLegVisualChanged += ApplyLegVisualChange;
         PlayerStats.Instance.OnHandWeaponDataChanged += RefreshWeaponHoldLayers;
 
+        PlayerStats.Instance.OnThrusterVisualChanged += ApplyThrusterVfxChange;
+        PlayerStats.Instance.OnThrusterFlameOffsetChanged += ApplyThrusterFlameTramformChange;
+
+        // 進場同步（關鍵：VFX + Offset 都要）
         ApplyLegVisualChange(PlayerStats.Instance.CurrentLegVisual);
         RefreshWeaponHoldLayers();
+        ApplyThrusterVfxChange(PlayerStats.Instance.CurrentThruster);
+        ApplyThrusterFlameTramformChange(PlayerStats.Instance.CurrentThrusterFlameOffset);
     }
+
     private void OnDisable()
     {
         if (_initRoutine != null) StopCoroutine(_initRoutine);
@@ -90,6 +102,8 @@ public class PlayerAnimation : MonoBehaviour
         {
             PlayerStats.Instance.OnLegVisualChanged -= ApplyLegVisualChange;
             PlayerStats.Instance.OnHandWeaponDataChanged -= RefreshWeaponHoldLayers;
+            PlayerStats.Instance.OnThrusterFlameOffsetChanged -= ApplyThrusterFlameTramformChange;
+            PlayerStats.Instance.OnThrusterVisualChanged -= ApplyThrusterVfxChange;
         }
     }
 
@@ -100,7 +114,11 @@ public class PlayerAnimation : MonoBehaviour
         ApplyColliderHeightOffset(vc.heightOffset);
         ApplyLocomotion(vc.animationType);
     }
-
+    private void ApplyThrusterFlameTramformChange(Vector3 offset)
+    {
+        if (thrusterFlamePointL != null) thrusterFlamePointL.localPosition = offset;
+        if (thrusterFlamePointR != null) thrusterFlamePointR.localPosition = offset;
+    }
     private void ApplyColliderHeightOffset(float heightOffset)
     {
         if (capsuleCollider == null) return;
@@ -121,7 +139,48 @@ public class PlayerAnimation : MonoBehaviour
             groundPoint.localPosition = gp;
         }
     }
+    private void ApplyThrusterVfxChange(Thruster thr)
+    {
+        // 1) 先清掉舊的（避免重複堆疊）
+        ClearThrusterVfxInstances();
 
+        // 2) 沒裝 thruster（或卸下）→ 清空後直接結束
+        if (thr == null) return;
+
+        // 3) Instantiate normal flames
+        if (thr.normalThrusterFlame != null)
+        {
+            if (thrusterFlamePointL != null)
+                normalThrusterFlameL = Instantiate(thr.normalThrusterFlame, thrusterFlamePointL.transform, false);
+
+            if (thrusterFlamePointR != null)
+                normalThrusterFlameR = Instantiate(thr.normalThrusterFlame, thrusterFlamePointR.transform, false);
+        }
+
+        // 4) Instantiate boosted flames（通常預設先關閉，等 Boost 時再開）
+        if (thr.boostedThrusterFlame != null)
+        {
+            if (thrusterFlamePointL != null)
+                boostedThrusterFlameL = Instantiate(thr.boostedThrusterFlame, thrusterFlamePointL.transform, false);
+
+            if (thrusterFlamePointR != null)
+                boostedThrusterFlameR = Instantiate(thr.boostedThrusterFlame, thrusterFlamePointR.transform, false);
+
+        }
+    }
+
+    private void ClearThrusterVfxInstances()
+    {
+        if (normalThrusterFlameL != null) Destroy(normalThrusterFlameL);
+        if (normalThrusterFlameR != null) Destroy(normalThrusterFlameR);
+        if (boostedThrusterFlameL != null) Destroy(boostedThrusterFlameL);
+        if (boostedThrusterFlameR != null) Destroy(boostedThrusterFlameR);
+
+        normalThrusterFlameL = null;
+        normalThrusterFlameR = null;
+        boostedThrusterFlameL = null;
+        boostedThrusterFlameR = null;
+    }
     private void ApplyLocomotion(AnimationType type)
     {
         // 依你的 AnimationType 實際 enum 值調整 case

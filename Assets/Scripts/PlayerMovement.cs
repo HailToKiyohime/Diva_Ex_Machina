@@ -362,7 +362,7 @@ public class PlayerMovement : MonoBehaviour
             {
                 if (!meleeDashReachedStopWithin)
                 {
-                    playerAnimation.ChangeFOVtoAttack();
+
                     meleeDashReachedStopWithin = true;
                     Debug.Log(" 距離目標 <= meleeDashStopWithin");
                     playerAnimation.InvokeStartAttack(0.1f);

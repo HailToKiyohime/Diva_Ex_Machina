@@ -43,4 +43,4 @@ MonoBehaviour:
   attribute: 2
   mainHandGrip: {fileID: 3088508940731471166, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
   defaultCoatingEffect: {fileID: 2123748689605059989, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
-  swordLength: 1
+  swordLength: 0.65

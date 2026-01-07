@@ -698,7 +698,7 @@ public class CraftingManager : MonoBehaviour
                     Destroy(attachmentPoint.assembledPart);
 
                 GameObject part = Instantiate(mwc.meleeCoatingPrefab, attachmentPoint.attachmentPointTransform);
-
+                part.transform.localScale = new Vector3(meleeWeapon.swordLength, 1, 1);
                 attachmentPoint.assembledPart = part;
                 attachmentPoint.item = item;
             }

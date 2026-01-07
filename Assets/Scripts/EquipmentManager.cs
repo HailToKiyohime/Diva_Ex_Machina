@@ -471,8 +471,8 @@ public class EquipmentManager : MonoBehaviour
                             fx.transform.localPosition = Vector3.zero;
 
                             // ✅ 先用 identity，再加一個補正旋轉（90 度問題通常在這）
-                            fx.transform.localRotation = Quaternion.Euler(0, 0f, -90f); // 或 +90f，依你實際方向調一次就定
-                            fx.transform.localScale = Vector3.one;
+                            fx.transform.localRotation = Quaternion.Euler(0, 90f, -90f); // 或 +90f，依你實際方向調一次就定
+                            fx.transform.localScale = new Vector3(mw.swordLength, 1, 1);
 
                             ApplyCoatingColors(fx, attach.colors); // ✅ 套用鍛造存下來的顏色
 
