@@ -117,7 +117,11 @@ public class PlayerAnimation : MonoBehaviour
     private void ApplyThrusterFlameTramformChange(Vector3 offset)
     {
         if (thrusterFlamePointL != null) thrusterFlamePointL.localPosition = offset;
-        if (thrusterFlamePointR != null) thrusterFlamePointR.localPosition = offset;
+        if (thrusterFlamePointR != null)
+        {
+            offset.x = -offset.x; // 右邊的 X 軸取反
+            thrusterFlamePointR.localPosition = offset;
+        }
     }
     private void ApplyColliderHeightOffset(float heightOffset)
     {
