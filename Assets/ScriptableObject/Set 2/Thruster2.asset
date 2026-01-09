@@ -38,6 +38,7 @@ MonoBehaviour:
     mode: 0
     value: 50
   randomBuffs: []
-  normalThrusterFlame: {fileID: 5437542583735723391, guid: 4ab960d472b8b8346a0f25a6fe48a004, type: 3}
+  normalThrusterFlame: {fileID: 1322921810134268507, guid: 5756023bad4e2334ba3e2a0ace9eb133, type: 3}
   boostedThrusterFlame: {fileID: 5437542583735723391, guid: 4ab960d472b8b8346a0f25a6fe48a004, type: 3}
+  meleeThrusterFlame: {fileID: 1322921810134268507, guid: f0b12d2bb8415bf469799a511d3c535c, type: 3}
   thrusterFlameOffset: {x: 0, y: 0.3, z: -0.045}

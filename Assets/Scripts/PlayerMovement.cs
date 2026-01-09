@@ -1,5 +1,4 @@
-﻿using SadnessMonday.BetterPhysics;
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
 using UnityEngine.InputSystem;
 public class PlayerMovement : MonoBehaviour
@@ -9,7 +8,7 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private Transform characterOrientation;
     [SerializeField] private Transform characterModel;
     [Header("Rigidbody")]
-    [SerializeField] private BetterRigidbody playerRigidbody;
+    [SerializeField] private Rigidbody playerRigidbody;
     [Header("Movement Settings")]
     [SerializeField] private bool grounded;
     [SerializeField] private bool readyToJump;
@@ -98,7 +97,7 @@ public class PlayerMovement : MonoBehaviour
     {
         EnergyRegenerationCheck();
         RotateCharacter();
-        UIManager.Instance.speedText.text = playerRigidbody.velocity.magnitude < 0.0001f ? 0.ToString("F2") : playerRigidbody.velocity.magnitude.ToString("F2");
+        UIManager.Instance.speedText.text = playerRigidbody.linearVelocity.magnitude < 0.0001f ? 0.ToString("F2") : playerRigidbody.linearVelocity.magnitude.ToString("F2");
     }
     public void FixedUpdate()
     {
@@ -112,14 +111,14 @@ public class PlayerMovement : MonoBehaviour
     {
         if (meleeDashActive) return; // 近戰衝刺期間忽略所有移動輸入
         if (Time.time <= dashActiveUntil) return;
-        Vector3 v = playerRigidbody.velocity;
+        Vector3 v = playerRigidbody.linearVelocity;
         Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
 
         // 沒輸入：用 deceleration 拉回 0（只處理 x/z，保留 y）
         if (moveDirection.sqrMagnitude < 0.0001f)
         {
             horizontalVel = Vector3.MoveTowards(horizontalVel, Vector3.zero, PlayerStats.Instance.decelerationSpeed * dt);
-            playerRigidbody.velocity = new Vector3(horizontalVel.x, v.y, horizontalVel.z);
+            playerRigidbody.linearVelocity = new Vector3(horizontalVel.x, v.y, horizontalVel.z);
             return;
         }
 
@@ -127,7 +126,7 @@ public class PlayerMovement : MonoBehaviour
         Vector3 targetHorizontalVel = moveDirection * PlayerStats.Instance.sprintSpeed;
         horizontalVel = Vector3.MoveTowards(horizontalVel, targetHorizontalVel, PlayerStats.Instance.accelerationSpeed * dt);
 
-        playerRigidbody.velocity = new Vector3(horizontalVel.x, v.y, horizontalVel.z);
+        playerRigidbody.linearVelocity = new Vector3(horizontalVel.x, v.y, horizontalVel.z);
     }
 
     private void ApplyFlyFixed(float dt)
@@ -151,7 +150,7 @@ public class PlayerMovement : MonoBehaviour
             return;
         }
 
-        Vector3 v = playerRigidbody.velocity;
+        Vector3 v = playerRigidbody.linearVelocity;
 
         // 這裡把 flyForce 當成「目標上升速度（m/s）」來用
         float targetVy = stats.flySpeed;
@@ -161,7 +160,7 @@ public class PlayerMovement : MonoBehaviour
         {
             float newVy = Mathf.MoveTowards(v.y, targetVy, stats.flyAcceleration * dt);
 
-            playerRigidbody.velocity = new Vector3(v.x, newVy, v.z);
+            playerRigidbody.linearVelocity = new Vector3(v.x, newVy, v.z);
         }
         // 能量消耗用 fixed dt（不飄幀率）
         stats.currentEnergy = Mathf.Max(0f, stats.currentEnergy - dt * stats.flyEnergyCost);
@@ -330,8 +329,8 @@ public class PlayerMovement : MonoBehaviour
         if (grounded && readyToJump)
         {
             readyToJump = false;
-            playerRigidbody.velocity = new Vector3(playerRigidbody.velocity.x, 0, playerRigidbody.velocity.z);
-            playerRigidbody.AddForceWithoutLimit(Vector3.up * convertJumpHeightToForce(PlayerStats.Instance.jumpHeight), ForceMode.Impulse);
+            playerRigidbody.linearVelocity = new Vector3(playerRigidbody.linearVelocity.x, 0, playerRigidbody.linearVelocity.z);
+            playerRigidbody.AddForce(Vector3.up * convertJumpHeightToForce(PlayerStats.Instance.jumpHeight), ForceMode.Impulse);
             Invoke("ResetJump", jumpCooldown);
             return true;
         }
@@ -397,7 +396,7 @@ public class PlayerMovement : MonoBehaviour
         }
         // 3) 施加衝刺速度（真 3D：X/Y/Z 全吃方向）
         Vector3 dashVel = meleeDashDir * meleeDashSpeed;
-        playerRigidbody.velocity = dashVel;
+        playerRigidbody.linearVelocity = dashVel;
     }
 
     private void StartMeleeDash(AttackManager attackManager, Weapon ownerWeapon, Vector3 targetPoint, float dashSpeed, float dashDistance)
@@ -543,7 +542,7 @@ public class PlayerMovement : MonoBehaviour
             return;
         }
 
-        Vector3 v = playerRigidbody.velocity;
+        Vector3 v = playerRigidbody.linearVelocity;
         Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
 
         float vParallel = Vector3.Dot(horizontalVel, dashDir);
@@ -552,7 +551,7 @@ public class PlayerMovement : MonoBehaviour
         if (vParallel >= dashTargetSpeed) return;
 
         // 固定加速度（不受質量影響）
-        playerRigidbody.AddForceWithoutLimit(dashDir * dashAccel, ForceMode.Acceleration);
+        playerRigidbody.AddForce(dashDir * dashAccel, ForceMode.Acceleration);
     }
     public bool DashAction()
     {
@@ -573,7 +572,7 @@ public class PlayerMovement : MonoBehaviour
         dir.Normalize();
 
         // 先算 dash 的固定加速度（只看水平）
-        Vector3 v = playerRigidbody.velocity;
+        Vector3 v = playerRigidbody.linearVelocity;
         Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
 
         dashDir = dir;
@@ -656,7 +655,7 @@ public class PlayerMovement : MonoBehaviour
         // ————————————————————
         // 1) dynamic ground check
         // ————————————————————
-        float castDistance = groundCheckDistance + playerRigidbody.velocity.y * Time.fixedDeltaTime;
+        float castDistance = groundCheckDistance + playerRigidbody.linearVelocity.y * Time.fixedDeltaTime;
         RaycastHit hit;
         bool didHit = Physics.Raycast(groundPoint.position,
             Vector3.down,
@@ -788,4 +787,23 @@ public class PlayerMovement : MonoBehaviour
         flatForward = dir.normalized;
         return true;
     }
+    // ---- Thruster VFX state (read-only) ----
+    public bool IsGrounded => grounded;
+
+    // 你原本的飛行判定就是靠 flyRequestUntil buffer，這裡沿用同一條準則
+    public bool IsFlyingActive => !grounded && Time.time <= flyRequestUntil;
+
+    public float VerticalVelocity
+    {
+        get
+        {
+            if (playerRigidbody == null) return 0f;
+            return playerRigidbody.linearVelocity.y;
+        }
+    }
+
+    public bool IsDashActive => Time.time <= dashActiveUntil;
+
+    public bool IsMeleeDashActive => meleeDashActive;
+
 }

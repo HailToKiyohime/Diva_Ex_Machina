@@ -48,9 +48,7 @@ public class MeleeTrailOnAttack : MonoBehaviour
             }
             else
             {
-                ps.Stop(true, clear
-                    ? ParticleSystemStopBehavior.StopEmittingAndClear
-                    : ParticleSystemStopBehavior.StopEmitting);
+                ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
             }
         }
     }

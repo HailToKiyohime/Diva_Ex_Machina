@@ -27,6 +27,8 @@ public class PlayerAnimation : MonoBehaviour
     public GameObject normalThrusterFlameR;
     public GameObject boostedThrusterFlameL;
     public GameObject boostedThrusterFlameR;
+    public GameObject meleeThrusterFlameL;
+    public GameObject meleeThrusterFlameR;
 
     // ===== Attack Layer Blend (Smooth) =====
     [SerializeField] private float weaponHoldBlendTime = 0.15f; // 主人可調：持槍/雙持切換的混合時間
@@ -171,6 +173,14 @@ public class PlayerAnimation : MonoBehaviour
                 boostedThrusterFlameR = Instantiate(thr.boostedThrusterFlame, thrusterFlamePointR.transform, false);
 
         }
+        // 5) Instantiate melee flames
+        if (thr.meleeThrusterFlame != null)
+        {
+            if (thrusterFlamePointL != null)
+                meleeThrusterFlameL = Instantiate(thr.meleeThrusterFlame, thrusterFlamePointL.transform, false);
+            if (thrusterFlamePointR != null)
+                meleeThrusterFlameR = Instantiate(thr.meleeThrusterFlame, thrusterFlamePointR.transform, false);
+        }
     }
 
     private void ClearThrusterVfxInstances()
@@ -179,11 +189,15 @@ public class PlayerAnimation : MonoBehaviour
         if (normalThrusterFlameR != null) Destroy(normalThrusterFlameR);
         if (boostedThrusterFlameL != null) Destroy(boostedThrusterFlameL);
         if (boostedThrusterFlameR != null) Destroy(boostedThrusterFlameR);
+        if (meleeThrusterFlameL != null) Destroy(meleeThrusterFlameL);
+        if (meleeThrusterFlameR != null) Destroy(meleeThrusterFlameR);
 
         normalThrusterFlameL = null;
         normalThrusterFlameR = null;
         boostedThrusterFlameL = null;
         boostedThrusterFlameR = null;
+        meleeThrusterFlameL = null;
+        meleeThrusterFlameR = null;
     }
     private void ApplyLocomotion(AnimationType type)
     {
