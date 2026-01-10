@@ -13,14 +13,14 @@ public class AdvancedButton : Selectable, IPointerClickHandler
 
     private Coroutine _resetRoutine;
 
-    protected override void Reset()
+    // 注意：Reset 是 Unity Message，不是 virtual，不要 override
+    protected void Reset()
     {
-        base.Reset();
+        // 取得或補上 Image，並指定 targetGraphic
         var imageComponent = GetComponent<Image>();
-        if (imageComponent != null)
-        {
+        if (imageComponent == null)
             imageComponent = gameObject.AddComponent<Image>();
-        }
+
         targetGraphic = imageComponent;
     }
 
@@ -28,7 +28,8 @@ public class AdvancedButton : Selectable, IPointerClickHandler
     {
         DoStateTransition(SelectionState.Pressed, true);
 
-        switch (eventData.button) { 
+        switch (eventData.button)
+        {
             default:
             case PointerEventData.InputButton.Left:
                 OnLeftClick?.Invoke();
@@ -40,12 +41,13 @@ public class AdvancedButton : Selectable, IPointerClickHandler
                 OnMiddleClick?.Invoke();
                 break;
         }
+
         if (_resetRoutine != null)
-        {
-            StopCoroutine(OnFinishSubmit());
-        }
+            StopCoroutine(_resetRoutine);
+
         _resetRoutine = StartCoroutine(OnFinishSubmit());
     }
+
     private IEnumerator OnFinishSubmit()
     {
         var fadeTime = colors.fadeDuration;
@@ -56,7 +58,9 @@ public class AdvancedButton : Selectable, IPointerClickHandler
             elapsedTime += Time.unscaledDeltaTime;
             yield return null;
         }
+
+        // 回到目前狀態（或主人也可以改成 SelectionState.Normal 看需求）
         DoStateTransition(currentSelectionState, false);
+        _resetRoutine = null;
     }
 }
-
