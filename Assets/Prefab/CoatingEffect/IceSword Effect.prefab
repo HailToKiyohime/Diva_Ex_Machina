@@ -9708,9 +9708,8 @@ MonoBehaviour:
     - {fileID: 3499961215987371008}
     - {fileID: 1670801802151622653}
   - particleSystem:
-    - {fileID: 2889101205171950397}
-  - particleSystem:
     - {fileID: 9137867381498085064}
+    - {fileID: 2889101205171950397}
   colors: []
 --- !u!114 &4952608163231711731
 MonoBehaviour:

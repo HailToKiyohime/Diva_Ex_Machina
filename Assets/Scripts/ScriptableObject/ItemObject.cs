@@ -13,6 +13,7 @@ public enum ItemType {
     MeleeWeapon,
     Consumable,
     Material,
+    ShoulderCannon,
 }
 
 public enum WeaponPartType
@@ -23,6 +24,8 @@ public enum WeaponPartType
     Blade,
     Handle,
     Coating,
+    Cannon,
+    CannonBarrel,
 }
 
 [System.Serializable]

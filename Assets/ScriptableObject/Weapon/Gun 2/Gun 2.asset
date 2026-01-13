@@ -48,7 +48,7 @@ MonoBehaviour:
     value: 160
   - attribute: 16
     mode: 0
-    value: 0
+    value: 1
   randomBuffs:
   - buff:
       attribute: 0

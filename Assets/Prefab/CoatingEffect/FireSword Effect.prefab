@@ -14544,9 +14544,8 @@ MonoBehaviour:
     - {fileID: 3499961215987371008}
     - {fileID: 1670801802151622653}
   - particleSystem:
-    - {fileID: 601646890439345401}
-  - particleSystem:
     - {fileID: 2889101205171950397}
+    - {fileID: 601646890439345401}
   colors: []
 --- !u!114 &4877188114655176544
 MonoBehaviour:
@@ -19614,9 +19613,9 @@ ParticleSystem:
         m_RotationOrder: 4
     startColor:
       serializedVersion: 2
-      minMaxState: 2
+      minMaxState: 0
       minColor: {r: 0.9245283, g: 0.7543286, b: 0.30526868, a: 1}
-      maxColor: {r: 1, g: 0.81778693, b: 0.76037735, a: 1}
+      maxColor: {r: 0.9843137, g: 0.45882353, b: 0.33333334, a: 1}
       maxGradient:
         serializedVersion: 2
         key0: {r: 1, g: 1, b: 1, a: 1}

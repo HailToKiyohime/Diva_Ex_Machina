@@ -61,6 +61,17 @@ public class UIManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if (Input.GetKeyDown(KeyCode.Keypad1))
+        {
+            currentCameraSet = 0;
+        }
+        else if (Input.GetKeyDown(KeyCode.Keypad2))
+        {
+            currentCameraSet = 1;
+        }else if (Input.GetKeyDown(KeyCode.Keypad3))
+        {
+            currentCameraSet = 2;
+        }
         switch (currentCameraSet)
         {
             case 0:

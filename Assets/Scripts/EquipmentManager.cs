@@ -243,7 +243,7 @@ public class EquipmentManager : MonoBehaviour
         {
             // 1) ¥DªZ¾¹±¾¦b mountPoint¡]³õ´ºª«¥ó¡^
             slot.equipedItem = Instantiate(rw.weaponPrefab, mountPoint, false);
-            //slot.equipedItem.transform.localRotation = Quaternion.Euler(new Vector3(-90, 90, 0));
+            slot.equipedItem.transform.localRotation = Quaternion.Euler(new Vector3(90, 0, 0));
             slot.item = item;
             if (FindChildRecursive(slot.equipedItem.transform, "MuzzlePoint") != null)
             {
