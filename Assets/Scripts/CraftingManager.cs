@@ -129,6 +129,17 @@ public class CraftingManager : MonoBehaviour
         }
         return false;
     }
+    private bool IsForgedWeapon(ShoulderWeaponInstance swi)
+    {
+        if (swi.attachment == null) return false;
+        foreach (var part in swi.attachment)
+        {
+            if (part != null && part.item != null)
+                return true;
+        }
+        return false;
+    }
+
     // ===== Crafting Stat Block =====
 
     /// <summary>
@@ -505,7 +516,38 @@ public class CraftingManager : MonoBehaviour
             CreateInventoryButtonForCraftingItem(inv, slotHasEquipment, slotIndex);
         }
     }
+    //打開 shoulder Weapon 清單
+    public void OpenShoulderWeaponInventory()
+    {
+        AssignRemovePartButtonListener();
+        Debug.Log("OpenShoulderWeaponInventory called.:" + craftingPartsToggleGroup.name);
+        if (!craftingPartsToggleGroup.AnyTogglesOn() || weaponColorBlock.activeSelf)
+        {
+            Debug.Log("No slot selected or color page is open.");
+            // 沒選插槽或正在開顏色頁面 → 關掉 Remove 按鈕 + 清空列表
+            HideAllRemoveButtonsOnCraftingSlots();
+            ClearInventoryButton();
+            return;
+        }
+        ClearInventoryButton();
 
+        int slotIndex = GetSelectedSlotIndex();
+        HideAllRemoveButtonsOnCraftingSlots();
+        bool slotHasEquipment = SlotHasEquipment(slotIndex);
+
+        foreach (var inv in InventoryManager.Instance.inventory)
+        {
+
+            if (inv == null || inv.item == null || inv.item.type != ItemType.MeleeWeapon)
+                continue;
+
+            // 只列出「還沒鍛造的 blueprint 武器」
+            if (inv is ShoulderWeaponInstance swi && IsForgedWeapon(swi))
+                continue;
+
+            CreateInventoryButtonForCraftingItem(inv, slotHasEquipment, slotIndex);
+        }
+    }
 
     // 右側「背包物品按鈕」被勾選時的處理
     private void OnClickInventoryItem(ItemInstance item, Toggle btn)

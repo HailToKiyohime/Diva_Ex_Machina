@@ -1,16 +1,17 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ShoulderWeapon : MonoBehaviour
+[CreateAssetMenu(fileName = "New Shoulder Weapon Part", menuName = "Inventory/ShoulderWeapon")]
+public class ShoulderWeapon : ItemObject
 {
-    public GameObject shoulderWeaponPartPrefab;
-    public WeaponPartType partType;
+    public GameObject weaponPrefab;
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
     public List<RandomBuff> randomBuffs = new List<RandomBuff>();
+    public List<AttachmentPoint> attachmentPoints = new List<AttachmentPoint>();
     public MeshRenderer meshRenderer;
-
+    public GameObject bullet;
     public RandomBuff GetRandomBuff()
-    {   
+    {
         if (randomBuffs == null || randomBuffs.Count == 0)
             return null;
         float totalWeight = 0f;

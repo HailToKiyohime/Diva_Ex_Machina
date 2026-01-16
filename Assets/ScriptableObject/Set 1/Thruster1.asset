@@ -36,7 +36,7 @@ MonoBehaviour:
     value: 120
   - attribute: 19
     mode: 0
-    value: 100
+    value: 60
   - attribute: 36
     mode: 0
     value: 10

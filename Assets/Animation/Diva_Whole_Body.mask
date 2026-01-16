@@ -297,6 +297,10 @@ AvatarMask:
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/neck.x/head.x/Hair/Hair.018/Hair.019/Hair.020
     m_Weight: 1
+  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/Shoulder Weapon l
+    m_Weight: 0
+  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/Shoulder Weapon r
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l

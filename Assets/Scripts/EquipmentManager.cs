@@ -241,7 +241,7 @@ public class EquipmentManager : MonoBehaviour
 
         if (item is RangeWeaponInstance rwi && rwi.item is RangeWeapon rw)
         {
-            // 1) ¥DªZ¾¹±¾¦b mountPoint¡]³õ´ºª«¥ó¡^
+            // 1)
             slot.equipedItem = Instantiate(rw.weaponPrefab, mountPoint, false);
             slot.equipedItem.transform.localRotation = Quaternion.Euler(new Vector3(90, 0, 0));
             slot.item = item;
@@ -493,6 +493,107 @@ public class EquipmentManager : MonoBehaviour
             PlayerStats.Instance?.RecalculateFromEquipment();
             RefreshEquipmentStatBlock();
             Debug.Log($"Equipped weapon '{mw.itemName}' to slot index {slotIndex}");
+            return true;
+        }else if (item is ShoulderWeaponInstance swi && swi.item is ShoulderWeapon sw)
+        {
+            // 1)
+            slot.equipedItem = Instantiate(sw.weaponPrefab, mountPoint, false);
+            slot.equipedItem.transform.localRotation = Quaternion.Euler(new Vector3(-90, 0, 0));
+            slot.item = item;
+            if (FindChildRecursive(slot.equipedItem.transform, "MuzzlePoint") != null)
+            {
+                swi.muzzlePoint = FindChildRecursive(slot.equipedItem.transform, "MuzzlePoint");
+            }
+
+            // 1-1) §â RangeWeaponInstance ¤W¦sªºÃC¦â®M¦^¥h
+            if (swi.colors != null && swi.colors.Count > 0 && !string.IsNullOrEmpty(swi.shaderName))
+            {
+                var rend = slot.equipedItem.GetComponentInChildren<Renderer>();
+                if (rend)
+                {
+                    var mat = rend.material; // ¹ê¨Ò§÷½è
+                    if (swi.shaderName.Contains("Mix 3") && swi.colors.Count >= 3)
+                    {
+                        mat.SetColor("_BaseColor", swi.colors[0]);
+                        mat.SetColor("_Layer1Color", swi.colors[1]);
+                        mat.SetColor("_Layer2Color", swi.colors[2]);
+                    }
+                    else if (swi.shaderName.Contains("Mix 4") && swi.colors.Count >= 4)
+                    {
+                        mat.SetColor("_BaseColor", swi.colors[0]);
+                        mat.SetColor("_Layer1Color", swi.colors[1]);
+                        mat.SetColor("_Layer2Color", swi.colors[2]);
+                        mat.SetColor("_Layer3Color", swi.colors[3]);
+                    }
+                    else if (swi.shaderName.Contains("Mix 5") && swi.colors.Count >= 5)
+                    {
+                        mat.SetColor("_BaseColor", swi.colors[0]);
+                        for (int k = 1; k < 5; k++)
+                            mat.SetColor($"_Layer{k}Color", swi.colors[k]);
+                    }
+                }
+            }
+            // 2)
+            if (swi.attachment != null)
+            {
+                foreach (var attach in swi.attachment)
+                {
+                    if (attach?.item is not ShoulderWeaponPart swp) continue;
+
+                    foreach (var ap in sw.attachmentPoints)
+                    {
+                        if (ap.allowPart != attach.partType) continue;
+
+                        var target = FindChildRecursive(slot.equipedItem.transform, ap.pointTransform.name);
+                        if (target == null)
+                        {
+                            Debug.LogWarning($"Equip: cannot find mount '{ap.pointTransform.name}' on weapon instance");
+                            continue;
+                        }
+
+                        var part = Instantiate(swp.shoulderWeaponPartPrefab, target, false);
+                        part.transform.localPosition = Vector3.zero;
+                        part.transform.localRotation = Quaternion.identity;
+                        part.transform.localScale = Vector3.one;
+                        if (FindChildRecursive(part.transform, "MuzzlePoint") != null)
+                        {
+                            swi.muzzlePoint = FindChildRecursive(part.transform, "MuzzlePoint");
+                        }
+
+                        if (attach.colors != null && attach.colors.Count > 0 && !string.IsNullOrEmpty(attach.shaderName))
+                        {
+                            var partRend = part.GetComponentInChildren<Renderer>();
+                            if (partRend)
+                            {
+                                var mat = partRend.material;
+                                if (attach.shaderName.Contains("Mix 3") && attach.colors.Count >= 3)
+                                {
+                                    mat.SetColor("_BaseColor", attach.colors[0]);
+                                    mat.SetColor("_Layer1Color", attach.colors[1]);
+                                    mat.SetColor("_Layer2Color", attach.colors[2]);
+                                }
+                                else if (attach.shaderName.Contains("Mix 4") && attach.colors.Count >= 4)
+                                {
+                                    mat.SetColor("_BaseColor", attach.colors[0]);
+                                    mat.SetColor("_Layer1Color", attach.colors[1]);
+                                    mat.SetColor("_Layer2Color", attach.colors[2]);
+                                    mat.SetColor("_Layer3Color", attach.colors[3]);
+                                }
+                                else if (attach.shaderName.Contains("Mix 5") && attach.colors.Count >= 5)
+                                {
+                                    mat.SetColor("_BaseColor", attach.colors[0]);
+                                    for (int k = 1; k < 5; k++)
+                                        mat.SetColor($"_Layer{k}Color", attach.colors[k]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            PlayerStats.Instance?.RecalculateFromEquipment();
+            RefreshEquipmentStatBlock();
+            Debug.Log($"Equipped weapon '{sw.itemName}' to slot index {slotIndex}");
             return true;
         }
         else

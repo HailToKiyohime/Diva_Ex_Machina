@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5d006ac22a940f849a367cb652dedcf9, type: 3}
+  m_Name: New Shoulder Weapon
+  m_EditorClassIdentifier: Assembly-CSharp::ShoulderWeapon
+  itemName: 
+  type: 13
+  icon: {fileID: 0}
+  maxStack: 0
+  dropPrefab: {fileID: 0}
+  weaponPrefab: {fileID: 3663364035518867967, guid: 41d6c10c498fa4d4d96cf0cddf8f3e2c, type: 3}
+  buffs: []
+  randomBuffs: []
+  attachmentPoints: []
+  meshRenderer: {fileID: 3014630391301834794, guid: 41d6c10c498fa4d4d96cf0cddf8f3e2c, type: 3}
+  bullet: {fileID: 3891428710695554583, guid: f8141f7e21beae648a43caf66175acfa, type: 3}

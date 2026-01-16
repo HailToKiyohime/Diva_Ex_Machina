@@ -35,6 +35,15 @@ public class PlayerAiming : MonoBehaviour
 
     [SerializeField] private Rigidbody currentTargetRb;
 
+    [Header("Aiming Point Smoothing")]
+    [SerializeField] private float aimingPointSmoothTime = 0.06f;      // 平時追蹤速度
+    [SerializeField] private float aimingPointSwitchSmoothTime = 0.10f; // 切換模式時更柔和
+    [SerializeField] private float aimingPointMaxSpeed = 9999f;         // 上限，避免慢到跟不上
+    [SerializeField] private float freeAimMaxDistance = 500f;           // 對齊你下面 Raycast 的 maxDistance
+
+    private Vector3 aimingPointVelocity;
+    private bool lastLockOn;
+
     void Awake()
     {
         if (Instance != null && Instance != this)
@@ -123,11 +132,16 @@ public class PlayerAiming : MonoBehaviour
             : Mathf.Infinity;
         float pixelRadius = GetLockAreaPixelRadius();
         bool isInsideLockArea = closestProximity < pixelRadius;
+        Vector3 desiredAimPointPos = aimingPoint ? aimingPoint.position : Vector3.zero;
         if (isInsideLockArea && targetDistance < lockOnDistance && isVisible)
         {
             DriveCrosshairTo(closestScreenPoint, true);
-            if (aimingPoint) aimingPoint.position = closestEnemy.transform.position;
+
+            // 只決定「目標位置」，不要硬切
+            desiredAimPointPos = closestEnemy.transform.position;
+
             lockOn = true;
+
             UIManager.Instance.distanceText.text = targetDistance.ToString("F2");
             UIManager.Instance.distanceText.color = UIManager.Instance.lockonColor;
             UIManager.Instance.distanceText.fontStyle = FontStyles.Bold;
@@ -137,29 +151,26 @@ public class PlayerAiming : MonoBehaviour
             ray = mainCam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
             SmoothResetCrosshairToCenter();
 
-            if (aimingPoint && playerOrientation.transform)
-                aimingPoint.position = playerOrientation.transform.position + (playerOrientation.transform.forward * 100f);
-
             lockOn = false;
 
-            const float maxDistance = 500f;
-
-            float distanceToPoint = 0f;
-            if (Physics.Raycast(ray, out RaycastHit hit, maxDistance, ~0, QueryTriggerInteraction.Ignore))
+            // Free-aim：用 Raycast hit.point 當目標（沒有命中就用 forward*distance）
+            if (playerOrientation && Physics.Raycast(ray, out RaycastHit hit, freeAimMaxDistance, ~0, QueryTriggerInteraction.Ignore))
             {
-                // hit.distance = 從 ray.origin 到命中點的距離（這才是「瞄到哪裡」的距離）
-                distanceToPoint = hit.distance;
+                desiredAimPointPos = hit.point;
+                UIManager.Instance.distanceText.text = hit.distance.ToString("F2");
             }
-            else
+            else if (playerOrientation)
             {
-                // 沒打到東西：依主人需求，可顯示 0 或 maxDistance
-                distanceToPoint = 0f;
+                desiredAimPointPos = playerOrientation.transform.position + (playerOrientation.transform.forward * freeAimMaxDistance);
+                UIManager.Instance.distanceText.text = 0f.ToString("F2");
             }
 
-            UIManager.Instance.distanceText.text = distanceToPoint.ToString("F2");
             UIManager.Instance.distanceText.color = UIManager.Instance.normalColor;
             UIManager.Instance.distanceText.fontStyle = FontStyles.Normal;
         }
+
+        // 最後統一「平滑套用」
+        ApplyAimingPointSmoothing(desiredAimPointPos);
     }
     private void DriveCrosshairTo(Vector2 screenPoint, bool tilt)
     {
@@ -210,5 +221,27 @@ public class PlayerAiming : MonoBehaviour
         AimAreaImage.rectTransform.sizeDelta = new Vector2(newSize, newSize);
         UIManager.Instance.speedInfo.anchoredPosition = new Vector2((newSize/2)+55,0);
         UIManager.Instance.distanceInfo.anchoredPosition = new Vector2(-((newSize / 2) + 55), 0);
+    }
+
+    private void ApplyAimingPointSmoothing(Vector3 desiredPos)
+    {
+        if (!aimingPoint) return;
+
+        bool switching = (lockOn != lastLockOn);
+        float smoothTime = switching ? aimingPointSwitchSmoothTime : aimingPointSmoothTime;
+
+        // 切換模式時清掉速度，避免 SmoothDamp 的殘速造成奇怪甩動
+        if (switching)
+            aimingPointVelocity = Vector3.zero;
+
+        aimingPoint.position = Vector3.SmoothDamp(
+            aimingPoint.position,
+            desiredPos,
+            ref aimingPointVelocity,
+            smoothTime,
+            aimingPointMaxSpeed
+        );
+
+        lastLockOn = lockOn;
     }
 }

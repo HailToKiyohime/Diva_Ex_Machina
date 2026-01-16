@@ -43,6 +43,21 @@ public class MeleeWeaponInstance : ItemInstance
 }
 
 [System.Serializable]
+public class ShoulderWeaponInstance : ItemInstance
+{
+    public string newWeaponName;                 // 用來存鍛造後的新名稱
+    public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
+    public List<PartInstance> attachment;
+    public Transform muzzlePoint;
+
+    // 用來存不同 shader 的顏色
+    [SerializeField] public List<Color> colors = new List<Color>();
+
+    // 記錄此裝備用的 shader 名稱，方便還原
+    [SerializeField] public string shaderName;
+}
+
+[System.Serializable]
 public class ArmorInstance : ItemInstance
 {
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
@@ -474,7 +489,64 @@ public class InventoryManager : MonoBehaviour
             inventory.Add(inst);
             return;
         }
+        if (item is ShoulderWeapon sw)
+        {
+            var attachmentPoints = new List<PartInstance>();
+            foreach (var ap in sw.attachmentPoints)
+            {
+                attachmentPoints.Add(new PartInstance
+                {
+                    item = null,
+                    amount = 0,
+                    partType = ap.allowPart
+                });
+            }
 
+            var inst = new ShoulderWeaponInstance
+            {
+                item = item,
+                amount = 1,
+                attachment = attachmentPoints,
+                muzzlePoint = sw.weaponPrefab != null ? sw.weaponPrefab.transform.Find("MuzzlePoint") : null,
+            };
+
+            // 讀顏色（修正：Mix5 也要把 BaseColor 放進來）
+            if (sw.meshRenderer && sw.meshRenderer.sharedMaterial)
+            {
+                var mat = sw.meshRenderer.sharedMaterial;
+                inst.shaderName = mat.shader.name;
+
+                if (inst.shaderName.Contains("Mix 3"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                }
+                else if (inst.shaderName.Contains("Mix 4"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                    inst.colors.Add(mat.GetColor("_Layer3Color"));
+                }
+                else if (inst.shaderName.Contains("Mix 5"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    for (int i = 1; i < 5; i++)
+                        inst.colors.Add(mat.GetColor($"_Layer{i}Color"));
+                }
+            }
+
+            foreach (EquipmentBuff buff in sw.buffs)
+                inst.buffs.Add(buff);
+
+            var pickedBuff = sw.GetRandomBuff();
+            if (pickedBuff != null)
+                inst.buffs.Add(pickedBuff.buff);
+
+            inventory.Add(inst);
+            return;
+        }
         inventory.Add(new ItemInstance { item = item, amount = 1 });
     }
 
@@ -797,6 +869,43 @@ public class InventoryManager : MonoBehaviour
                 btn.isOn = false;
                 return;
             }
+            Transform mountPoint = weaponTransform.weaponTransform;
+
+            if (!EquipmentManager.Instance.TryEquipWeaponFromInventory(item, mountPoint, slotIndex))
+            {
+                btn.isOn = false;
+                return;
+            }
+
+            // UI 更新
+            SetEquipmentSlotIcon(slotIndex, item.item.icon);
+            SetRemoveButtonForSlot(slotIndex, true);
+
+            RefreshItemListLockStates(btn);
+
+            // 鎖住當前已裝備的按鈕
+            btn.interactable = false;
+            return;
+        }
+        if (item is ShoulderWeaponInstance)
+        {
+            int slotIndex = GetSelectedSlotIndex();
+            if (slotIndex < 0)
+            {
+                Debug.LogWarning("OnClickInventoryItem (weapon): no equipment slot selected");
+                btn.isOn = false;
+                return;
+            }
+
+            var slotButton = inventoryButtonParent.GetChild(slotIndex);
+            var weaponTransform = slotButton.GetComponentInChildren<WeaponTransform>();
+            if (weaponTransform == null || weaponTransform.weaponTransform == null)
+            {
+                Debug.LogWarning($"OnClickInventoryItem (weapon): WeaponTransform missing on slot {slotIndex}");
+                btn.isOn = false;
+                return;
+            }
+
             Transform mountPoint = weaponTransform.weaponTransform;
 
             if (!EquipmentManager.Instance.TryEquipWeaponFromInventory(item, mountPoint, slotIndex))
