@@ -208,6 +208,24 @@ public partial class @PlayerControllers: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""LeftShoulderAttack"",
+                    ""type"": ""Button"",
+                    ""id"": ""db14d956-1a5b-4ae6-bbda-b96cd9e8933e"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""RightShoulderAttack"",
+                    ""type"": ""Button"",
+                    ""id"": ""2b70acda-a43e-4f77-8ccb-9a4f47f13f73"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -637,6 +655,28 @@ public partial class @PlayerControllers: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""groups"": "";Keyboard&Mouse"",
                     ""action"": ""RightHandAttack"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""15c5c20b-ab5b-4489-aead-f1bd9e6ac7ee"",
+                    ""path"": ""<Mouse>/forwardButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""LeftShoulderAttack"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""0bcddacd-1c41-45ed-abf9-6d937b0d28ee"",
+                    ""path"": ""<Mouse>/backButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""RightShoulderAttack"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -1237,6 +1277,8 @@ public partial class @PlayerControllers: IInputActionCollection2, IDisposable
         m_Player_Save = m_Player.FindAction("Save", throwIfNotFound: true);
         m_Player_Load = m_Player.FindAction("Load", throwIfNotFound: true);
         m_Player_Reload = m_Player.FindAction("Reload", throwIfNotFound: true);
+        m_Player_LeftShoulderAttack = m_Player.FindAction("LeftShoulderAttack", throwIfNotFound: true);
+        m_Player_RightShoulderAttack = m_Player.FindAction("RightShoulderAttack", throwIfNotFound: true);
         // UI
         m_UI = asset.FindActionMap("UI", throwIfNotFound: true);
         m_UI_Navigate = m_UI.FindAction("Navigate", throwIfNotFound: true);
@@ -1343,6 +1385,8 @@ public partial class @PlayerControllers: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_Save;
     private readonly InputAction m_Player_Load;
     private readonly InputAction m_Player_Reload;
+    private readonly InputAction m_Player_LeftShoulderAttack;
+    private readonly InputAction m_Player_RightShoulderAttack;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -1406,6 +1450,14 @@ public partial class @PlayerControllers: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player/Reload".
         /// </summary>
         public InputAction @Reload => m_Wrapper.m_Player_Reload;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/LeftShoulderAttack".
+        /// </summary>
+        public InputAction @LeftShoulderAttack => m_Wrapper.m_Player_LeftShoulderAttack;
+        /// <summary>
+        /// Provides access to the underlying input action "Player/RightShoulderAttack".
+        /// </summary>
+        public InputAction @RightShoulderAttack => m_Wrapper.m_Player_RightShoulderAttack;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -1471,6 +1523,12 @@ public partial class @PlayerControllers: IInputActionCollection2, IDisposable
             @Reload.started += instance.OnReload;
             @Reload.performed += instance.OnReload;
             @Reload.canceled += instance.OnReload;
+            @LeftShoulderAttack.started += instance.OnLeftShoulderAttack;
+            @LeftShoulderAttack.performed += instance.OnLeftShoulderAttack;
+            @LeftShoulderAttack.canceled += instance.OnLeftShoulderAttack;
+            @RightShoulderAttack.started += instance.OnRightShoulderAttack;
+            @RightShoulderAttack.performed += instance.OnRightShoulderAttack;
+            @RightShoulderAttack.canceled += instance.OnRightShoulderAttack;
         }
 
         /// <summary>
@@ -1521,6 +1579,12 @@ public partial class @PlayerControllers: IInputActionCollection2, IDisposable
             @Reload.started -= instance.OnReload;
             @Reload.performed -= instance.OnReload;
             @Reload.canceled -= instance.OnReload;
+            @LeftShoulderAttack.started -= instance.OnLeftShoulderAttack;
+            @LeftShoulderAttack.performed -= instance.OnLeftShoulderAttack;
+            @LeftShoulderAttack.canceled -= instance.OnLeftShoulderAttack;
+            @RightShoulderAttack.started -= instance.OnRightShoulderAttack;
+            @RightShoulderAttack.performed -= instance.OnRightShoulderAttack;
+            @RightShoulderAttack.canceled -= instance.OnRightShoulderAttack;
         }
 
         /// <summary>
@@ -1912,6 +1976,20 @@ public partial class @PlayerControllers: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnReload(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "LeftShoulderAttack" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnLeftShoulderAttack(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "RightShoulderAttack" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnRightShoulderAttack(InputAction.CallbackContext context);
     }
     /// <summary>
     /// Interface to implement callback methods for all input action callbacks associated with input actions defined by "UI" which allows adding and removing callbacks.

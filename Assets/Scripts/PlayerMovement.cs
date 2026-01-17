@@ -175,8 +175,8 @@ public class PlayerMovement : MonoBehaviour
 
         // 判斷這次攻擊是遠程還是近戰（不改 PlayerController 的呼叫方式）
         var stats = PlayerStats.Instance;
-        bool isLeft = (attackManager != null && w == attackManager.leftWeapon);
-        bool isRight = (attackManager != null && w == attackManager.rightWeapon);
+        bool isLeft = (attackManager != null && w == attackManager.leftHandWeapon);
+        bool isRight = (attackManager != null && w == attackManager.rightHandWeapon);
         bool isMelee = false;
 
         // 近戰衝刺距離目前統一使用 PlayerStats.meleeDashDistance
@@ -482,7 +482,7 @@ public class PlayerMovement : MonoBehaviour
         // 近戰衝刺期間不回能（與一般 dash 同步）
         CancelInvoke("ResetEnergyRegenerate");
         canRegenerateEnergy = false;
-        bool isLeftHand = (attackManager != null && ownerWeapon != null && attackManager.leftWeapon == ownerWeapon);
+        bool isLeftHand = (attackManager != null && ownerWeapon != null && attackManager.leftHandWeapon == ownerWeapon);
 
         // For now: stance is decided only by the melee weapon's attribute (ignore attachments/handles)
         MeleeWeaponPartAttribute attr = default;

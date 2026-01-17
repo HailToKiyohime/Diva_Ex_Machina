@@ -77,8 +77,10 @@ public class Weapon
 
 public class AttackManager : MonoBehaviour
 {
-    public Weapon leftWeapon;
-    public Weapon rightWeapon;
+    public Weapon leftHandWeapon;
+    public Weapon rightHandWeapon;
+    public Weapon leftShoulderWeapon;
+    public Weapon rightShoulderWeapon;
 
     // Just for testing
     public GameObject testBulletPrefab;
@@ -111,8 +113,8 @@ public class AttackManager : MonoBehaviour
         var stats = PlayerStats.Instance;
         if (stats == null) return;
 
-        ApplyHand(stats.leftHand, leftWeapon, ref _leftSource, ref _leftMeleeSource);
-        ApplyHand(stats.rightHand, rightWeapon, ref _rightSource, ref _rightMeleeSource);
+        ApplyHand(stats.leftHand, leftHandWeapon, ref _leftSource, ref _leftMeleeSource);
+        ApplyHand(stats.rightHand, rightHandWeapon, ref _rightSource, ref _rightMeleeSource);
         PushAmmoUI();
     }
 
@@ -278,11 +280,11 @@ public class AttackManager : MonoBehaviour
         bool leftIsMelee = stats != null && stats.leftHand != null && stats.leftHand.weaponKind == HandWeaponKind.Melee && stats.leftHand.meleeWeapon != null;
         bool rightIsMelee = stats != null && stats.rightHand != null && stats.rightHand.weaponKind == HandWeaponKind.Melee && stats.rightHand.meleeWeapon != null;
 
-        float leftFill = CalcAmmoBarFill(leftWeapon, leftIsMelee);
-        float rightFill = CalcAmmoBarFill(rightWeapon, rightIsMelee);
+        float leftFill = CalcAmmoBarFill(leftHandWeapon, leftIsMelee);
+        float rightFill = CalcAmmoBarFill(rightHandWeapon, rightIsMelee);
 
-        bool leftReloading = leftIsMelee ? (leftWeapon != null && leftWeapon.meleeRuntime.reloading) : (leftWeapon != null && leftWeapon.runtime.reloading);
-        bool rightReloading = rightIsMelee ? (rightWeapon != null && rightWeapon.meleeRuntime.reloading) : (rightWeapon != null && rightWeapon.runtime.reloading);
+        bool leftReloading = leftIsMelee ? (leftHandWeapon != null && leftHandWeapon.meleeRuntime.reloading) : (leftHandWeapon != null && leftHandWeapon.runtime.reloading);
+        bool rightReloading = rightIsMelee ? (rightHandWeapon != null && rightHandWeapon.meleeRuntime.reloading) : (rightHandWeapon != null && rightHandWeapon.runtime.reloading);
 
         // Also drive reload color + flashing (UIManager stores the colors)
         ui.SetAmmoState(leftFill, leftReloading, rightFill, rightReloading);
@@ -362,8 +364,8 @@ public class AttackManager : MonoBehaviour
         var stats = PlayerStats.Instance;
         if (stats == null) return false;
 
-        bool isLeft = (w == leftWeapon);
-        bool isRight = (w == rightWeapon);
+        bool isLeft = (w == leftHandWeapon);
+        bool isRight = (w == rightHandWeapon);
 
         if (!isLeft && !isRight) return false;
 
@@ -468,8 +470,8 @@ public class AttackManager : MonoBehaviour
         var stats = PlayerStats.Instance;
         if (stats == null) return;
 
-        bool isLeft = (w == leftWeapon);
-        bool isRight = (w == rightWeapon);
+        bool isLeft = (w == leftHandWeapon);
+        bool isRight = (w == rightHandWeapon);
         if (!isLeft && !isRight) return;
 
         var hand = isLeft ? stats.leftHand : stats.rightHand;

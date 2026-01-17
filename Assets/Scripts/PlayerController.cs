@@ -72,22 +72,24 @@ public class PlayerController : MonoBehaviour
             if (leftPressed)
             {
                 bool leftIsRange = (stats != null && stats.leftHand.weaponKind == HandWeaponKind.Range);
-                if (leftIsRange) attackManager.StartReload(attackManager.leftWeapon);
-                else playerMovement.ProcessAttackFacingAndAttack(attackManager, attackManager.leftWeapon, playerControls.Player.LeftHandAttack);
+                if (leftIsRange) attackManager.StartReload(attackManager.leftHandWeapon);
+                else playerMovement.ProcessAttackFacingAndAttack(attackManager, attackManager.leftHandWeapon, playerControls.Player.LeftHandAttack);
             }
 
             if (rightPressed)
             {
                 bool rightIsRange = (stats != null && stats.rightHand.weaponKind == HandWeaponKind.Range);
-                if (rightIsRange) attackManager.StartReload(attackManager.rightWeapon);
-                else playerMovement.ProcessAttackFacingAndAttack(attackManager, attackManager.rightWeapon, playerControls.Player.RightHandAttack);
+                if (rightIsRange) attackManager.StartReload(attackManager.rightHandWeapon);
+                else playerMovement.ProcessAttackFacingAndAttack(attackManager, attackManager.rightHandWeapon, playerControls.Player.RightHandAttack);
             }
 
             return;
         }
 
         // Normal attack (range or melee is decided inside PlayerMovement.ProcessAttackFacingAndAttack)
-        playerMovement.ProcessAttackFacingAndAttack(attackManager, attackManager.leftWeapon, playerControls.Player.LeftHandAttack);
-        playerMovement.ProcessAttackFacingAndAttack(attackManager, attackManager.rightWeapon, playerControls.Player.RightHandAttack);
+        playerMovement.ProcessAttackFacingAndAttack(attackManager, attackManager.leftHandWeapon, playerControls.Player.LeftHandAttack);
+        playerMovement.ProcessAttackFacingAndAttack(attackManager, attackManager.rightHandWeapon, playerControls.Player.RightHandAttack);
+        playerMovement.ProcessAttackFacingAndAttack(attackManager, attackManager.leftShoulderWeapon, playerControls.Player.LeftShoulderAttack);
+        playerMovement.ProcessAttackFacingAndAttack(attackManager, attackManager.rightShoulderWeapon, playerControls.Player.RightShoulderAttack);
     }
 }

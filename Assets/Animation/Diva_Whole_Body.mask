@@ -297,10 +297,6 @@ AvatarMask:
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/neck.x/head.x/Hair/Hair.018/Hair.019/Hair.020
     m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/Shoulder Weapon l
-    m_Weight: 0
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/Shoulder Weapon r
-    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l
@@ -435,6 +431,14 @@ AvatarMask:
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/subarm1_R/subarm2_R/subarm3_R/subarm4_R/subarm5_R/subarm6_R
     m_Weight: 1
+  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/Shoulder_Weapon
+    m_Weight: 1
+  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/Shoulder_Weapon/Shoulder
+      Weapon l
+    m_Weight: 0
+  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/Shoulder_Weapon/Shoulder
+      Weapon r
+    m_Weight: 0
   - m_Path: root/root.x/thigh_stretch.r
     m_Weight: 1
   - m_Path: root/root.x/thigh_stretch.r/leg_stretch.r
