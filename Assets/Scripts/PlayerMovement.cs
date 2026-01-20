@@ -77,6 +77,11 @@ public class PlayerMovement : MonoBehaviour
     private bool _prevLockOn;
     private float _aimHoldUntil;
     private Vector3 _lastAimHoldForward = Vector3.forward;
+
+    [Header("Melee Dash End Brake")]
+    [Range(0f, 1f)]
+    [SerializeField] private float meleeDashEndHorizontalSpeedFactor = 0.2f; // 剩 20%
+    [SerializeField] private float meleeDashEndMinHorizontalSpeed = 0.0f;    // 可選：避免太慢卡住
     private void OnEnable()
     {
         if (playerAnimation != null)
@@ -499,13 +504,18 @@ public class PlayerMovement : MonoBehaviour
         meleeDashTargetPoint = targetPoint;
         meleeDashTarget = targetTf;
         meleeDashChasingTarget = chasing;
-
         meleeDashActive = true;
         meleeDashDir = dir;
         meleeDashSpeed = Mathf.Max(0f, dashSpeed);
         meleeDashDistance = Mathf.Max(0f, dashDistance);
         meleeDashStartTime = Time.time;
         meleeDashStartPos = transform.position;
+        // 近戰 dash 期間：把鏡頭拉去鎖定目標，讓目標在畫面中央
+        if (meleeDashChasingTarget && meleeDashTarget != null && PlayerAiming.Instance != null)
+        {
+            PlayerAiming.Instance.BeginMeleeDashCameraFocus(meleeDashTarget);
+        }
+
         // meleeDashTargetPoint/meleeDashTarget/meleeDashChasingTarget 已在上面設定
 
         playerAnimation.SetToAttackLayer();
@@ -524,11 +534,7 @@ public class PlayerMovement : MonoBehaviour
                 attr = mw.attribute;
         }
         playerAnimation.BeginMeleeDash(isLeftHand, attr);
-        // 近戰 dash 期間：把鏡頭拉去鎖定目標，讓目標在畫面中央
-        if (meleeDashChasingTarget && meleeDashTarget != null && PlayerAiming.Instance != null)
-        {
-            PlayerAiming.Instance.BeginMeleeDashCameraFocus(meleeDashTarget);
-        }
+
         Vector3 targetPos = (meleeDashTarget != null) ? meleeDashTarget.position : meleeDashTargetPoint;
         float distToTarget = Vector3.Distance(transform.position, targetPos);
         if (distToTarget >= meleeDashStopWithin*2)
@@ -540,8 +546,30 @@ public class PlayerMovement : MonoBehaviour
 
     private void StopMeleeDash()
     {
-        if (!meleeDashActive) return; // 沒在近戰衝刺就不用做事
-                                      // 結束近戰 dash：把相機控制權還給滑鼠
+        if (!meleeDashActive) return;
+
+        // ✅ 立刻剎停水平慣性（保留 Y）
+        if (playerRigidbody != null)
+        {
+            Vector3 v = playerRigidbody.linearVelocity;
+
+            Vector3 horizontal = new Vector3(v.x, 0f, v.z);
+            float y = v.y;
+
+            horizontal *= meleeDashEndHorizontalSpeedFactor;
+
+            // 可選：做個下限，避免變到幾乎 0 時感覺「黏地」
+            if (meleeDashEndMinHorizontalSpeed > 0f)
+            {
+                float mag = horizontal.magnitude;
+                if (mag > 0f && mag < meleeDashEndMinHorizontalSpeed)
+                    horizontal = horizontal.normalized * meleeDashEndMinHorizontalSpeed;
+            }
+
+            playerRigidbody.linearVelocity = new Vector3(horizontal.x, y, horizontal.z);
+        }
+
+        // 結束近戰 dash：把相機控制權還給滑鼠
         if (PlayerAiming.Instance != null)
         {
             PlayerAiming.Instance.EndMeleeDashCameraFocus();
