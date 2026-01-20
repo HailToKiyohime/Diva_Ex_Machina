@@ -28,6 +28,7 @@ public class CraftingManager : MonoBehaviour
     public Transform craftingPartsButtonParent;
     public Transform rangeWeaponPartsButtonParent;
     public Transform meleeWeaponPartsButtonParent;
+    public Transform shoulderWeaponPartsButtonParent;
 
     // 右側「背包物品按鈕」們的父物件
     public Transform itemsButtonParent;
@@ -35,6 +36,7 @@ public class CraftingManager : MonoBehaviour
     private ToggleGroup craftingPartsToggleGroup;
     public ToggleGroup rangeWeaponPartsToggleGroup;
     public ToggleGroup meleeWeaponPartsToggleGroup;
+    public ToggleGroup shoulderWeaponPartsToggleGroup;
     // 武器預覽的父節點
     public Transform weaponPreviewTransform;
     // 目前場景中的武器預覽實體
@@ -42,11 +44,13 @@ public class CraftingManager : MonoBehaviour
     // 目前正在預覽 / 組裝中的武器資料 (ScriptableObject)
     public RangeWeapon rangeWeapon;
     public MeleeWeapon meleeWeapon;
+    public ShoulderWeapon shoulderWeapon;
     // 記錄每一個合成插槽的狀態
     [SerializeField] public List<CraftingSlot> craftingSlots = new();
 
     public GameObject rangeWeaponCraftingSlotPage;
     public GameObject meleeWeaponCraftingSlotPage;
+    public GameObject shoulderWeaponCraftingSlotPage;
 
     [Header("UI Button Prefab")]
     // 右側背包物品按鈕的預置物
@@ -57,6 +61,8 @@ public class CraftingManager : MonoBehaviour
     public Sprite scopeIcon;
     public Sprite handleIcon;
     public Sprite coatingIcon;
+    public Sprite cannonIcon;
+    public Sprite cannonBarrelIcon;
 
     public UIPageSwitch uiPageSwitch;
 
@@ -538,7 +544,7 @@ public class CraftingManager : MonoBehaviour
         foreach (var inv in InventoryManager.Instance.inventory)
         {
 
-            if (inv == null || inv.item == null || inv.item.type != ItemType.MeleeWeapon)
+            if (inv == null || inv.item == null || inv.item.type != ItemType.ShoulderCannon)
                 continue;
 
             // 只列出「還沒鍛造的 blueprint 武器」
@@ -548,7 +554,28 @@ public class CraftingManager : MonoBehaviour
             CreateInventoryButtonForCraftingItem(inv, slotHasEquipment, slotIndex);
         }
     }
+    public void OpenShoulderWeaponPartsInventory(ItemType itemType, WeaponPartType weaponPartType)
+    {
+        if (!craftingPartsToggleGroup.AnyTogglesOn() || weaponColorBlock.activeSelf)
+            return;
 
+        ClearInventoryButton();
+
+        int slotIndex = GetSelectedSlotIndex();
+        HideAllRemoveButtonsOnCraftingSlots();
+        bool slotHasEquipment = SlotHasEquipment(slotIndex);
+
+        foreach (var inv in InventoryManager.Instance.inventory)
+        {
+            if (inv == null || inv.item == null || inv.item.type != itemType)
+                continue;
+
+            if (!(inv.item is ShoulderWeaponPart swp) || swp.partType != weaponPartType)
+                continue;
+
+            CreateInventoryButtonForCraftingItem(inv, slotHasEquipment, slotIndex);
+        }
+    }
     // 右側「背包物品按鈕」被勾選時的處理
     private void OnClickInventoryItem(ItemInstance item, Toggle btn)
     {
@@ -755,10 +782,92 @@ public class CraftingManager : MonoBehaviour
                 }
             }
             RefreshMeleeDefaultCoatingState();
+        }else if (item.item is ShoulderWeapon sw)
+        {
+            // 先清掉舊預覽與舊插槽（避免重複產生 part slot）
+            if (weaponPreview != null)
+                Destroy(weaponPreview);
+
+            CleanCraftingSlots();   // 清左側 UI + craftingSlots
+
+            // 建立新的武器預覽
+            GameObject weapon = Instantiate(sw.weaponPrefab, weaponPreviewTransform);
+            weaponPreview = weapon;
+            shoulderWeapon = sw;
+
+            // 槽 0：整把武器本體
+            craftingSlots.Add(new CraftingSlot
+            {
+                assembledPart = weapon,
+                attachmentPointTransform = null,
+                equipmentType = WeaponPartType.Cannon,
+                item = item
+            });
+
+            if (item is ShoulderWeaponInstance swi)
+            {
+                newWeaponName.text = !string.IsNullOrEmpty(swi.newWeaponName)
+                    ? swi.newWeaponName
+                    : item.item.itemName;
+            }
+
+            // 之後的槽：各個掛點
+            foreach (var at in sw.attachmentPoints)
+            {
+                string slotName = at.pointTransform.name;
+                craftingSlots.Add(new CraftingSlot
+                {
+                    assembledPart = null,
+                    attachmentPointTransform = FindChildRecursive(weaponPreview.transform, slotName),
+                    equipmentType = at.allowPart,
+                    item = null
+                });
+            }
+
+            // 依照新的 craftingSlots 重新產生左側插槽按鈕
+            CreateCraftingSlots();
+
+            // 右側只留下這把武器為選中
+            foreach (var t in itemsButtonParent.GetComponentsInChildren<Toggle>(true))
+            {
+                if (t != btn)
+                {
+                    t.isOn = false;
+                    t.interactable = true;
+                }
+            }
+        }else if (item.item is ShoulderWeaponPart swp)
+        {
+            if (shoulderWeapon == null || weaponPreview == null)
+                return;
+
+            foreach (var attachmentPoint in craftingSlots)
+            {
+                if (swp.partType != attachmentPoint.equipmentType ||
+                    attachmentPoint.attachmentPointTransform == null)
+                    continue;
+                if (attachmentPoint.assembledPart != null)
+                {
+                    Destroy(attachmentPoint.assembledPart);
+                }
+
+                GameObject part = Instantiate(swp.shoulderWeaponPartPrefab, attachmentPoint.attachmentPointTransform);
+                attachmentPoint.assembledPart = part;
+                attachmentPoint.item = item;
+            }
+            // 右側只留下這把武器為選中
+            foreach (var t in itemsButtonParent.GetComponentsInChildren<Toggle>(true))
+            {
+                if (t != btn)
+                {
+                    t.isOn = false;
+                    t.interactable = true;
+                }
+            }
         }
 
-        // 更新左側插槽圖示
-        int selectedIndex = GetSelectedSlotIndex();
+            // 更新左側插槽圖示
+            int selectedIndex = GetSelectedSlotIndex();
         if (selectedIndex >= 0 && selectedIndex < craftingPartsButtonParent.childCount)
         {
             Image spriteImage = InventoryManager.Instance
@@ -999,6 +1108,10 @@ public class CraftingManager : MonoBehaviour
                     icon.sprite = handleIcon;
                 else if (slot.equipmentType == WeaponPartType.Coating)
                     icon.sprite = coatingIcon;
+                else if (slot.equipmentType == WeaponPartType.Cannon)
+                    icon.sprite = cannonIcon;
+                else if (slot.equipmentType == WeaponPartType.CannonBarrel)
+                    icon.sprite = cannonBarrelIcon;
             }
 
             var btn = slotButton.GetComponent<Toggle>();
@@ -1025,8 +1138,11 @@ public class CraftingManager : MonoBehaviour
                     else if (craftingType == 1)
                     {
                         OpenMeleeWeaponPartsInventory(ItemType.WeaponPart, capturedSlot.equipmentType);
+                    }else if(craftingType == 2)
+                    {
+                        OpenShoulderWeaponPartsInventory(ItemType.WeaponPart, capturedSlot.equipmentType);
                     }
-                    SelectWeaponPartToColor(slotIndex);
+                        SelectWeaponPartToColor(slotIndex);
                 });
             }
         }
@@ -1144,10 +1260,13 @@ public class CraftingManager : MonoBehaviour
             Debug.LogWarning("Forge: base slot has no item");
             return;
         }
-
+        Debug.Log($"Forge baseSlot.item runtime type = {baseSlot.item.GetType().Name}");
+        Debug.Log($"Forge baseSlot.item.item SO type = {baseSlot.item.item?.GetType().Name}");
+        // =========================
+        // Range Weapon
+        // =========================
         if (baseSlot.item is RangeWeaponInstance rangeWeaponInstance)
         {
-            // 先把「預覽武器本體」上改好的顏色，回寫到 RangeWeaponInstance
             if (baseSlot.assembledPart != null)
             {
                 string baseShaderName;
@@ -1160,36 +1279,31 @@ public class CraftingManager : MonoBehaviour
                 }
             }
 
-            // 收集零件（同時同步每個零件的顏色）
             var rangeWeaponPartInstances = new List<PartInstance>();
-
-            if (craftingSlots.Count > 1)
+            for (int i = 1; i < craftingSlots.Count; i++)
             {
-                for (int i = 1; i < craftingSlots.Count; i++)
+                var slot = craftingSlots[i];
+                if (slot == null || slot.item == null) continue;
+
+                if (slot.item is PartInstance pi)
                 {
-                    var slot = craftingSlots[i];
-                    if (slot == null || slot.item == null)
-                        continue;
-                    if (slot.item is PartInstance pi)
+                    if (slot.assembledPart != null)
                     {
-                        if (slot.assembledPart != null)
+                        string partShaderName;
+                        var partColors = ExtractColorsFromGameObject(slot.assembledPart, out partShaderName);
+
+                        if (partColors.Count > 0)
                         {
-                            string partShaderName;
-                            var partColors = ExtractColorsFromGameObject(slot.assembledPart, out partShaderName);
-
-                            if (partColors.Count > 0)
-                            {
-                                pi.colors = partColors;
-                                pi.shaderName = partShaderName;
-                            }
+                            pi.colors = partColors;
+                            pi.shaderName = partShaderName;
                         }
+                    }
 
-                        rangeWeaponPartInstances.Add(pi);
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"Forge: slot[{i}] item is not PartInstance, actual={slot.item.GetType().Name}");
-                    }
+                    rangeWeaponPartInstances.Add(pi);
+                }
+                else
+                {
+                    Debug.LogWarning($"Forge: slot[{i}] item is not PartInstance, actual={slot.item.GetType().Name}");
                 }
             }
 
@@ -1205,17 +1319,12 @@ public class CraftingManager : MonoBehaviour
                 return;
             }
 
-            // 1) 生成鍛造後的新武器，加入背包
             InventoryManager.Instance.AddCraftedRangeWeaponToInventory(rangeWeaponInstance, rangeWeaponPartInstances);
 
-            // 2) 消耗掉原本的 blueprint 武器 + 零件
             InventoryManager.Instance.RemoveItemFromInventory(baseSlot.item);
             foreach (var part in rangeWeaponPartInstances)
-            {
                 InventoryManager.Instance.RemoveItemFromInventory(part);
-            }
 
-            // 清畫面
             if (weaponPreview != null)
             {
                 Destroy(weaponPreview);
@@ -1223,11 +1332,15 @@ public class CraftingManager : MonoBehaviour
             }
             CleanCraftingSlots();
 
-            Debug.Log("Forge: success");
-        }else if(baseSlot.item is MeleeWeaponInstance meleeWeaponInstance)
+            Debug.Log("Forge: success (Range)");
+            return;
+        }
+
+        // =========================
+        // Melee Weapon
+        // =========================
+        if (baseSlot.item is MeleeWeaponInstance meleeWeaponInstance)
         {
-            Debug.Log("Running");
-            // 先把「預覽武器本體」上改好的顏色，回寫到 RangeWeaponInstance
             if (baseSlot.assembledPart != null)
             {
                 string baseShaderName;
@@ -1240,44 +1353,39 @@ public class CraftingManager : MonoBehaviour
                 }
             }
 
-            // 收集零件（同時同步每個零件的顏色）
             var meleeWeaponPartInstances = new List<PartInstance>();
-
-            if (craftingSlots.Count > 1)
+            for (int i = 1; i < craftingSlots.Count; i++)
             {
-                for (int i = 1; i < craftingSlots.Count; i++)
+                var slot = craftingSlots[i];
+                if (slot == null || slot.item == null) continue;
+
+                if (slot.item is PartInstance pi)
                 {
-                    var slot = craftingSlots[i];
-                    if (slot == null || slot.item == null)
-                        continue;
-
-                    if (slot.item is PartInstance pi)
+                    if (slot.assembledPart != null)
                     {
-                        if (slot.assembledPart != null)
+                        string partShaderName;
+                        List<Color> partColors;
+
+                        if (pi.partType == WeaponPartType.Coating || pi.item is MeleeWeaponCoating)
+                            partColors = ExtractCoatingColorsFromGameObject(slot.assembledPart, out partShaderName);
+                        else
+                            partColors = ExtractColorsFromGameObject(slot.assembledPart, out partShaderName);
+
+                        if (partColors.Count > 0)
                         {
-                            string partShaderName;
-                            List<Color> partColors;
-
-                            if (pi.partType == WeaponPartType.Coating || pi.item is MeleeWeaponCoating)
-                                partColors = ExtractCoatingColorsFromGameObject(slot.assembledPart, out partShaderName);
-                            else
-                                partColors = ExtractColorsFromGameObject(slot.assembledPart, out partShaderName);
-
-                            if (partColors.Count > 0)
-                            {
-                                pi.colors = partColors;
-                                pi.shaderName = partShaderName;
-                            }
+                            pi.colors = partColors;
+                            pi.shaderName = partShaderName;
                         }
+                    }
 
-                        meleeWeaponPartInstances.Add(pi);
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"Forge: slot[{i}] item is not PartInstance, actual={slot.item.GetType().Name}");
-                    }
+                    meleeWeaponPartInstances.Add(pi);
+                }
+                else
+                {
+                    Debug.LogWarning($"Forge: slot[{i}] item is not PartInstance, actual={slot.item.GetType().Name}");
                 }
             }
+
             if (!string.IsNullOrEmpty(newWeaponName.text))
             {
                 Debug.Log("Forge: setting new weapon name to " + newWeaponName.text);
@@ -1290,17 +1398,12 @@ public class CraftingManager : MonoBehaviour
                 return;
             }
 
-            // 1) 生成鍛造後的新武器，加入背包
             InventoryManager.Instance.AddCraftedMeleeWeaponToInventory(meleeWeaponInstance, meleeWeaponPartInstances);
 
-            // 2) 消耗掉原本的 blueprint 武器 + 零件
             InventoryManager.Instance.RemoveItemFromInventory(baseSlot.item);
             foreach (var part in meleeWeaponPartInstances)
-            {
                 InventoryManager.Instance.RemoveItemFromInventory(part);
-            }
 
-            // 清畫面
             if (weaponPreview != null)
             {
                 Destroy(weaponPreview);
@@ -1308,9 +1411,87 @@ public class CraftingManager : MonoBehaviour
             }
             CleanCraftingSlots();
 
-            Debug.Log("Forge: success");
+            Debug.Log("Forge: success (Melee)");
+            return;
         }
+
+        // =========================
+        // Shoulder Weapon  ✅修正：拉到最外層
+        // =========================
+        if (baseSlot.item is ShoulderWeaponInstance shoulderWeaponInstance)
+        {
+            if (baseSlot.assembledPart != null)
+            {
+                string baseShaderName;
+                var baseColors = ExtractColorsFromGameObject(baseSlot.assembledPart, out baseShaderName);
+
+                if (baseColors.Count > 0)
+                {
+                    shoulderWeaponInstance.colors = baseColors;
+                    shoulderWeaponInstance.shaderName = baseShaderName;
+                }
+            }
+
+            var shoulderWeaponPartInstances = new List<PartInstance>();
+            for (int i = 1; i < craftingSlots.Count; i++)
+            {
+                var slot = craftingSlots[i];
+                if (slot == null || slot.item == null) continue;
+
+                if (slot.item is PartInstance pi)
+                {
+                    if (slot.assembledPart != null)
+                    {
+                        string partShaderName;
+                        var partColors = ExtractColorsFromGameObject(slot.assembledPart, out partShaderName);
+
+                        if (partColors.Count > 0)
+                        {
+                            pi.colors = partColors;
+                            pi.shaderName = partShaderName;
+                        }
+                    }
+
+                    shoulderWeaponPartInstances.Add(pi);
+                }
+                else
+                {
+                    Debug.LogWarning($"Forge: slot[{i}] item is not PartInstance, actual={slot.item.GetType().Name}");
+                }
+            }
+
+            if (!string.IsNullOrEmpty(newWeaponName.text))
+            {
+                Debug.Log("Forge: setting new weapon name to " + newWeaponName.text);
+                shoulderWeaponInstance.newWeaponName = newWeaponName.text;
+            }
+
+            if (shoulderWeaponPartInstances.Count == 0)
+            {
+                Debug.LogWarning("Forge: no parts selected, cannot forge");
+                return;
+            }
+
+            InventoryManager.Instance.AddCraftedShoulderWeaponToInventory(shoulderWeaponInstance, shoulderWeaponPartInstances);
+
+            InventoryManager.Instance.RemoveItemFromInventory(baseSlot.item);
+            foreach (var part in shoulderWeaponPartInstances)
+                InventoryManager.Instance.RemoveItemFromInventory(part);
+
+            if (weaponPreview != null)
+            {
+                Destroy(weaponPreview);
+                weaponPreview = null;
+            }
+            CleanCraftingSlots();
+
+            Debug.Log("Forge: success (Shoulder)");
+            return;
+        }
+
+        Debug.LogWarning($"Forge: unsupported base slot item type: {baseSlot.item.GetType().Name}");
     }
+
 
     public void CleanCraftingSlots()
     {
@@ -1433,6 +1614,7 @@ public class CraftingManager : MonoBehaviour
             craftingPartsToggleGroup = rangeWeaponPartsToggleGroup;
             rangeWeaponCraftingSlotPage.SetActive(true);
             meleeWeaponCraftingSlotPage.SetActive(false);
+            shoulderWeaponCraftingSlotPage.SetActive(false);
         }
         else if (craftingType == 1)
         {
@@ -1443,6 +1625,18 @@ public class CraftingManager : MonoBehaviour
             craftingPartsToggleGroup = meleeWeaponPartsToggleGroup;
             rangeWeaponCraftingSlotPage.SetActive(false);
             meleeWeaponCraftingSlotPage.SetActive(true);
+            shoulderWeaponCraftingSlotPage.SetActive(false);
+        }
+        else if (craftingType == 2)
+        {
+            removePart(0);
+            ClearInventoryButton();
+            craftingPartsToggleGroup.SetAllTogglesOff();
+            craftingPartsButtonParent = shoulderWeaponPartsButtonParent;
+            craftingPartsToggleGroup = shoulderWeaponPartsToggleGroup;
+            rangeWeaponCraftingSlotPage.SetActive(false);
+            meleeWeaponCraftingSlotPage.SetActive(false);
+            shoulderWeaponCraftingSlotPage.SetActive(true);
         }
     }
     private void SetDefaultMeleeHandleActive(bool active)
@@ -1534,18 +1728,19 @@ public class CraftingManager : MonoBehaviour
 
     private void RefreshInventoryAfterRemove(int removedIndex, WeaponPartType removedPartType)
     {
-        // removedIndex == 0：刷新武器清單
         if (removedIndex == 0)
         {
             if (craftingType == 0) OpenRangeWeaponInventory();
             else if (craftingType == 1) OpenMeleeWeaponInventory();
+            else if (craftingType == 2) OpenShoulderWeaponInventory();
             return;
         }
 
-        // removedIndex > 0：刷新零件清單（依照目前 tab）
         if (craftingType == 0)
             OpenRangeWeaponPartsInventory(ItemType.WeaponPart, removedPartType);
         else if (craftingType == 1)
             OpenMeleeWeaponPartsInventory(ItemType.WeaponPart, removedPartType);
+        else if (craftingType == 2)
+            OpenShoulderWeaponPartsInventory(ItemType.WeaponPart, removedPartType);
     }
 }

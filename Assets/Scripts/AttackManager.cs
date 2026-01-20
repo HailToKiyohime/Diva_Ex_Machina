@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using UnityEngine;
+using UnityEngine.XR;
 
 [System.Serializable]
 public class WeaponDamage
@@ -86,13 +87,16 @@ public class AttackManager : MonoBehaviour
     public GameObject testBulletPrefab;
 
     // 用來判斷「是否換了一把武器」，以便重置子彈等 runtime state
-    private RangeWeaponInstance _leftSource;
-    private RangeWeaponInstance _rightSource;
+    private RangeWeaponInstance _leftRangeWeaponSource;
+    private RangeWeaponInstance _rightRangeWeaponSource;
 
     // Melee source cache
-    private MeleeWeaponInstance _leftMeleeSource;
-    private MeleeWeaponInstance _rightMeleeSource;
+    private MeleeWeaponInstance _leftMeleeWeaponSource;
+    private MeleeWeaponInstance _rightMeleeWeaponSource;
 
+    // Shoulder Weapon Scource cache
+    private ShoulderWeaponInstance _leftShoulderWeaponSource;
+    private ShoulderWeaponInstance _rightShoulderWeaponSource;
     private void OnEnable()
     {
         if (PlayerStats.Instance != null)
@@ -113,8 +117,10 @@ public class AttackManager : MonoBehaviour
         var stats = PlayerStats.Instance;
         if (stats == null) return;
 
-        ApplyHand(stats.leftHand, leftHandWeapon, ref _leftSource, ref _leftMeleeSource);
-        ApplyHand(stats.rightHand, rightHandWeapon, ref _rightSource, ref _rightMeleeSource);
+        ApplyHand(stats.leftHand, leftHandWeapon, ref _leftRangeWeaponSource, ref _leftMeleeWeaponSource);
+        ApplyHand(stats.rightHand, rightHandWeapon, ref _rightRangeWeaponSource, ref _rightMeleeWeaponSource);
+        ApplyShoulder(stats.leftShoulder, leftShoulderWeapon, ref _leftShoulderWeaponSource);
+        ApplyShoulder(stats.rightShoulder, rightShoulderWeapon, ref _rightShoulderWeaponSource);
         PushAmmoUI();
     }
 
@@ -158,7 +164,45 @@ public class AttackManager : MonoBehaviour
         outWeapon.runtime.readyToShoot = false;
         outWeapon.runtime.allowInvoke = false;
     }
+    private static void ClearWeaponOutput(Weapon outWeapon, ref ShoulderWeaponInstance cachedSource)
+    {
+        cachedSource = null;
 
+        outWeapon.bullet = null;
+        outWeapon.muzzle = null;
+
+        outWeapon.damage.physicalDamage = 0f;
+        outWeapon.damage.explosionDamage = 0f;
+        outWeapon.damage.energyDamage = 0f;
+        outWeapon.damage.coldDamage = 0f;
+
+        outWeapon.range.reloadTime = 0f;
+        outWeapon.range.bulletPerShot = 0;
+        outWeapon.range.roundPerTap = 0;
+        outWeapon.range.timeBetweenShooting = 0f;
+        outWeapon.range.timeBetweenShots = 0f;
+        outWeapon.range.spread = 0f;
+        outWeapon.range.magazineSize = 0;
+        outWeapon.range.bulletSpeed = 0f;
+        outWeapon.range.firingMode = 0;
+
+        // melee settings
+        outWeapon.melee.reloadTime = 0f;
+        outWeapon.melee.item = null;
+        outWeapon.melee.weaponObject = null;
+
+        outWeapon.reloadNormalized = 0f;
+        outWeapon.meleeReloadNormalized = 0f;
+
+        outWeapon.meleeRuntime.reloading = false;
+
+        // runtime 不一定要清，但清咗 Inspector 會更直觀
+        outWeapon.runtime.bulletsLeft = 0;
+        outWeapon.runtime.shooting = false;
+        outWeapon.runtime.reloading = false;
+        outWeapon.runtime.readyToShoot = false;
+        outWeapon.runtime.allowInvoke = false;
+    }
     private static void ApplyHand(WeaponStats hand, Weapon outWeapon, ref RangeWeaponInstance cachedSource, ref MeleeWeaponInstance cachedMeleeSource)
     {
         if (outWeapon == null) return;
@@ -270,6 +314,68 @@ public class AttackManager : MonoBehaviour
 
 
     }
+    private static void ApplyShoulder(ShoulderWeaponStats shoulder, Weapon outWeapon, ref ShoulderWeaponInstance cachedSource)
+    {
+        if (outWeapon == null) return;
+        // 沒武器：清空輸出（也可以改成 disable 該手射擊）
+        if (shoulder == null || shoulder.weaponKind == ShoulderWeaponKind.None || (!shoulder.HasWeapon))
+        {
+            ClearWeaponOutput(outWeapon, ref cachedSource);
+            return;
+        }
+        // 分流：遠程 
+        if (shoulder.weaponKind == ShoulderWeaponKind.Range)
+        {
+            if (shoulder.shoulderweapon == null)
+            {
+                ClearWeaponOutput(outWeapon, ref cachedSource);
+                return;
+            }
+
+            // 如果換武器：重置 runtime state（子彈/裝填狀態等）
+            bool changedWeapon = cachedSource != shoulder.shoulderweapon;
+            cachedSource = shoulder.shoulderweapon;
+
+            // 1) 子彈 prefab / muzzle
+            var rw = shoulder.shoulderweapon.item as ShoulderWeapon;
+            outWeapon.bullet = (rw != null) ? rw.bullet : null;
+            outWeapon.muzzle = shoulder.shoulderweapon.muzzlePoint;
+
+            // 2) 把該手「總 Buff」轉成射擊數值
+            outWeapon.damage.physicalDamage = shoulder.GetAttribute(Attributes.PhysicalDamage);
+            outWeapon.damage.explosionDamage = shoulder.GetAttribute(Attributes.ExplosionDamage);
+            outWeapon.damage.energyDamage = shoulder.GetAttribute(Attributes.EnergyDamage);
+            outWeapon.damage.coldDamage = shoulder.GetAttribute(Attributes.ColdDamage);
+
+            outWeapon.range.reloadTime = shoulder.GetAttribute(Attributes.ReloadTime);
+            outWeapon.range.bulletPerShot = Mathf.Max(1, Mathf.RoundToInt(shoulder.GetAttribute(Attributes.BulletPerShot)));
+            outWeapon.range.roundPerTap = Mathf.Max(1, Mathf.RoundToInt(shoulder.GetAttribute(Attributes.RoundPerPull)));
+            outWeapon.range.timeBetweenShooting = shoulder.GetAttribute(Attributes.TimeBetweenShooting);
+            outWeapon.range.timeBetweenShots = shoulder.GetAttribute(Attributes.TimeBetweenShots);
+            outWeapon.range.spread = shoulder.GetAttribute(Attributes.Spread);
+            outWeapon.range.magazineSize = Mathf.Max(1, Mathf.RoundToInt(shoulder.GetAttribute(Attributes.MagazineSize)));
+            outWeapon.range.bulletSpeed = shoulder.GetAttribute(Attributes.BulletSpeed);
+            outWeapon.range.firingMode = Mathf.RoundToInt(shoulder.GetAttribute(Attributes.FiringMode));
+
+            // melee 清空
+            outWeapon.melee.reloadTime = 0f;
+            outWeapon.melee.item = null;
+            outWeapon.melee.weaponObject = null;
+            outWeapon.meleeRuntime.reloading = false;
+            outWeapon.meleeReloadNormalized = 0f;
+
+            if (changedWeapon)
+            {
+                outWeapon.runtime.bulletsLeft = outWeapon.range.magazineSize;
+                outWeapon.runtime.shooting = false;
+                outWeapon.runtime.reloading = false;
+                outWeapon.runtime.readyToShoot = true;
+                outWeapon.runtime.allowInvoke = true;
+                outWeapon.reloadNormalized = 0f;
+            }
+            return;
+        }
+    }
 
     private void PushAmmoUI()
     {
@@ -277,17 +383,39 @@ public class AttackManager : MonoBehaviour
         if (ui == null) return;
 
         var stats = PlayerStats.Instance;
-        bool leftIsMelee = stats != null && stats.leftHand != null && stats.leftHand.weaponKind == HandWeaponKind.Melee && stats.leftHand.meleeWeapon != null;
-        bool rightIsMelee = stats != null && stats.rightHand != null && stats.rightHand.weaponKind == HandWeaponKind.Melee && stats.rightHand.meleeWeapon != null;
 
+        bool leftIsMelee = stats != null && stats.leftHand != null
+            && stats.leftHand.weaponKind == HandWeaponKind.Melee
+            && stats.leftHand.meleeWeapon != null;
+
+        bool rightIsMelee = stats != null && stats.rightHand != null
+            && stats.rightHand.weaponKind == HandWeaponKind.Melee
+            && stats.rightHand.meleeWeapon != null;
+
+        // Hand fill
         float leftFill = CalcAmmoBarFill(leftHandWeapon, leftIsMelee);
         float rightFill = CalcAmmoBarFill(rightHandWeapon, rightIsMelee);
 
-        bool leftReloading = leftIsMelee ? (leftHandWeapon != null && leftHandWeapon.meleeRuntime.reloading) : (leftHandWeapon != null && leftHandWeapon.runtime.reloading);
-        bool rightReloading = rightIsMelee ? (rightHandWeapon != null && rightHandWeapon.meleeRuntime.reloading) : (rightHandWeapon != null && rightHandWeapon.runtime.reloading);
+        bool leftReloading = leftIsMelee
+            ? (leftHandWeapon != null && leftHandWeapon.meleeRuntime.reloading)
+            : (leftHandWeapon != null && leftHandWeapon.runtime.reloading);
 
-        // Also drive reload color + flashing (UIManager stores the colors)
-        ui.SetAmmoState(leftFill, leftReloading, rightFill, rightReloading);
+        bool rightReloading = rightIsMelee
+            ? (rightHandWeapon != null && rightHandWeapon.meleeRuntime.reloading)
+            : (rightHandWeapon != null && rightHandWeapon.runtime.reloading);
+
+        // ✅ Shoulder fill (shoulder is range-only in current design)
+        float leftShoulderFill = CalcAmmoBarFill(leftShoulderWeapon, isMelee: false);
+        float rightShoulderFill = CalcAmmoBarFill(rightShoulderWeapon, isMelee: false);
+
+        bool leftShoulderReloading = (leftShoulderWeapon != null && leftShoulderWeapon.runtime.reloading);
+        bool rightShoulderReloading = (rightShoulderWeapon != null && rightShoulderWeapon.runtime.reloading);
+
+        ui.SetAmmoState(
+            leftFill, leftReloading,
+            rightFill, rightReloading,
+            leftShoulderFill, leftShoulderReloading,
+            rightShoulderFill, rightShoulderReloading);
     }
 
     private static float CalcAmmoBarFill(Weapon w, bool isMelee)
@@ -309,30 +437,6 @@ public class AttackManager : MonoBehaviour
         // Ammo mode: fillAmount means bullets / magazine
         if (w.range.magazineSize <= 0) return 0f;
         return Mathf.Clamp01((float)w.runtime.bulletsLeft / w.range.magazineSize);
-    }
-
-    public bool HandleAttack(Weapon w, UnityEngine.InputSystem.InputAction attackInput)
-    {
-        if (w == null)
-            return false;
-
-        if (w.range.firingMode == 0)
-            w.runtime.shooting = attackInput.WasPressedThisFrame();
-        else
-            w.runtime.shooting = attackInput.IsPressed();
-
-        if (w.runtime.readyToShoot && w.runtime.shooting && w.runtime.bulletsLeft <= 0)
-            StartReload(w);
-
-        if (w.runtime.readyToShoot && w.runtime.shooting && !w.runtime.reloading && w.runtime.bulletsLeft > 0)
-        {
-            w.runtime.bulletsLeft = Mathf.Max(0, w.runtime.bulletsLeft);
-            w.runtime.readyToShoot = false;
-            StartCoroutine(Shoot(w, PlayerAiming.Instance.GetRay()));
-            return true;
-        }
-
-        return false;
     }
 
     public bool TryStartShoot(Weapon w)

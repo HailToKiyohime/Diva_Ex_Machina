@@ -177,6 +177,8 @@ public class PlayerMovement : MonoBehaviour
         var stats = PlayerStats.Instance;
         bool isLeft = (attackManager != null && w == attackManager.leftHandWeapon);
         bool isRight = (attackManager != null && w == attackManager.rightHandWeapon);
+        bool isLeftShoulderAttack = (attackManager != null && w == attackManager.leftShoulderWeapon);
+        bool isRightShoulderAttack = (attackManager != null && w == attackManager.rightShoulderWeapon);
         bool isMelee = false;
 
         // 近戰衝刺距離目前統一使用 PlayerStats.meleeDashDistance
@@ -199,6 +201,14 @@ public class PlayerMovement : MonoBehaviour
             {
                 pendingSingleUntil[w] = Time.time + singleShotBufferTime;
                 alignStartTime[w] = Time.time;
+                if (isLeftShoulderAttack)
+                {
+                    playerAnimation.ShoulderWeaponAttackLeft();
+                }
+                else if (isRightShoulderAttack)
+                {
+                    playerAnimation.ShoulderWeaponAttackRight();
+                }
             }
 
             if (!pendingSingleUntil.TryGetValue(w, out float until) || Time.time > until)
@@ -216,6 +226,14 @@ public class PlayerMovement : MonoBehaviour
             {
                 alignStartTime.Remove(w);
                 ClearAttackFacingOwnerIfSelf(w);
+                if (isLeftShoulderAttack)
+                {
+                    playerAnimation.ShoulderWeaponAttackLeft();
+                }
+                else if (isRightShoulderAttack)
+                {
+                    playerAnimation.ShoulderWeaponAttackRight();
+                }
                 return;
             }
 
@@ -275,6 +293,18 @@ public class PlayerMovement : MonoBehaviour
 
                     StartAimHold(aimHoldAfterShootNoLock);
                 }
+
+                if (isLeftShoulderAttack)
+                {
+                    if (playerAnimation != null && !playerAnimation.IsShoulderWeaponReadyToFire(true, 0.1f))
+                        return; // 還未完成 Idle->Attack 轉場，先不要射（保留 pendingSingleUntil，下一幀再試）
+                }
+                else if (isRightShoulderAttack)
+                {
+                    if (playerAnimation != null && !playerAnimation.IsShoulderWeaponReadyToFire(false, 0.1f))
+                        return;
+                }
+
                 // 4) 真正觸發射擊（由 AttackManager 管理 cooldown/bullets）
                 bool didShoot = attackManager.TryStartShoot(w);
                 // 單發：一旦成功開火就消耗掉這次請求
@@ -494,7 +524,11 @@ public class PlayerMovement : MonoBehaviour
                 attr = mw.attribute;
         }
         playerAnimation.BeginMeleeDash(isLeftHand, attr);
-
+        // 近戰 dash 期間：把鏡頭拉去鎖定目標，讓目標在畫面中央
+        if (meleeDashChasingTarget && meleeDashTarget != null && PlayerAiming.Instance != null)
+        {
+            PlayerAiming.Instance.BeginMeleeDashCameraFocus(meleeDashTarget);
+        }
         Vector3 targetPos = (meleeDashTarget != null) ? meleeDashTarget.position : meleeDashTargetPoint;
         float distToTarget = Vector3.Distance(transform.position, targetPos);
         if (distToTarget >= meleeDashStopWithin*2)
@@ -507,6 +541,11 @@ public class PlayerMovement : MonoBehaviour
     private void StopMeleeDash()
     {
         if (!meleeDashActive) return; // 沒在近戰衝刺就不用做事
+                                      // 結束近戰 dash：把相機控制權還給滑鼠
+        if (PlayerAiming.Instance != null)
+        {
+            PlayerAiming.Instance.EndMeleeDashCameraFocus();
+        }
 
         if (meleeDashHasSavedGravity)
         {

@@ -73,6 +73,12 @@ public enum HandWeaponKind
     Range = 1,
     Melee = 2
 }
+public enum ShoulderWeaponKind
+{
+    None = 0,
+    Range = 1,
+}
+
 
 [System.Serializable]
 public class WeaponStats
@@ -102,6 +108,44 @@ public class WeaponStats
         rangeweapon = null;
         meleeWeapon = null;
         handArmor = null;
+        buffs.Clear();
+    }
+
+    // 之後如果要查某一種屬性（例如 RecoilControl）可以用這個
+    public float GetAttribute(Attributes attr)
+    {
+        float add = 0f;
+        float mul = 1f;
+
+        foreach (var b in buffs)
+        {
+            if (b.attribute != attr) continue;
+
+            if (b.mode == BuffApplyMode.Add) add += b.value;
+            else if (b.mode == BuffApplyMode.Multiplier) mul *= (1f + b.value);
+        }
+
+        return add * mul;
+    }
+}
+[System.Serializable]
+public class ShoulderWeaponStats {
+    // 目前這隻手拿的武器種類（None / Range / Melee）
+    public ShoulderWeaponKind weaponKind = ShoulderWeaponKind.None;
+
+    // 目前這隻手拿的遠程武器（如果沒有就 null）
+    public ShoulderWeaponInstance shoulderweapon;
+
+    // 總共吃到的 Buff
+    public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
+
+
+    public bool HasWeapon => shoulderweapon != null;
+
+    public void Reset()
+    {
+        weaponKind = ShoulderWeaponKind.None;
+        shoulderweapon = null;
         buffs.Clear();
     }
 
@@ -229,11 +273,18 @@ public class PlayerStats : MonoBehaviour
     [Header("手部武器狀態（只在執行時使用）")]
     public WeaponStats leftHand = new WeaponStats();
     public WeaponStats rightHand = new WeaponStats();
+    [Header("肩膀武器狀態（只在執行時使用）")]
+    public ShoulderWeaponStats leftShoulder = new ShoulderWeaponStats();
+    public ShoulderWeaponStats rightShoulder = new ShoulderWeaponStats();
+
 
     [Header("equipmentSlots 中左右手武器槽的 index")]
     // 請在 Inspector 裡對應到 EquipmentManager.equipmentSlots 的順序
     public int leftWeaponSlotIndex = -1;
     public int rightWeaponSlotIndex = -1;
+    [Header("equipmentSlots 中左右肩膀武器槽的 index")]
+    public int leftShoulderWeaponSlotIndex = -1;
+    public int rightShoulderWeaponSlotIndex = -1;
 
     // =============================
     // Equipment Stat Block (UI) API
@@ -381,9 +432,11 @@ public class PlayerStats : MonoBehaviour
 
         ResetState();
         currentEnergy = maxEnergy; // 開場補滿能量
-        // ✅ 開場保證清空左右手狀態（避免殘留引用）
+        // ✅ 開場保證清空左右手和肩膀狀態（避免殘留引用）
         leftHand.Reset();
         rightHand.Reset();
+        leftShoulder.Reset();
+        rightShoulder.Reset();
 
         // (可選) 讓監聽者立刻刷新一次
         OnHandWeaponDataChanged?.Invoke();
@@ -431,6 +484,8 @@ public class PlayerStats : MonoBehaviour
         ResetState();
         leftHand.Reset();
         rightHand.Reset();
+        leftShoulder.Reset();
+        rightShoulder.Reset();
 
         CurrentLegVisual.heightOffset = 0f;
         CurrentLegVisual.animationType = AnimationType.Bipedal;
@@ -447,6 +502,8 @@ public class PlayerStats : MonoBehaviour
         List<EquipmentBuff> sharedWeaponBuffs = new List<EquipmentBuff>();
         List<EquipmentBuff> leftHandArmorWeaponBuffs = new List<EquipmentBuff>();
         List<EquipmentBuff> rightHandArmorWeaponBuffs = new List<EquipmentBuff>();
+        List<EquipmentBuff> leftShoulderWeaponBuffs = new List<EquipmentBuff>();
+        List<EquipmentBuff> rightShoulderWeaponBuffs = new List<EquipmentBuff>();
 
         Vector3 thrusterOffset = Vector3.zero;
         bool hasThruster = false;
@@ -529,6 +586,22 @@ public class PlayerStats : MonoBehaviour
                     rightHand.meleeWeapon = meleeWeaponInst2;
                     rightHand.rangeweapon = null; // 保持與 AttackManager 相容：近戰時讓 ranged weapon 為 null
                     AddWeaponAndAttachmentBuffs(rightHand, meleeWeaponInst2);
+                }
+            }else if ( i == leftShoulderWeaponSlotIndex)
+            {
+                if (inst is ShoulderWeaponInstance shoulderWeaponInst)
+                {
+                    leftShoulder.weaponKind = ShoulderWeaponKind.Range;
+                    leftShoulder.shoulderweapon = shoulderWeaponInst;
+                    AddShoulderWeaponAndAttachmentBuffs(leftShoulder, shoulderWeaponInst);
+                }
+            }else if (i == rightShoulderWeaponSlotIndex)
+            {
+                if (inst is ShoulderWeaponInstance shoulderWeaponInst)
+                {
+                    rightShoulder.weaponKind = ShoulderWeaponKind.Range;
+                    rightShoulder.shoulderweapon = shoulderWeaponInst;
+                    AddShoulderWeaponAndAttachmentBuffs(rightShoulder, shoulderWeaponInst);
                 }
             }
         }
@@ -617,6 +690,12 @@ public class PlayerStats : MonoBehaviour
         if (buffs == null) return;
         target.buffs.AddRange(buffs);
     }
+    void AddBuffListToWeapon(ShoulderWeaponStats target, List<EquipmentBuff> buffs)
+    {
+        if (buffs == null) return;
+        target.buffs.AddRange(buffs);
+    }
+
 
     // ======= local function: 全身屬性累積 =======
     void ApplyBuffListToGlobal(List<EquipmentBuff> buffs)
@@ -731,6 +810,25 @@ public class PlayerStats : MonoBehaviour
     }
 
     void AddWeaponAndAttachmentBuffs(WeaponStats target, RangeWeaponInstance weaponInst)
+    {
+        if (weaponInst == null) return;
+
+        // 武器本體 buffs
+        AddBuffListToWeapon(target, weaponInst.buffs);
+
+        // 零件 buffs（attachment 裡每個 PartInstance）
+        if (weaponInst.attachment == null) return;
+
+        foreach (var part in weaponInst.attachment)
+        {
+            // 通常 item == null 代表該槽沒裝零件；也避免殘留 buffs 造成幽靈加成
+            if (part == null || part.item == null) continue;
+
+            AddBuffListToWeapon(target, part.buffs);
+        }
+    }
+
+    void AddShoulderWeaponAndAttachmentBuffs(ShoulderWeaponStats target, ShoulderWeaponInstance weaponInst)
     {
         if (weaponInst == null) return;
 

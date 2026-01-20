@@ -547,6 +547,53 @@ public class InventoryManager : MonoBehaviour
             inventory.Add(inst);
             return;
         }
+
+        if (item is ShoulderWeaponPart swp)
+        {
+            var inst = new PartInstance
+            {
+                item = item,
+                amount = 1,
+                partType = swp.partType
+            };
+
+            if (swp.meshRenderer && swp.meshRenderer.sharedMaterial)
+            {
+                var mat = swp.meshRenderer.sharedMaterial;
+                inst.shaderName = mat.shader.name;
+
+                if (inst.shaderName.Contains("Mix 3"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                }
+                else if (inst.shaderName.Contains("Mix 4"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    inst.colors.Add(mat.GetColor("_Layer1Color"));
+                    inst.colors.Add(mat.GetColor("_Layer2Color"));
+                    inst.colors.Add(mat.GetColor("_Layer3Color"));
+                }
+                else if (inst.shaderName.Contains("Mix 5"))
+                {
+                    inst.colors.Add(mat.GetColor("_BaseColor"));
+                    for (int i = 1; i < 5; i++)
+                        inst.colors.Add(mat.GetColor($"_Layer{i}Color"));
+                }
+            }
+
+            foreach (EquipmentBuff buff in swp.buffs)
+                inst.buffs.Add(buff);
+
+            var pickedBuff = swp.GetRandomBuff();
+            if (pickedBuff != null)
+                inst.buffs.Add(pickedBuff.buff);
+
+            inventory.Add(inst);
+            return;
+        }
+
         inventory.Add(new ItemInstance { item = item, amount = 1 });
     }
 
@@ -614,6 +661,34 @@ public class InventoryManager : MonoBehaviour
         inventory.Add(newInst);
     }
 
+    public void AddCraftedShoulderWeaponToInventory(ShoulderWeaponInstance baseWeaponInstance, List<PartInstance> rangeWeaponParts)
+    {
+        if (baseWeaponInstance == null)
+        {
+            Debug.LogWarning("AddCraftedRangeWeaponToInventory: baseWeaponInstance is null");
+            return;
+        }
+
+        var newInst = new ShoulderWeaponInstance
+        {
+            item = baseWeaponInstance.item,
+            amount = 1,
+            newWeaponName = baseWeaponInstance.newWeaponName,
+            buffs = new List<EquipmentBuff>(baseWeaponInstance.buffs),
+            attachment = new List<PartInstance>(),
+            muzzlePoint = baseWeaponInstance.muzzlePoint,
+            shaderName = baseWeaponInstance.shaderName,
+            colors = baseWeaponInstance.colors != null ? new List<Color>(baseWeaponInstance.colors) : new List<Color>()
+        };
+
+        if (rangeWeaponParts != null)
+        {
+            foreach (var part in rangeWeaponParts)
+                if (part != null) newInst.attachment.Add(part);
+        }
+
+        inventory.Add(newInst);
+    }
 
     #endregion
 

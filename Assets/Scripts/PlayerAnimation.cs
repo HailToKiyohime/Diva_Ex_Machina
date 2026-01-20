@@ -16,6 +16,8 @@ public class PlayerAnimation : MonoBehaviour
     int Dual_Wielding_Weapon_LeftLayer; // 雙手持有武器（左手）
     int Dual_Wielding_Weapon_RightLayer; // 雙手持有武器（右手）
     int One_Hand_Melee_AttackLayer; // 持有單手近戰武器
+    int Shoulder_Weapon_LeftLayer; // 肩掛武器（左）
+    int Shoulder_Weapon_RightLayer; // 肩掛武器（右）
     //Character height adjustment
     private float baseHeight;
     private Vector3 baseCenter;
@@ -49,7 +51,7 @@ public class PlayerAnimation : MonoBehaviour
     void Awake()
     {
         anim = anim != null ? anim : GetComponent<Animator>();
-        capsuleCollider = capsuleCollider!=null ? capsuleCollider: GetComponent<CapsuleCollider>();
+        capsuleCollider = capsuleCollider != null ? capsuleCollider : GetComponent<CapsuleCollider>();
 
         if (anim != null)
         {
@@ -61,6 +63,8 @@ public class PlayerAnimation : MonoBehaviour
             Dual_Wielding_Weapon_LeftLayer = anim.GetLayerIndex("Dual_Wielding_Weapon_Left");
             Dual_Wielding_Weapon_RightLayer = anim.GetLayerIndex("Dual_Wielding_Weapon_Right");
             One_Hand_Melee_AttackLayer = anim.GetLayerIndex("One_Hand_Melee_Attack");
+            Shoulder_Weapon_LeftLayer = anim.GetLayerIndex("Shoulder_Weapon_Left");
+            Shoulder_Weapon_RightLayer = anim.GetLayerIndex("Shoulder_Weapon_Right");
         }
 
         if (capsuleCollider != null)
@@ -502,5 +506,116 @@ public class PlayerAnimation : MonoBehaviour
 
         Camera.Lens.FieldOfView = targetFov;
         _fovRoutine = null;
+    }
+
+    public void ShoulderWeaponAttackLeft()
+    {
+        CancelInvoke("StopShoulderWeaponAttackLeft");
+        anim.SetBool("leftShoulderAttacking", true);
+        Invoke("StopShoulderWeaponAttackLeft", 3f);
+    }
+    public void ShoulderWeaponAttackRight()
+    {
+        CancelInvoke("StopShoulderWeaponAttackRight");
+        anim.SetBool("rightShoulderAttacking", true);
+        Invoke("StopShoulderWeaponAttackRight", 3f);
+    }
+
+    public void StopShoulderWeaponAttackLeft()
+    {
+        ResetShoulderWeaponFireGate(true);
+        anim.SetBool("leftShoulderAttacking", false);
+    }
+    public void StopShoulderWeaponAttackRight()
+    {
+        ResetShoulderWeaponFireGate(false);
+        anim.SetBool("rightShoulderAttacking", false);
+    }
+
+    private static readonly int AttackStateHash = Animator.StringToHash("Attack");
+
+    // 記錄「進入 Attack state」的時間點（秒）
+    private float _leftShoulderAttackEnteredTime = -1f;
+    private float _rightShoulderAttackEnteredTime = -1f;
+
+    // 用來偵測“剛進入 Attack state”的邊沿
+    private bool _leftShoulderWasInAttack = false;
+    private bool _rightShoulderWasInAttack = false;
+
+    /// <summary>
+    /// Shoulder layer 已完成轉場且在 Attack state 後，延遲 fireDelaySeconds 秒才回傳 true
+    /// </summary>
+    public bool IsShoulderWeaponReadyToFire(bool isLeft, float fireDelaySeconds)
+    {
+        if (anim == null) return false;
+
+        int layer = isLeft ? Shoulder_Weapon_LeftLayer : Shoulder_Weapon_RightLayer;
+        if (layer < 0) return false;
+
+        // 還在任何 transition 中：不允許
+        if (anim.IsInTransition(layer))
+        {
+            // transition 期間也視為未進入 attack
+            if (isLeft) _leftShoulderWasInAttack = false;
+            else _rightShoulderWasInAttack = false;
+            return false;
+        }
+
+        var st = anim.GetCurrentAnimatorStateInfo(layer);
+        bool inAttack = (st.shortNameHash == AttackStateHash);
+
+        if (isLeft)
+        {
+            if (inAttack)
+            {
+                // 第一次進入 Attack 的那一幀
+                if (!_leftShoulderWasInAttack)
+                {
+                    _leftShoulderWasInAttack = true;
+                    _leftShoulderAttackEnteredTime = Time.time;
+                }
+
+                return (Time.time - _leftShoulderAttackEnteredTime) >= fireDelaySeconds;
+            }
+            else
+            {
+                // 離開 Attack：重置
+                _leftShoulderWasInAttack = false;
+                _leftShoulderAttackEnteredTime = -1f;
+                return false;
+            }
+        }
+        else
+        {
+            if (inAttack)
+            {
+                if (!_rightShoulderWasInAttack)
+                {
+                    _rightShoulderWasInAttack = true;
+                    _rightShoulderAttackEnteredTime = Time.time;
+                }
+
+                return (Time.time - _rightShoulderAttackEnteredTime) >= fireDelaySeconds;
+            }
+            else
+            {
+                _rightShoulderWasInAttack = false;
+                _rightShoulderAttackEnteredTime = -1f;
+                return false;
+            }
+        }
+    }
+    public void ResetShoulderWeaponFireGate(bool isLeft)
+    {
+        if (isLeft)
+        {
+            _leftShoulderWasInAttack = false;
+            _leftShoulderAttackEnteredTime = -1f;
+        }
+        else
+        {
+            _rightShoulderWasInAttack = false;
+            _rightShoulderAttackEnteredTime = -1f;
+        }
     }
 }

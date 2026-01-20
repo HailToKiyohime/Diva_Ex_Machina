@@ -34,10 +34,12 @@ public class UIManager : MonoBehaviour
     public Color ammoNormalColor ;
     public Color ammoReloadColor ;
     public float ammoReloadFlashSpeed = 6f;
-
+    // hand reload state
     private bool _leftReloading;
     private bool _rightReloading;
-
+    // shoulder reload state
+    private bool _leftShoulderReloading;
+    private bool _rightShoulderReloading;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Awake()
     {
@@ -150,20 +152,41 @@ public class UIManager : MonoBehaviour
             rightHandAmmoBar.fillAmount = Mathf.Clamp01(fillAmount);
         }
     }
+    public void changeLeftShoulderAmmoBar(float fillAmount)
+    {
+        if (leftShoulderAmmoBar != null)
+            leftShoulderAmmoBar.fillAmount = Mathf.Clamp01(fillAmount);
+    }
+
+    public void changeRightShoulderAmmoBar(float fillAmount)
+    {
+        if (rightShoulderAmmoBar != null)
+            rightShoulderAmmoBar.fillAmount = Mathf.Clamp01(fillAmount);
+    }
+
+    public void SetAmmoState(
+    float leftHandFill, bool leftHandReloading,
+    float rightHandFill, bool rightHandReloading,
+    float leftShoulderFill, bool leftShoulderReloading,
+    float rightShoulderFill, bool rightShoulderReloading)
+    {
+        _leftReloading = leftHandReloading;
+        _rightReloading = rightHandReloading;
+        _leftShoulderReloading = leftShoulderReloading;
+        _rightShoulderReloading = rightShoulderReloading;
+
+        changeLeftHandAmmoBar(leftHandFill);
+        changeRightHandAmmoBar(rightHandFill);
+        changeLeftShoulderAmmoBar(leftShoulderFill);
+        changeRightShoulderAmmoBar(rightShoulderFill);
+
+        UpdateAmmoBarColors();
+    }
+
     public void SetAmmoNormalized(float leftFill, float rightFill)
     {
         changeLeftHandAmmoBar(leftFill);
         changeRightHandAmmoBar(rightFill);
-    }
-    public void SetAmmoState(float leftFill, bool leftReloading, float rightFill, bool rightReloading)
-    {
-        _leftReloading = leftReloading;
-        _rightReloading = rightReloading;
-
-        changeLeftHandAmmoBar(leftFill);
-        changeRightHandAmmoBar(rightFill);
-
-        UpdateAmmoBarColors(); // 立刻套用一次顏色
     }
 
     private void UpdateAmmoBarColors()
@@ -175,6 +198,13 @@ public class UIManager : MonoBehaviour
 
         if (rightHandAmmoBar != null)
             rightHandAmmoBar.color = _rightReloading ? Color.Lerp(ammoReloadColor, Color.red, pulse) : ammoNormalColor;
+
+        // ✅ NEW: shoulder colors
+        if (leftShoulderAmmoBar != null)
+            leftShoulderAmmoBar.color = _leftShoulderReloading ? Color.Lerp(ammoReloadColor, Color.red, pulse) : ammoNormalColor;
+
+        if (rightShoulderAmmoBar != null)
+            rightShoulderAmmoBar.color = _rightShoulderReloading ? Color.Lerp(ammoReloadColor, Color.red, pulse) : ammoNormalColor;
     }
     public void SetAmmoBarSize(float lockOnRange)
     {
