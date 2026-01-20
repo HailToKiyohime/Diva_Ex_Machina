@@ -129,12 +129,12 @@ public class CreatePath : MonoBehaviour
                 return GetNextOrbitPoint(
                 transform,
                 target,
-                orbitRadius,
+                orbitRadius + Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset),
                 orbitStepDeg,
                 orbitClockwise,
                 orbitUseCurrentAsStart,
                 target.position.y
-                ) + new Vector3(Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset), 0, Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset));
+                );
             }
 
             return new Vector3(
