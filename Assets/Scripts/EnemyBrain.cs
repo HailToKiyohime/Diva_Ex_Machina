@@ -1,11 +1,24 @@
 using UnityEngine;
 using UnityEngine.AI;
 
+public enum EnemyState
+{
+    Idle,
+    Chasing,
+    Attacking,
+}
+
 public class EnemyBrain : MonoBehaviour
 {
+    public EnemyState currentState = EnemyState.Idle;
+
     [Header("Repath When Path Finished")]
-    [SerializeField] private float repathWhenCloseToLastCorner = 1.0f;   // 距離小於這個值，視為到終點
-    [SerializeField] private float repathCooldown = 0.25f;               // 避免每幀重算
+    [SerializeField] private float repathWhenCloseToLastCorner = 1.0f;
+    [SerializeField] private float repathCooldown = 0.25f;
+
+    [Header("State Switch")]
+    [Tooltip("避免距離在 combatRange 邊界抖動時狀態瘋狂切換（>0 建議 0.5~2）")]
+    [SerializeField] private float combatRangeHysteresis = 1.0f;
 
     private CreatePath pathFinder;
     private EnemyMovement movement;
@@ -22,11 +35,90 @@ public class EnemyBrain : MonoBehaviour
     private void Update()
     {
         if (pathFinder == null || movement == null) return;
+        if (pathFinder.Target == null)
+        {
+            SetState(EnemyState.Idle);
+            movement.HorizontalMovement(0f, 0f);
+            return;
+        }
 
-        // 1) 若已到路徑終點附近，就立即重算路徑
+        // A) 先根據距離切狀態（含 hysteresis）
+        UpdateStateByDistance();
+
+        // B) 再跑狀態行為
+        switch (currentState)
+        {
+            case EnemyState.Idle:
+                movement.HorizontalMovement(0f, 0f);
+                break;
+
+            case EnemyState.Chasing:
+                DoChasing();
+                break;
+
+            case EnemyState.Attacking:
+                DoAttacking();
+                break;
+        }
+    }
+
+    private void UpdateStateByDistance()
+    {
+        float dist = Vector3.Distance(transform.position, pathFinder.Target.position);
+        float enterAttack = pathFinder.CombatRange;                     // 進攻判斷線
+        float exitAttack = pathFinder.CombatRange + combatRangeHysteresis; // 離開進攻（回到追擊）判斷線
+
+        if (currentState != EnemyState.Attacking)
+        {
+            if (dist <= enterAttack)
+                SetState(EnemyState.Attacking);
+            else
+                SetState(EnemyState.Chasing);
+        }
+        else
+        {
+            // 已在 Attacking：拉開到 exitAttack 才切回 Chasing，避免抖動
+            if (dist >= exitAttack)
+                SetState(EnemyState.Chasing);
+        }
+    }
+
+    private void SetState(EnemyState newState)
+    {
+        if (currentState == newState) return;
+
+        // Exit old
+        switch (currentState)
+        {
+            case EnemyState.Chasing:
+                // 需要的話可在這裡做追擊結束清理
+                break;
+        }
+
+        currentState = newState;
+
+        // Enter new
+        switch (currentState)
+        {
+            case EnemyState.Chasing:
+                // 進入追擊：立刻算一次路，避免剛切回來還沿用舊 corner
+                pathFinder.FindPath();
+                _nextAllowedRepathTime = 0f;
+                break;
+
+            case EnemyState.Attacking:
+                // 進入攻擊：先停一下（真正攻擊行為你之後再接 AttackManager/動畫）
+                movement.HorizontalMovement(0f, 0f);
+                break;
+        }
+    }
+
+    private void DoChasing()
+    {
+        // 1) 若已到路徑終點附近，就立即重算路徑（沿用你原本邏輯）
         TryRepathIfPathFinished();
 
-        // 2) 正常沿路徑移動
+        // 2) 正常沿路徑移動（沿用你原本邏輯）
         nextMoveLocation = pathFinder.FindNextMoveLocation(transform);
 
         Vector3 dir = nextMoveLocation - transform.position;
@@ -39,12 +131,55 @@ public class EnemyBrain : MonoBehaviour
         }
 
         dir.Normalize();
-        movement.SetWorldMoveDirection(dir);
+
+        Transform basis = transform;
+        Vector3 fwd = basis.forward; fwd.y = 0f;
+        Vector3 right = basis.right; right.y = 0f;
+
+        if (fwd.sqrMagnitude > 0.0001f) fwd.Normalize();
+        if (right.sqrMagnitude > 0.0001f) right.Normalize();
+
+        float moveZ = Vector3.Dot(fwd, dir);
+        float moveX = Vector3.Dot(right, dir);
+
+        movement.HorizontalMovement(moveX, moveZ);
     }
 
-    /// <summary>
-    /// 當「最近的 corner 是最後一個 corner」且距離小於門檻，就立即 FindPath() 產生新路徑
-    /// </summary>
+    private void DoAttacking()
+    {
+        // 最小版本：攻擊狀態先停住（或你想用 circularPathFinding 在近距離繞圈也行）
+        // 1) 若已到路徑終點附近，就立即重算路徑（沿用你原本邏輯）
+        TryRepathIfPathFinished();
+
+        // 2) 正常沿路徑移動（沿用你原本邏輯）
+        nextMoveLocation = pathFinder.FindNextMoveLocation(transform);
+
+        Vector3 dir = nextMoveLocation - transform.position;
+        dir.y = 0f;
+
+        if (dir.sqrMagnitude < 0.01f)
+        {
+            movement.HorizontalMovement(0f, 0f);
+            return;
+        }
+
+        dir.Normalize();
+
+        Transform basis = transform;
+        Vector3 fwd = basis.forward; fwd.y = 0f;
+        Vector3 right = basis.right; right.y = 0f;
+
+        if (fwd.sqrMagnitude > 0.0001f) fwd.Normalize();
+        if (right.sqrMagnitude > 0.0001f) right.Normalize();
+
+        float moveZ = Vector3.Dot(fwd, dir);
+        float moveX = Vector3.Dot(right, dir);
+
+        movement.HorizontalMovement(moveX, moveZ);
+
+        // 之後要接：面向目標、播放攻擊動畫、觸發 AttackManager 等
+    }
+
     private void TryRepathIfPathFinished()
     {
         if (Time.time < _nextAllowedRepathTime) return;
@@ -54,7 +189,6 @@ public class EnemyBrain : MonoBehaviour
 
         int len = p.corners.Length;
 
-        // corners 太少通常代表路徑無效/剛好只有終點，直接嘗試重算一次
         if (len < 2)
         {
             pathFinder.FindPath();
@@ -62,7 +196,6 @@ public class EnemyBrain : MonoBehaviour
             return;
         }
 
-        // 找最近 corner（包含最後一點）
         Vector3 pos = transform.position;
         pos.y = 0f;
 
@@ -82,7 +215,6 @@ public class EnemyBrain : MonoBehaviour
             }
         }
 
-        // 最近 corner 是最後一個 + 距離小於門檻 -> 重算新路徑
         float thresholdSqr = repathWhenCloseToLastCorner * repathWhenCloseToLastCorner;
         if (closestIndex == len - 1 && bestSqr <= thresholdSqr)
         {

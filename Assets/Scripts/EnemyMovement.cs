@@ -4,7 +4,6 @@ using UnityEngine.EventSystems;
 public class EnemyMovement : MonoBehaviour
 {
     private EnemyStats stats;
-    [SerializeField] private Transform characterOrientation;
     [SerializeField] private Vector3 moveDirection = new Vector3(0, 0, 0);
     [Header("Rigidbody")]
     [SerializeField] private Rigidbody enemyRigidbody;
@@ -26,10 +25,10 @@ public class EnemyMovement : MonoBehaviour
     public void HorizontalMovement(float moveX, float moveZ)
     {
         // 只更新 moveDirection（給 RotateCharacter / 動畫用），不要在 Update 內碰剛體
-        Vector3 forward = characterOrientation.forward;
+        Vector3 forward = enemyRigidbody.transform.forward;
         forward.y = 0f;
 
-        Vector3 right = characterOrientation.right;
+        Vector3 right = enemyRigidbody.transform.right;
         right.y = 0f;
 
         // 避免極端情況（方向向量太小）造成 NaN
@@ -61,24 +60,15 @@ public class EnemyMovement : MonoBehaviour
     }
     public void SetWorldMoveDirection(Vector3 worldDir)
     {
-        if (characterOrientation == null) return;
-
         worldDir.y = 0f;
+
         if (worldDir.sqrMagnitude < 0.0001f)
         {
             moveDirection = Vector3.zero;
             return;
         }
-        worldDir.Normalize();
 
-        // 投影到角色的 forward/right 上，得到 moveZ/moveX
-        Vector3 fwd = characterOrientation.forward; fwd.y = 0f; fwd.Normalize();
-        Vector3 right = characterOrientation.right; right.y = 0f; right.Normalize();
-
-        float moveZ = Vector3.Dot(fwd, worldDir);
-        float moveX = Vector3.Dot(right, worldDir);
-
-        HorizontalMovement(moveX, moveZ);
+        moveDirection = worldDir.normalized; // 直接用世界方向，AI 最穩
     }
     private void RotateToMoveDirectionFixed(float dt)
     {

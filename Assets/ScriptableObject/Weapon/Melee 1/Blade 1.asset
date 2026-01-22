@@ -31,7 +31,7 @@ MonoBehaviour:
     value: 0.2
   - attribute: 8
     mode: 0
-    value: 3
+    value: 1.5
   randomBuffs: []
   attachmentPoints:
   - pointTransform: {fileID: -6737475982703767480, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
@@ -44,3 +44,4 @@ MonoBehaviour:
   mainHandGrip: {fileID: 3088508940731471166, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
   defaultCoatingEffect: {fileID: 2123748689605059989, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
   swordLength: 0.65
+  swordSlash: {fileID: 1141309423517676179, guid: 90db99d2ef52f2249b85c19992c1f531, type: 3}

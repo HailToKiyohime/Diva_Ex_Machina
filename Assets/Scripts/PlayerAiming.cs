@@ -29,6 +29,7 @@ public class PlayerAiming : MonoBehaviour
     [SerializeField] private float crosshairTiltLerp = 12f;
     [SerializeField] private float resetTiltLerp = 8f;
     [SerializeField] private float lockOnDistance = 25f;
+    [SerializeField] public Transform meshTranssform;
     [Header("UI Speeds")]
     [SerializeField] private float crosshairLerpSpeed = 30f;
 

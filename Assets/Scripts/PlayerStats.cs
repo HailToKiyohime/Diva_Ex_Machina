@@ -8,6 +8,11 @@ public enum BuffApplyMode
     Multiplier = 1   // 倍率：(1 + value) 倍；例如 0.2 = +20%
 }
 
+public enum FiringMode
+{
+    Salvo,
+    ShootingInTurn
+}
 public enum Attributes
 {
     //Damage Type

@@ -82,6 +82,11 @@ public class PlayerMovement : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] private float meleeDashEndHorizontalSpeedFactor = 0.2f; // 剩 20%
     [SerializeField] private float meleeDashEndMinHorizontalSpeed = 0.0f;    // 可選：避免太慢卡住
+
+    // --- Melee Dash lead (predict) ---
+    private Rigidbody meleeDashTargetRb = null;
+    private Vector3 meleeDashLastTargetPos = Vector3.zero;
+    private bool meleeDashHasLastTargetPos = false;
     private void OnEnable()
     {
         if (playerAnimation != null)
@@ -408,8 +413,36 @@ public class PlayerMovement : MonoBehaviour
             // 追人：每個 FixedUpdate 重新校正方向
             if (meleeDashTarget != null)
             {
-                Vector3 toTarget = targetPos - transform.position;
-                if (toTarget.sqrMagnitude > 0.0001f) meleeDashDir = toTarget.normalized;
+                targetPos = meleeDashTarget.position;
+
+                // 估目標速度：優先 Rigidbody；冇就用位置差分估速（可對付 NavMeshAgent 類）
+                Vector3 targetVel = Vector3.zero;
+                if (meleeDashTargetRb != null)
+                {
+                    targetVel = meleeDashTargetRb.linearVelocity;
+                }
+                else
+                {
+                    if (meleeDashHasLastTargetPos && dt > 0f)
+                        targetVel = (targetPos - meleeDashLastTargetPos) / dt;
+
+                    meleeDashLastTargetPos = targetPos;
+                    meleeDashHasLastTargetPos = true;
+                }
+
+                // 算攔截點
+                if (Math.InterceptionPoint(targetPos, transform.position, targetVel, meleeDashSpeed, out var leadPoint))
+                {
+                    //leadPoint.y = transform.position.y; // 平面追擊
+                    Vector3 toLead = leadPoint - transform.position;
+                    if (toLead.sqrMagnitude > 0.0001f) meleeDashDir = toLead.normalized;
+                }
+                else
+                {
+                    Vector3 toTarget = targetPos - transform.position;
+                    toTarget.y = 0f;
+                    if (toTarget.sqrMagnitude > 0.0001f) meleeDashDir = toTarget.normalized;
+                }
             }
         }
 
@@ -447,11 +480,15 @@ public class PlayerMovement : MonoBehaviour
 
         Transform targetTf = null;
         bool chasing = false;
+        meleeDashTargetRb = null;
+        meleeDashHasLastTargetPos = false;
+
         if (lockOn)
         {
             var targetRb = PlayerAiming.Instance.GetTargetRigidbody();
             if (targetRb != null)
             {
+                meleeDashTargetRb = targetRb;
                 targetTf = targetRb.transform;
                 chasing = true;
             }
@@ -460,15 +497,29 @@ public class PlayerMovement : MonoBehaviour
         Vector3 dir;
         if (chasing && targetTf != null)
         {
-            dir = (targetTf.position - transform.position);
+
+            // 取目標速度：有 Rigidbody 就用佢；冇就先當 0（之後 FixedUpdate 會用位移估速）
+            Vector3 targetVel = (meleeDashTargetRb != null) ? meleeDashTargetRb.linearVelocity : Vector3.zero;
+
+            // 用攔截點做 lead（Math.cs 已有）
+            if (Math.InterceptionPoint(targetTf.position, transform.position, targetVel, dashSpeed, out var leadPoint))
+            {
+                // 近戰 dash 通常唔想飛天：鎖死 y，保持平面追擊
+                //leadPoint.y = transform.position.y;
+                dir = (leadPoint - transform.position);
+            }
+            else
+            {
+                dir = (targetTf.position - transform.position);
+                dir.y = 0f;
+            }
         }
         else
         {
-            // 未 lockOn：用準星 ray 的 targetPoint 當 dash 方向（水平）
+            // 你原本未 lockOn 邏輯照舊
             dir = (targetPoint - transform.position);
             dir.y = 0f;
 
-            // fallback：如果 targetPoint 太近 / 幾何異常，就用角色前方
             if (dir.sqrMagnitude < 0.0001f)
             {
                 dir = (characterModel != null ? characterModel.forward : transform.forward);
@@ -513,7 +564,7 @@ public class PlayerMovement : MonoBehaviour
         // 近戰 dash 期間：把鏡頭拉去鎖定目標，讓目標在畫面中央
         if (meleeDashChasingTarget && meleeDashTarget != null && PlayerAiming.Instance != null)
         {
-            PlayerAiming.Instance.BeginMeleeDashCameraFocus(meleeDashTarget);
+            //PlayerAiming.Instance.BeginMeleeDashCameraFocus(meleeDashTarget);
         }
 
         // meleeDashTargetPoint/meleeDashTarget/meleeDashChasingTarget 已在上面設定
@@ -572,7 +623,7 @@ public class PlayerMovement : MonoBehaviour
         // 結束近戰 dash：把相機控制權還給滑鼠
         if (PlayerAiming.Instance != null)
         {
-            PlayerAiming.Instance.EndMeleeDashCameraFocus();
+            //PlayerAiming.Instance.EndMeleeDashCameraFocus();
         }
 
         if (meleeDashHasSavedGravity)
@@ -596,6 +647,9 @@ public class PlayerMovement : MonoBehaviour
         meleeDashReachedStopWithin = false;
         attackFacingOwner = null;
         attackFacingActive = false;
+
+        meleeDashTargetRb = null;
+        meleeDashHasLastTargetPos = false;
     }
 
 

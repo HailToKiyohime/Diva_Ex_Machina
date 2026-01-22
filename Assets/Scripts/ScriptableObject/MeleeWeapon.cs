@@ -35,7 +35,7 @@ public class MeleeWeapon : ItemObject
     public Transform mainHandGrip;
     public GameObject defaultCoatingEffect;
     public float swordLength = 1.0f;
-
+    public GameObject swordSlash;
     public RandomBuff GetRandomBuff()
     {
         if (randomBuffs == null || randomBuffs.Count == 0)

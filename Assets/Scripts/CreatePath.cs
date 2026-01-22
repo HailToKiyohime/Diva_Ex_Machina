@@ -9,7 +9,7 @@ public class CreatePath : MonoBehaviour
     public Vector3[] midwayPoint;
     private NavMeshPath path;
 
-    [Range(1, 40)]
+    [Range(1, 50)]
     [SerializeField] private float combatRange;
     [SerializeField] private float randomCombatRangeOffset;
     [SerializeField] private float combatRangeBrainMinUpdateTime;
@@ -30,6 +30,9 @@ public class CreatePath : MonoBehaviour
     [SerializeField] private bool orbitUseCurrentAsStart = true; // 初始角度用敵人目前方位，或用 random
     private float orbitAngleDeg;
     private bool orbitAngleInitialized;
+
+    public float CombatRange => combatRange;
+    public Transform Target => target;
     void Start()
     {
         path = new NavMeshPath();

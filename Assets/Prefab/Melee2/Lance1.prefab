@@ -1,5 +1,36 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &4571817892219275593
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1651909731363943939}
+  m_Layer: 8
+  m_Name: MuzzlePoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1651909731363943939
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4571817892219275593}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 1.25, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4979127790162344029}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &4797410185177702326
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -151,11 +182,19 @@ PrefabInstance:
     - {fileID: 6428963101796067725, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1651909731363943939}
     - targetCorrespondingSourceObject: {fileID: 4449487210523686389, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
       insertIndex: -1
       addedObject: {fileID: 4825261571071945135}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
+--- !u!4 &4979127790162344029 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
+  m_PrefabInstance: {fileID: 4797410185177702326}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &9163719332427196995 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4449487210523686389, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}

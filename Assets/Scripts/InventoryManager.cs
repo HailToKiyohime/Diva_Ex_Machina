@@ -34,7 +34,7 @@ public class MeleeWeaponInstance : ItemInstance
     public string newWeaponName;                 // 用來存鍛造後的新名稱
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
     public List<PartInstance> attachment;
-
+    public Transform muzzlePoint;
     // 用來存不同 shader 的顏色
     [SerializeField] public List<Color> colors = new List<Color>();
 

@@ -394,6 +394,10 @@ public class EquipmentManager : MonoBehaviour
                 }
             }
 
+            if (FindChildRecursive(slot.equipedItem.transform, "MuzzlePoint") != null)
+            {
+                mwi.muzzlePoint = FindChildRecursive(slot.equipedItem.transform, "MuzzlePoint");
+            }
 
             if (mwi.attachment != null)
             {
@@ -472,7 +476,7 @@ public class EquipmentManager : MonoBehaviour
 
                             // ✅ 先用 identity，再加一個補正旋轉（90 度問題通常在這）
                             fx.transform.localRotation = Quaternion.Euler(0, 90f, -90f); // 或 +90f，依你實際方向調一次就定
-                            fx.transform.localScale = new Vector3(mw.swordLength, 1, 1);
+                            fx.transform.localScale = new Vector3(mw.swordLength, mw.swordLength, 1);
 
                             ApplyCoatingColors(fx, attach.colors); // ✅ 套用鍛造存下來的顏色
 

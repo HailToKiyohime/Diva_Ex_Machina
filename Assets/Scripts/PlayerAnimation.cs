@@ -3,6 +3,7 @@ using System;
 using Unity.Cinemachine;
 public class PlayerAnimation : MonoBehaviour
 {
+    [SerializeField] private AttackManager attackManager;
 
     private Coroutine _initRoutine;
     public Animator anim;
@@ -617,5 +618,20 @@ public class PlayerAnimation : MonoBehaviour
             _rightShoulderWasInAttack = false;
             _rightShoulderAttackEnteredTime = -1f;
         }
+    }
+
+    // ===== Animation Events (Plan A) =====
+    // 左手攻擊動畫 clip 的 Animation Event 直接叫呢個
+    public void AnimEvent_SpawnSwordSlash_Left()
+    {
+        if (attackManager == null) return;
+        attackManager.AnimEvent_SpawnSwordSlash_Left();
+    }
+
+    // 右手攻擊動畫 clip 的 Animation Event 直接叫呢個
+    public void AnimEvent_SpawnSwordSlash_Right()   
+    {
+        if (attackManager == null) return;
+        attackManager.AnimEvent_SpawnSwordSlash_Right();
     }
 }

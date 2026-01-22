@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Trail64cg
+  m_Name: Trail64cg 1
   m_Shader: {fileID: 4800000, guid: a060444ae7a0ff34e8affc4ebd09c0f1, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -96,7 +96,7 @@ Material:
     - _DistortionStrength: 1
     - _DistortionStrengthScaled: 0
     - _DstBlend: 1
-    - _Emission: 1
+    - _Emission: 50
     - _EmissionEnabled: 0
     - _FlipbookMode: 0
     - _GlossMapScale: 1

@@ -30,6 +30,7 @@ public class MeleeWeaponSettings
     public float reloadTime;
     public MeleeWeapon item;
     public Transform weaponObject;
+    public GameObject swordSlashPrefab;
 }
 
 [System.Serializable]
@@ -97,6 +98,15 @@ public class AttackManager : MonoBehaviour
     // Shoulder Weapon Scource cache
     private ShoulderWeaponInstance _leftShoulderWeaponSource;
     private ShoulderWeaponInstance _rightShoulderWeaponSource;
+
+    [Header("Optional: used to add player velocity to sword slash")]
+    [SerializeField] private Rigidbody playerRb;
+
+    private void Awake()
+    {
+        if (playerRb == null)
+            playerRb = GetComponentInParent<Rigidbody>();
+    }
     private void OnEnable()
     {
         if (PlayerStats.Instance != null)
@@ -119,9 +129,29 @@ public class AttackManager : MonoBehaviour
 
         ApplyHand(stats.leftHand, leftHandWeapon, ref _leftRangeWeaponSource, ref _leftMeleeWeaponSource);
         ApplyHand(stats.rightHand, rightHandWeapon, ref _rightRangeWeaponSource, ref _rightMeleeWeaponSource);
+
+        // ★補齊 melee weaponObject（由裝備系統拎實體武器 Transform）
+        ResolveMeleeWeaponObject(leftHandWeapon, stats.leftWeaponSlotIndex);
+        ResolveMeleeWeaponObject(rightHandWeapon, stats.rightWeaponSlotIndex);
+
         ApplyShoulder(stats.leftShoulder, leftShoulderWeapon, ref _leftShoulderWeaponSource);
         ApplyShoulder(stats.rightShoulder, rightShoulderWeapon, ref _rightShoulderWeaponSource);
+
         PushAmmoUI();
+    }
+    private void ResolveMeleeWeaponObject(Weapon w, int slotIndex)
+    {
+        if (w == null) return;
+
+        // 只處理近戰
+        if (w.melee == null || w.melee.item == null) { w.melee.weaponObject = null; return; }
+
+        var em = EquipmentManager.Instance;
+        if (em == null || em.equipmentSlots == null) { w.melee.weaponObject = null; return; }
+        if (slotIndex < 0 || slotIndex >= em.equipmentSlots.Count) { w.melee.weaponObject = null; return; }
+
+        var go = em.equipmentSlots[slotIndex].equipedItem;
+        w.melee.weaponObject = (go != null) ? go.transform : null;
     }
 
     private static void ClearWeaponOutput(Weapon outWeapon, ref RangeWeaponInstance cachedSource, ref MeleeWeaponInstance cachedMeleeSource)
@@ -148,6 +178,7 @@ public class AttackManager : MonoBehaviour
         outWeapon.range.firingMode = 0;
 
         // melee settings
+        outWeapon.melee.swordSlashPrefab = null;
         outWeapon.melee.reloadTime = 0f;
         outWeapon.melee.item = null;
         outWeapon.melee.weaponObject = null;
@@ -299,9 +330,11 @@ public class AttackManager : MonoBehaviour
             outWeapon.reloadNormalized = 0f;
 
             // melee 設定：暫時用 hand 的 ReloadTime 當作近戰 cooldown（可以被裝備/零件 buff）
+            outWeapon.muzzle = hand.meleeWeapon.muzzlePoint;
             outWeapon.melee.reloadTime = hand.GetAttribute(Attributes.ReloadTime);
             outWeapon.melee.item = hand.meleeWeapon.item as MeleeWeapon;
             // weaponObject：MeleeWeaponInstance 目前沒有提供 Transform，這裡保持 null（需要的話之後再接）
+            outWeapon.melee.swordSlashPrefab = (outWeapon.melee.item != null) ? outWeapon.melee.item.swordSlash : null;
             outWeapon.melee.weaponObject = null;
 
             if (changedMelee)
@@ -548,6 +581,8 @@ public class AttackManager : MonoBehaviour
 
                 var rb = currentBullet.GetComponent<Rigidbody>();
                 if (rb) rb.linearVelocity = dirWithSpread * w.range.bulletSpeed;
+                //make bullet face the direction it's moving
+                currentBullet.transform.forward = dirWithSpread;
             }
 
             w.runtime.bulletsLeft--;
@@ -699,5 +734,35 @@ public class AttackManager : MonoBehaviour
         {
             return false;
         }
+    }
+
+    public void AnimEvent_SpawnSwordSlash_Left()
+    {
+        SpawnSwordSlash(leftHandWeapon);
+    }
+
+    public void AnimEvent_SpawnSwordSlash_Right()
+    {
+        SpawnSwordSlash(rightHandWeapon);
+    }
+    private void SpawnSwordSlash(Weapon w)
+    {
+        float baseSlashSpeed = playerRb.linearVelocity.magnitude+50;      
+
+        if (w == null) return;
+
+        var prefab = w.melee.swordSlashPrefab;
+        var origin = w.muzzle;
+        if (prefab == null || origin == null) return;
+
+
+        Quaternion rot = Quaternion.LookRotation(PlayerAiming.Instance.meshTranssform.forward, Vector3.up);
+        GameObject slash = Instantiate(prefab, origin.position, rot);
+
+        // ===== 3) 計算 velocity：base + player speed projected =====
+        Rigidbody rb = slash.GetComponent<Rigidbody>();
+        rb.linearVelocity = PlayerAiming.Instance.meshTranssform.forward * baseSlashSpeed;
+        slash.transform.rotation = rot;
+
     }
 }
