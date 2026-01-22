@@ -1,7 +1,8 @@
 using UnityEngine;
 
 [System.Serializable]
-public class FireArm {
+public class FireArm
+{
     public GameObject turret;
     public GameObject barrel;
 
@@ -23,7 +24,7 @@ public class FireArm {
     public float roundsPerFire = 1; // number of round per firing action, e.g., burst fire, for single shot set to 1,PS : This will affect the number of rounds fired
     public float timeBetweenShots = 0; // time delay between shots
     public float timeBetweenShooting = 1f;
-    public float reloadTime = 5f;   
+    public float reloadTime = 5f;
     public float reloadTimer = 0f;
     public int magazineSize = 5; // number of rounds per magazine
 }
@@ -40,6 +41,8 @@ public class FirearmControlSystem : MonoBehaviour
     private Vector3 _lastTargetPos;
     private Vector3 _targetVel;
 
+    // 記錄每把槍上一幀計算出的攔截瞄準點（避免重算，且與 AimOne 一致）
+    private Vector3[] _lastAimPoint;
     private struct Runtime
     {
         public Quaternion turretInitialLocalRot;
@@ -54,10 +57,30 @@ public class FirearmControlSystem : MonoBehaviour
 
     private Runtime[] _rt;
 
+    // ----------------------------
+    // Firing runtime (per FireArm)
+    // ----------------------------
+    private int[] _ammo;                 // currentAmmo in magazine
+    private float[] _cooldown;           // time remaining until next firing action allowed
+    private bool[] _burstActive;         // currently executing burst (跨幀)
+    private int[] _burstRemaining;       // remaining shot events in current burst
+    private float[] _burstTimer;         // time until next shot event in burst
+    private int[] _nextMuzzleIndex;      // for ShootingInTurn: which muzzle to use next firing action
+    private int[] _burstMuzzleIndex;     // for ShootingInTurn: fixed muzzle during the current burst
+
     private void Awake()
     {
         if (fireArms == null) fireArms = new FireArm[0];
         _rt = new Runtime[fireArms.Length];
+
+        _ammo = new int[fireArms.Length];
+        _cooldown = new float[fireArms.Length];
+        _burstActive = new bool[fireArms.Length];
+        _burstRemaining = new int[fireArms.Length];
+        _burstTimer = new float[fireArms.Length];
+        _nextMuzzleIndex = new int[fireArms.Length];
+        _burstMuzzleIndex = new int[fireArms.Length];
+        _lastAimPoint = new Vector3[fireArms.Length];
     }
 
     private void Start()
@@ -74,6 +97,19 @@ public class FirearmControlSystem : MonoBehaviour
             _rt[i].yawDeltaDeg = 0f;
             _rt[i].pitchDeg = 0f;
             _rt[i].inited = true;
+
+            // init magazine
+            _ammo[i] = Mathf.Max(0, fa.magazineSize);
+            _cooldown[i] = 0f;
+            _burstActive[i] = false;
+            _burstRemaining[i] = 0;
+            _burstTimer[i] = 0f;
+            _nextMuzzleIndex[i] = 0;
+            _burstMuzzleIndex[i] = 0;
+
+            // if inspector left reloadTimer > 0, treat as reloading
+            fa.reloadTimer = Mathf.Max(0f, fa.reloadTimer);
+            if (fa.reloadTimer > 0f) _ammo[i] = 0;
         }
     }
 
@@ -86,6 +122,8 @@ public class FirearmControlSystem : MonoBehaviour
         for (int i = 0; i < fireArms.Length; i++)
         {
             AimOne(i, fireArms[i]);
+            TickFiring(i, fireArms[i]);
+
         }
     }
 
@@ -127,7 +165,7 @@ public class FirearmControlSystem : MonoBehaviour
             if (Math.InterceptionPoint(target.position, origin, _targetVel, fa.bulletSpeed, out var c))
                 aimPoint = c;
         }
-
+        _lastAimPoint[idx] = aimPoint;
         // 3) Yaw: rotate turret toward aimPoint on XZ plane, with optional limit around initial pose
         UpdateTurretYaw(idx, fa, turretT, aimPoint);
 
@@ -204,8 +242,283 @@ public class FirearmControlSystem : MonoBehaviour
         barrelT.localRotation = Quaternion.AngleAxis(-_rt[idx].pitchDeg, Vector3.right) * _rt[idx].barrelInitialLocalRot;
     }
 
+    // --------------------------------
+    // Firing + reload + cooldown tick
+    // --------------------------------
+    private void TickFiring(int idx, FireArm fa)
+    {
+        if (fa == null) return;
+
+        float dt = Time.deltaTime;
+
+        // Reload ticking (fa.reloadTimer > 0 means reloading)
+        if (fa.reloadTimer > 0f)
+        {
+            fa.reloadTimer -= dt;
+            if (fa.reloadTimer <= 0f)
+            {
+                fa.reloadTimer = 0f;
+                _ammo[idx] = Mathf.Max(0, fa.magazineSize);
+            }
+            // while reloading, we do not progress burst shots
+            return;
+        }
+
+        // Cooldown ticking
+        if (_cooldown[idx] > 0f)
+        {
+            _cooldown[idx] -= dt;
+            if (_cooldown[idx] < 0f) _cooldown[idx] = 0f;
+        }
+
+        // Burst ticking
+        if (!_burstActive[idx]) return;
+
+        // wait for next shot event
+        if (_burstTimer[idx] > 0f)
+        {
+            _burstTimer[idx] -= dt;
+            if (_burstTimer[idx] > 0f) return;
+            _burstTimer[idx] = 0f;
+        }
+
+        // If out of ammo mid-burst, start reload and abort burst (規格：不足就 reload，且這次不開火)
+        if (_ammo[idx] <= 0)
+        {
+            AbortBurstAndStartReload(idx, fa);
+            return;
+        }
+
+        // Fire one shot event
+        DoShotEvent(idx, fa);
+
+        // consume 1 round per shot event (Salvo 也只扣 1；總扣 roundsPerFire)
+        _ammo[idx] = Mathf.Max(0, _ammo[idx] - 1);
+
+        _burstRemaining[idx]--;
+
+        if (_burstRemaining[idx] <= 0)
+        {
+            EndBurst(idx, fa);
+        }
+        else
+        {
+            // only meaningful when roundsPerFire > 1 (主人指定)
+            _burstTimer[idx] = Mathf.Max(0f, fa.timeBetweenShots);
+        }
+    }
+
+    // -------------------------
+    // Public: begin firing action
+    // -------------------------
     public void FireWeapon(FireArm fireArm)
     {
+        if (fireArm == null) return;
 
+        // Find index
+        int idx = -1;
+        for (int i = 0; i < fireArms.Length; i++)
+        {
+            if (ReferenceEquals(fireArms[i], fireArm))
+            {
+                idx = i;
+                break;
+            }
+        }
+        if (idx < 0) return;
+
+        var fa = fireArm;
+
+        // Validate
+        if (fa.bulletPrefab == null) return;
+        if (fa.muzzles == null || fa.muzzles.Length == 0) return;
+
+        // Ignore while burst/cooldown/reloading (主人指定 ignore)
+        if (_burstActive[idx]) return;
+        if (_cooldown[idx] > 0f) return;
+        if (fa.reloadTimer > 0f) return;
+
+        int roundsPerFire = Mathf.Max(1, Mathf.RoundToInt(fa.roundsPerFire));
+
+        // If not enough ammo for the whole firing action => start reload, do not shoot (主人指定)
+        if (_ammo[idx] < roundsPerFire)
+        {
+            StartReload(idx, fa);
+            return;
+        }
+
+        // Pick muzzle for ShootingInTurn: same muzzle for the whole burst
+        if (fa.firingMode == FiringMode.ShootingInTurn)
+        {
+            int n = fa.muzzles.Length;
+            if (n <= 0) return;
+            int next = _nextMuzzleIndex[idx];
+            if (next < 0) next = 0;
+            if (next >= n) next = next % n;
+            _burstMuzzleIndex[idx] = next;
+        }
+        else
+        {
+            _burstMuzzleIndex[idx] = 0; // unused in Salvo
+        }
+
+        // Start burst
+        _burstActive[idx] = true;
+        _burstRemaining[idx] = roundsPerFire;
+        _burstTimer[idx] = 0f; // first shot immediately
+
+        // Fire first shot event immediately
+        DoShotEvent(idx, fa);
+        _ammo[idx] = Mathf.Max(0, _ammo[idx] - 1);
+        _burstRemaining[idx]--;
+
+        if (_burstRemaining[idx] <= 0)
+        {
+            EndBurst(idx, fa);
+        }
+        else
+        {
+            _burstTimer[idx] = Mathf.Max(0f, fa.timeBetweenShots);
+        }
+    }
+
+    // -------------------------
+    // Shot event implementation
+    // -------------------------
+    private void DoShotEvent(int idx, FireArm fa)
+    {
+        int pellets = Mathf.Max(1, Mathf.RoundToInt(fa.bulletPerRound));
+        float spread = Mathf.Max(0f, fa.bulletSpread);
+        float speed = Mathf.Max(0f, fa.bulletSpeed);
+
+        if (fa.firingMode == FiringMode.Salvo)
+        {
+            // every shot event: fire ALL muzzles
+            for (int m = 0; m < fa.muzzles.Length; m++)
+            {
+                var muzzle = fa.muzzles[m];
+                if (muzzle == null) continue;
+
+                SpawnProjectilesFromMuzzle(muzzle, fa.bulletPrefab, pellets, spread, speed);
+            }
+        }
+        else // ShootingInTurn
+        {
+            int mi = _burstMuzzleIndex[idx];
+            if (mi < 0 || fa.muzzles == null || mi >= fa.muzzles.Length) return;
+
+            var muzzle = fa.muzzles[mi];
+            if (muzzle == null) return;
+
+            SpawnProjectilesFromMuzzle(muzzle, fa.bulletPrefab, pellets, spread, speed);
+        }
+    }
+
+    private void SpawnProjectilesFromMuzzle(Transform muzzle, GameObject bulletPrefab, int pellets, float spreadDeg, float speed)
+    {
+        Vector3 baseDir = muzzle.forward;
+
+        for (int i = 0; i < pellets; i++)
+        {
+            Vector3 dir = baseDir;
+
+            if (spreadDeg > 0.0001f)
+            {
+                // simple cone spread: random yaw/pitch
+                float yaw = Random.Range(-spreadDeg, spreadDeg);
+                float pitch = Random.Range(-spreadDeg, spreadDeg);
+                dir = Quaternion.Euler(pitch, yaw, 0f) * baseDir;
+                dir.Normalize();
+            }
+
+            Quaternion rot = Quaternion.LookRotation(dir, muzzle.up);
+            GameObject b = Instantiate(bulletPrefab, muzzle.position, rot);
+
+            Rigidbody rb = b.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.linearVelocity = dir * speed;
+            }
+        }
+    }
+
+    // -------------------------
+    // Burst end / reload helpers
+    // -------------------------
+    private void EndBurst(int idx, FireArm fa)
+    {
+        _burstActive[idx] = false;
+        _burstRemaining[idx] = 0;
+        _burstTimer[idx] = 0f;
+
+        // advance muzzle turn AFTER a complete firing action
+        if (fa.firingMode == FiringMode.ShootingInTurn && fa.muzzles != null && fa.muzzles.Length > 0)
+        {
+            _nextMuzzleIndex[idx] = (_nextMuzzleIndex[idx] + 1) % fa.muzzles.Length;
+        }
+
+        _cooldown[idx] = Mathf.Max(0f, fa.timeBetweenShooting);
+    }
+
+    private void StartReload(int idx, FireArm fa)
+    {
+        // begin reload (during reload: do not shoot)
+        fa.reloadTimer = Mathf.Max(0f, fa.reloadTime);
+        _ammo[idx] = 0;
+
+        // if currently bursting (shouldn't happen from FireWeapon due to checks), abort safely
+        _burstActive[idx] = false;
+        _burstRemaining[idx] = 0;
+        _burstTimer[idx] = 0f;
+    }
+
+    private void AbortBurstAndStartReload(int idx, FireArm fa)
+    {
+        _burstActive[idx] = false;
+        _burstRemaining[idx] = 0;
+        _burstTimer[idx] = 0f;
+        StartReload(idx, fa);
+    }
+
+    public void RequestFireAll(float coneDeg)
+    {
+        if (target == null || fireArms == null) return;
+
+        for (int i = 0; i < fireArms.Length; i++)
+        {
+            var fa = fireArms[i];
+            if (fa == null) continue;
+
+            // 只有在「炮口方向」已經對準攔截點一定角度內，才允許觸發一次 firing action
+            if (!IsWithinFireCone(i, fa, coneDeg))
+                continue;
+
+            // 觸發一次 firing action（內部仍會處理 cooldown / burst / reload / ammo）
+            FireWeapon(fa);
+        }
+    }
+
+    private bool IsWithinFireCone(int idx, FireArm fa, float coneDeg)
+    {
+        if (fa == null) return false;
+
+        // 以 muzzleCenterPoint 當作「槍口群中心」最穩；沒有就退回 barrel
+        Transform dirT = fa.muzzleCenterPoint != null ? fa.muzzleCenterPoint.transform : null;
+        if (dirT == null && fa.barrel != null) dirT = fa.barrel.transform;
+        if (dirT == null) return false;
+
+        Vector3 origin = (fa.muzzleCenterPoint != null) ? fa.muzzleCenterPoint.position : dirT.position;
+        Vector3 toAim = _lastAimPoint[idx] - origin;
+        if (toAim.sqrMagnitude < 0.0001f) return false;
+
+        Vector3 fwd = dirT.forward;
+        fwd.y = 0f;
+        toAim.y = 0f;
+
+        if (fwd.sqrMagnitude < 0.0001f) return false;
+        if (toAim.sqrMagnitude < 0.0001f) return false;
+
+        float angle = Vector3.Angle(fwd.normalized, toAim.normalized);
+        return angle <= Mathf.Max(0f, coneDeg);
     }
 }

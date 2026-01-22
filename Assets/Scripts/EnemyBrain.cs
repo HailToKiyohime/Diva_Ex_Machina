@@ -26,10 +26,14 @@ public class EnemyBrain : MonoBehaviour
     private Vector3 nextMoveLocation;
     private float _nextAllowedRepathTime;
 
+    private FirearmControlSystem firearmSystem;
+    [SerializeField] private float fireConeDeg = 10f;
+
     private void Awake()
     {
         pathFinder = GetComponent<CreatePath>();
         movement = GetComponent<EnemyMovement>();
+        firearmSystem = GetComponent<FirearmControlSystem>();
     }
 
     private void Update()
@@ -41,7 +45,10 @@ public class EnemyBrain : MonoBehaviour
             movement.HorizontalMovement(0f, 0f);
             return;
         }
-
+        if (firearmSystem != null)
+        {
+            firearmSystem.target = pathFinder.Target;
+        }
         // A) 先根據距離切狀態（含 hysteresis）
         UpdateStateByDistance();
 
@@ -178,6 +185,11 @@ public class EnemyBrain : MonoBehaviour
         movement.HorizontalMovement(moveX, moveZ);
 
         // 之後要接：面向目標、播放攻擊動畫、觸發 AttackManager 等
+        // 只有 Attacking 狀態才觸發開火（主人需求 #3）
+        if (firearmSystem != null && currentState == EnemyState.Attacking)
+        {
+            firearmSystem.RequestFireAll(fireConeDeg); // 主人需求 #1 + #2
+        }
     }
 
     private void TryRepathIfPathFinished()
