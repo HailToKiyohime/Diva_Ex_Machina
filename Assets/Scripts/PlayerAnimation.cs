@@ -5,7 +5,6 @@ using UnityEngine;
 public class PlayerAnimation : MonoBehaviour
 {
     [SerializeField] private AttackManager attackManager;
-
     private Coroutine _initRoutine;
     public Animator anim;
     [SerializeField] private CapsuleCollider capsuleCollider;
@@ -50,9 +49,7 @@ public class PlayerAnimation : MonoBehaviour
     [SerializeField] private float fovBlendOutTime = 0.15f;
     private Coroutine _fovRoutine;
     public CinemachineCamera Camera;
-    // ===== Combo Stop Failsafe =====
-    [SerializeField] private float combo2FailSafeSeconds = 1.0f; // 主人可調：Combo2 若沒正常結束，最晚多久強制收尾
-    private const string _failsafeMethodName = nameof(ForceStopAttackingFailsafe);
+
     public MMF_Player leftAttackFeedback;
     public MMF_Player rightAttackFeedback;
     void Awake()
@@ -100,7 +97,7 @@ public class PlayerAnimation : MonoBehaviour
         PlayerStats.Instance.OnThrusterVisualChanged += ApplyThrusterVfxChange;
         PlayerStats.Instance.OnThrusterFlameOffsetChanged += ApplyThrusterFlameTramformChange;
 
-        // 進場同步（關鍵：VFX + Offset 都要）
+        // �i���P�B�]����GVFX + Offset ���n�^
         ApplyLegVisualChange(PlayerStats.Instance.CurrentLegVisual);
         RefreshWeaponHoldLayers();
         ApplyThrusterVfxChange(PlayerStats.Instance.CurrentThruster);
@@ -132,7 +129,7 @@ public class PlayerAnimation : MonoBehaviour
         if (thrusterFlamePointL != null) thrusterFlamePointL.localPosition = offset;
         if (thrusterFlamePointR != null)
         {
-            offset.x = -offset.x; // 右邊的 X 軸取反
+            offset.x = -offset.x; // �k�䪺 X �b����
             thrusterFlamePointR.localPosition = offset;
         }
     }
@@ -143,12 +140,12 @@ public class PlayerAnimation : MonoBehaviour
         float newHeight = Mathf.Max(0.1f, baseHeight + heightOffset);
         capsuleCollider.height = newHeight;
 
-        // 固定頭頂：高度增加，center 往下移一半
+        // �T�w�Y���G���׼W�[�Acenter ���U���@�b
         var c = baseCenter;
         c.y -= (newHeight - baseHeight) * 0.5f;
         capsuleCollider.center = c;
 
-        // 調整 groundPoint 位置
+        // �վ� groundPoint ��m
         if (groundPoint != null)
         {
             Vector3 gp = groundPoint.localPosition;
@@ -160,7 +157,6 @@ public class PlayerAnimation : MonoBehaviour
     {
         // 1) 先清掉舊的（避免重複堆疊）
         ClearThrusterVfxInstances();
-
         // 2) 沒裝 thruster（或卸下）→ 清空後直接結束
         if (thr == null) return;
 
@@ -212,7 +208,7 @@ public class PlayerAnimation : MonoBehaviour
     }
     private void ApplyLocomotion(AnimationType type)
     {
-        // 依你的 AnimationType 實際 enum 值調整 case
+        // �̧A�� AnimationType ��� enum �Ƚվ� case
         switch (type)
         {
             case AnimationType.Hover:
@@ -227,7 +223,7 @@ public class PlayerAnimation : MonoBehaviour
         }
     }
 
-    // ===== 你原本的函式可以保留 =====
+
     public void SetBipedMode() { SetAllLayersOff(); anim.SetLayerWeight(bipedLayer, 1f); }
     public void SetHoverMode() { SetAllLayersOff(); anim.SetLayerWeight(hoverLayer, 1f); }
     public void SetAllLayersOff()
@@ -269,7 +265,7 @@ public class PlayerAnimation : MonoBehaviour
     {
         if (_attackEventFired) return;
         _attackEventFired = true;
-        OnStartAttacking?.Invoke(); // Trail/粒子等效果靠這個
+        OnStartAttacking?.Invoke();// Trail/粒子等效果靠這個
     }
     public void ChangeFOVtoAttack()
     {
@@ -279,7 +275,6 @@ public class PlayerAnimation : MonoBehaviour
     }
     public void StartAttack()
     {
-        CancelInvoke(_failsafeMethodName); // 新增這行
         EnsureAttackStartEventFired();
         anim.SetBool("attacking", true);
     }
@@ -289,7 +284,7 @@ public class PlayerAnimation : MonoBehaviour
         anim.SetBool("attacking", false);
         SetOffAttackLayer();
 
-        _attackEventFired = false;      // 允許下一次攻擊再觸發 OnStartAttacking
+        _attackEventFired = false;     // 允許下一次攻擊再觸發 OnStartAttacking
         OnStopAttacking?.Invoke();
     }
     public void InvokeStartAttack(float delay)
@@ -307,48 +302,12 @@ public class PlayerAnimation : MonoBehaviour
     {
         SmoothSetFov(normalFov, fovBlendInTime);
     }
-    // 0 = 相容舊 event（不帶參數）
-    // 1 = Combo1 end（若已排隊 Combo2，則不結束）
-    // 2 = Combo2 end（一定結束）
-
- public void InvokeStopAttacking(int comboEnded)
-{
-    if (anim == null) return;
-
-    // 先取消所有可能的排程，避免時間交疊
-    CancelInvoke(nameof(StopAttacking));
-    CancelInvoke(_failsafeMethodName);
-
-    int leftCombo = anim.GetInteger("LeftHandCombo");
-    int rightCombo = anim.GetInteger("RightHandCombo");
-
-    bool nextQueued = (leftCombo >= 2) || (rightCombo >= 2);
-
-    // Combo1 結尾：若已排隊 Combo2，不立刻結束 attacking，
-    // 但一定要掛一個 failsafe，避免 Combo2 沒進去/沒結束導致永遠不 reset。
-    if (comboEnded == 1 && nextQueued)
+    public void InvokeStopAttacking()
     {
-        Invoke(_failsafeMethodName, combo2FailSafeSeconds);
-        return;
-    }
-
-    // 舊版相容（comboEnded==0）：看起來像 Combo2（>=2）就同樣掛 failsafe
-    // 這能防止「event 仍用舊版不帶參數」時偶發卡住
-    if (comboEnded == 0 && nextQueued)
-    {
-        Invoke(_failsafeMethodName, combo2FailSafeSeconds);
-        return;
-    }
-
-    // Combo2 結尾（或沒有下一段）：正常結束
-    Invoke(nameof(StopAttacking), 0.2f);
-}
-
-    // 可選：主人若想 Combo2 結尾完全不做 gate，直接用這個
-    public void InvokeStopAttackingForce()
-    {
-        CancelInvoke(nameof(StopAttacking));
-        Invoke(nameof(StopAttacking), 0.2f);
+        if (!IsInvoking(nameof(StopAttacking)))
+        {
+            Invoke("StopAttacking", 0.2f);
+        }
     }
     private void SmoothSetLayerWeight(int layerIndex, float target, float duration)
     {
@@ -662,6 +621,16 @@ public class PlayerAnimation : MonoBehaviour
         }
     }
 
+    public void LeftWeaponMuzzleFlash()
+    {
+        leftAttackFeedback?.PlayFeedbacks(this.transform.position);
+    }
+    public void RightWeaponMuzzleFlash()
+    {
+        rightAttackFeedback?.PlayFeedbacks(this.transform.position);
+    }
+
+
     // ===== Animation Events =====
     // 左手攻擊動畫 clip 的 Animation Event 直接叫呢個
     public void AnimEvent_SpawnSwordSlash_Left()
@@ -671,28 +640,9 @@ public class PlayerAnimation : MonoBehaviour
     }
 
     // 右手攻擊動畫 clip 的 Animation Event 直接叫呢個
-    public void AnimEvent_SpawnSwordSlash_Right()   
+    public void AnimEvent_SpawnSwordSlash_Right()
     {
         if (attackManager == null) return;
         attackManager.AnimEvent_SpawnSwordSlash_Right();
-    }
-    public void LeftWeaponMuzzleFlash()
-    {
-        leftAttackFeedback?.PlayFeedbacks(this.transform.position);
-    }
-    public void RightWeaponMuzzleFlash()
-    {
-        rightAttackFeedback?.PlayFeedbacks(this.transform.position);
-    }
-    private void ForceStopAttackingFailsafe()
-    {
-        if (anim == null) return;
-
-        // 只在還卡著 attacking 時才強制收尾
-        if (anim.GetBool("attacking"))
-        {
-            Debug.LogWarning("PlayerAnimation: Combo failsafe triggered -> forcing StopAttacking()");
-            StopAttacking();
-        }
     }
 }

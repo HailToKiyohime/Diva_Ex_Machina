@@ -546,7 +546,8 @@ public class AttackManager : MonoBehaviour
                 if (isLeft)
                 {
                     playerAnimation.LeftWeaponMuzzleFlash();
-                }else if (isRight)
+                }
+                else if (isRight)
                 {
                     playerAnimation.RightWeaponMuzzleFlash();
                 }
@@ -780,7 +781,7 @@ public class AttackManager : MonoBehaviour
     }
     private void SpawnSwordSlash(Weapon w)
     {
-        float baseSlashSpeed = playerRb.linearVelocity.magnitude+50;      
+        float baseSlashSpeed = playerRb.linearVelocity.magnitude + 50;
 
         if (w == null) return;
 
