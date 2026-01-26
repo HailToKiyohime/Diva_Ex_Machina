@@ -64,6 +64,8 @@ public enum Attributes
     MeleeSpeed,
     MeleeDashDistance,
     MeleeReloadTime,
+    //Auto Aim Speed
+    AutoAimSpeed,// The speed of auto-aiming towards the target, degrees per second
 }
 
 public enum AnimationType
@@ -212,6 +214,7 @@ public class BaseStats
     [Header("Base Aiming")]
     public float lockOnRange = 300f;
     public float aimingDistance = 50f;
+    public float autoAimSpeed = 60f; // The speed of auto-aiming towards the target, degrees per second
 }
 
 
@@ -275,6 +278,7 @@ public class PlayerStats : MonoBehaviour
     [Header("Aiming")]
     public float lockOnRange;
     public float aimingDistance;
+    public float autoAimSpeed;
     [Header("手部武器狀態（只在執行時使用）")]
     public WeaponStats leftHand = new WeaponStats();
     public WeaponStats rightHand = new WeaponStats();
@@ -353,6 +357,8 @@ public class PlayerStats : MonoBehaviour
     public float GetLockedOnRange() => lockOnRange / 2;
 
     public float GetAimingDistance() => aimingDistance;
+
+    public float GetAutoAimSpeed() => autoAimSpeed;
     /// <summary>
     /// 主人先前定義的 Energy Efficiency（保留 API，以後若要用可直接接 UI）。
     /// FlyCost: 每秒；DashCost: 每次。
@@ -482,6 +488,7 @@ public class PlayerStats : MonoBehaviour
         flyAcceleration = baseStats.flyAcceleration;
         maxHealth = baseStats.maxHealth;
         lockOnRange = baseStats.lockOnRange;
+        autoAimSpeed = baseStats.autoAimSpeed;
         aimingDistance = baseStats.aimingDistance;
     }
     public void RecalculateFromEquipment()
@@ -750,6 +757,7 @@ public class PlayerStats : MonoBehaviour
             case Attributes.MaxHealth: maxHealth += buff.value; break;
             case Attributes.AimingDistance: aimingDistance += buff.value; break;
             case Attributes.LockOnRange: lockOnRange += buff.value; break;
+            case Attributes.AutoAimSpeed: autoAimSpeed += buff.value; break;
 
             case Attributes.MeleeDashDistance: meleeDashDistance += buff.value; break;
             case Attributes.MeleeReloadTime: meleeReloadTime += buff.value; break;
@@ -785,6 +793,7 @@ public class PlayerStats : MonoBehaviour
             case Attributes.MaxHealth: maxHealth *= m; break;
             case Attributes.AimingDistance: aimingDistance *= m; break;
             case Attributes.LockOnRange: lockOnRange *= m; break;
+            case Attributes.AutoAimSpeed: autoAimSpeed *= m; break; 
 
             case Attributes.MeleeDashDistance: meleeDashDistance *= m; break;
             case Attributes.MeleeReloadTime: meleeReloadTime *= m; break;

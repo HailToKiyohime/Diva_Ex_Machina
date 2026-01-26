@@ -1,6 +1,7 @@
-using UnityEngine;
+using MoreMountains.Feedbacks;
 using System;
 using Unity.Cinemachine;
+using UnityEngine;
 public class PlayerAnimation : MonoBehaviour
 {
     [SerializeField] private AttackManager attackManager;
@@ -49,6 +50,9 @@ public class PlayerAnimation : MonoBehaviour
     [SerializeField] private float fovBlendOutTime = 0.15f;
     private Coroutine _fovRoutine;
     public CinemachineCamera Camera;
+
+    public MMF_Player leftAttackFeedback;
+    public MMF_Player rightAttackFeedback;
     void Awake()
     {
         anim = anim != null ? anim : GetComponent<Animator>();
@@ -620,7 +624,7 @@ public class PlayerAnimation : MonoBehaviour
         }
     }
 
-    // ===== Animation Events (Plan A) =====
+    // ===== Animation Events =====
     // 左手攻擊動畫 clip 的 Animation Event 直接叫呢個
     public void AnimEvent_SpawnSwordSlash_Left()
     {
@@ -633,5 +637,13 @@ public class PlayerAnimation : MonoBehaviour
     {
         if (attackManager == null) return;
         attackManager.AnimEvent_SpawnSwordSlash_Right();
+    }
+    public void LeftWeaponMuzzleFlash()
+    {
+        leftAttackFeedback?.PlayFeedbacks(this.transform.position);
+    }
+    public void RightWeaponMuzzleFlash()
+    {
+        rightAttackFeedback?.PlayFeedbacks(this.transform.position);
     }
 }

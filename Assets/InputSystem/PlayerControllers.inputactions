@@ -140,6 +140,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "AutoAim",
+                    "type": "Button",
+                    "id": "08315718-c5be-483e-8976-373d387ed80f",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -591,6 +600,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "RightShoulderAttack",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "7c5f9e4c-8ab0-4e2f-bf72-58948f0ee267",
+                    "path": "<Mouse>/middleButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "AutoAim",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

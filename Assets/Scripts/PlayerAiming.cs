@@ -1,138 +1,334 @@
-using System.Collections.Generic;
+Ôªøusing System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using Unity.Cinemachine;
 using TMPro;
+
 public class PlayerAiming : MonoBehaviour
 {
     public static PlayerAiming Instance { get; private set; }
+
     [Header("Crosshair")]
     [SerializeField] private Image AimAreaImage;
     [SerializeField] private Image crosshairImage;
+
     [Header("Camera")]
     [SerializeField] private Camera mainCam;
     [SerializeField] private GameObject playerOrientation;
     public Vector2 turn;
-    [Tooltip("How far in degrees can you move the camera up")]
     public float TopClamp = 70f;
-    [Tooltip("How far in degrees can you move the camera down")]
     public float BottomClamp = -30f;
+
     [Header("Aiming Settings")]
     private Vector2 screenCenter;
     [SerializeField] public bool lockOn = false;
     [SerializeField] private Ray ray;
     [SerializeField] private float targetDistance;
     [SerializeField] private Vector3 targetDirection = Vector3.zero;
-    [SerializeField] private Transform currentLockedTarget;
-    [SerializeField] public Transform aimingPoint;
+
+    [Header("Lock Settings")]
+    [SerializeField] private float lockOnDistance = 50f;
+    [SerializeField] private float freeAimMaxDistance = 999f;
+
+    [Header("UI Speeds")]
     [SerializeField] private float centerLerpSpeed = 10f;
+    [SerializeField] private float crosshairLerpSpeed = 18f;
     [SerializeField] private float crosshairTiltLerp = 12f;
     [SerializeField] private float resetTiltLerp = 8f;
-    [SerializeField] private float lockOnDistance = 25f;
-    [SerializeField] public Transform meshTranssform;
-    [Header("UI Speeds")]
-    [SerializeField] private float crosshairLerpSpeed = 30f;
 
+    [Header("Aiming Point (Optional)")]
+    [SerializeField] public Transform aimingPoint;
 
-    [SerializeField] private Rigidbody currentTargetRb;
+    // Some scripts in your project may reference this (note spelling)
+    [Header("Auto Find / References")]
+    [SerializeField] public Transform meshTransform;
 
-    [Header("Aiming Point Smoothing")]
-    [SerializeField] private float aimingPointSmoothTime = 0.06f;      // •≠Æ…∞l¬‹≥t´◊
-    [SerializeField] private float aimingPointSwitchSmoothTime = 0.10f; // §¡¥´º“¶°Æ…ßÛ¨X©M
-    [SerializeField] private float aimingPointMaxSpeed = 9999f;         // §W≠≠°A¡◊ßK∫C®Ï∏Ú§£§W
-    [SerializeField] private float freeAimMaxDistance = 500f;           // πÔªÙßA§U≠± Raycast ™∫ maxDistance
+    private Rigidbody currentTargetRb;
 
-    // ===== Melee Dash Camera Assist =====
-    [Header("Melee Dash Camera Assist")]
-    [SerializeField] private bool enableMeleeDashCameraAssist = true;
-    [SerializeField] private float dashFocusYawLerp = 18f;
-    [SerializeField] private float dashFocusPitchLerp = 18f;
-    [SerializeField] private float dashFocusMinDirSqr = 0.0001f;
+    // =========================
+    // Constrained Lock state
+    // =========================
+    private Transform _lockedTarget;              // Áï∂ÂâçÈéñÂÆöÁõÆÊ®ôÔºàÊåÅÁ∫åÈéñÔºâ
+    private Rigidbody _lockedTargetRb;
+    private Renderer _lockedTargetRenderer;
+    private bool _lockedInsideCircle;             // ÈÄô‰∏ÄÂπÄÁõÆÊ®ôÊòØÂê¶Âú®ÂúàÂÖßÔºàÂè™ÂΩ±Èüø UI + ÂúàÂ§ñÈÄüÂ∫¶ capÔºâ
 
-    [Header("Dash Focus Target Point")]
-    [SerializeField] private Vector3 dashAimWorldOffset = Vector3.zero; // ∑Q¬ÍØ›§f¥N (0, 0.9, 0) §ß√˛
-    [SerializeField] private bool dashAimUseBoundsCenter = true;
+    [Header("Lock Follow (Exponential)")]
+    [Tooltip("Exponential follow strength. Larger = snappier. (Used for AutoAim + locked follow)")]
+    [SerializeField] private float lockRotateSpeed = 12f;
 
-    [Header("Dash Focus Center Correction")]
-    [SerializeField] private float dashCenterCorrectionYawGain = 35f;   // deg per viewport error
-    [SerializeField] private float dashCenterCorrectionPitchGain = 35f; // deg per viewport error
-    [SerializeField] private float dashCenterCorrectionMaxStep = 12f;   // deg per frame clamp
+    // =========================
+    // Auto Aim (Middle Mouse Toggle)
+    // =========================
+    [Header("Auto Aim")]
+    [SerializeField] private Vector3 autoAimOffset = new Vector3(0f, 0.2f, 0f);
+    [SerializeField] private bool autoAimUseBoundsCenter = true;
 
-    private bool _dashFocusActive;
-    private Transform _dashFocusTarget;
+    [Tooltip("Smooth aim point to reduce jitter. If you prefer old hard lock feel, set 0.")]
+    [SerializeField] private float autoAimPointSmoothTime = 0f;
 
-    private Vector3 aimingPointVelocity;
-    private bool lastLockOn;
+    [Header("Auto Aim Auto Exit")]
+    [SerializeField] private float autoAimAutoExitSeconds_LockArea = 3f;
+    [SerializeField] private float autoAimAutoExitSeconds_Distance = 1f;
 
-    void Awake()
+    private float _autoAimOutDistanceTimer = 0f;
+    private float _autoAimOutAreaTimer = 0f;
+
+    private bool _autoAimActive;
+    private Transform _autoAimTarget;
+    private Renderer _autoAimTargetRenderer;
+
+    private Vector3 _autoAimPointVel;
+    private Vector3 _autoAimPointSmoothed;
+
+    // Debug hook (optional)
+    private int _autoAimLastWriteFrame = -1;
+    public bool IsAutoAimActiveDebug() => _autoAimActive;
+    public bool DidAutoAimWriteThisFrameDebug(int frame) => _autoAimLastWriteFrame == frame;
+
+    private void Awake()
     {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
-    }
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
-    {
-        mainCam = mainCam != null ? mainCam : Camera.main;
-        // ™Ï©l ray + yaw
-        ray = mainCam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
-        if (playerOrientation != null)
-            turn.x = playerOrientation.transform.rotation.eulerAngles.y;
+
+        if (meshTransform == null) meshTransform = transform;
+        if (mainCam == null) mainCam = Camera.main;
     }
 
-    // Update is called once per frame
-    void Update()
+    private void Update()
     {
-        // Melee dash ¥¡∂°°G±µ∫ﬁ¨€æ˜°A±j®Óß‚•ÿº–©‘¶^§§•°
-        if (_dashFocusActive)
-        {
-            UpdateMeleeDashCameraFocus();
-            return; // ≠´≠n°G™˝§Ó∑∆π´øÈ§J¬–ª\ turn.x/turn.y
-        }
-        // Stop aiming & camera rotation when in Equipment / Crafting UI
+        // UI gate (keep your original rule)
         if (UIManager.Instance != null && UIManager.Instance.currentCameraSet != 0)
             return;
 
+        // AutoAim active: block mouse input, but keep lock system updated
+        if (_autoAimActive)
+        {
+            CrosshairDetect_ConstrainedLock();
+            return;
+        }
+
+        // Manual look
         float mouseX = Input.GetAxis("Mouse X");
         float mouseY = Input.GetAxis("Mouse Y");
         if (Mathf.Abs(mouseX) > 0.001f || Mathf.Abs(mouseY) > 0.001f)
         {
             turn.x += mouseX;
             turn.y -= mouseY;
+
             turn.x = ClampAngle(turn.x, float.MinValue, float.MaxValue);
             turn.y = ClampAngle(turn.y, BottomClamp, TopClamp);
 
             if (playerOrientation != null)
                 playerOrientation.transform.rotation = Quaternion.Euler(turn.y, turn.x, 0f);
         }
-        CrosshairDetect();
-        
+
+        CrosshairDetect_ConstrainedLock();
     }
-    private static float ClampAngle(float angle, float min, float max)
+
+    private void LateUpdate()
     {
-        if (angle < -360f) angle += 360f;
-        if (angle > 360f) angle -= 360f;
-        return Mathf.Clamp(angle, min, max);
+        // AutoAimÔºöÁî®ÊåáÊï∏ÂºèË∑üÈö®
+        if (_autoAimActive)
+            LateUpdateAutoAimRotation_ExponentialWithCap();
     }
-    private void CrosshairDetect()
+
+    // =========================
+    // Input API
+    // =========================
+    public void ToggleAutoAim()
     {
-        List<GameObject> enemies;
+        if (_autoAimActive)
+        {
+            EndAutoAim();
+            return;
+        }
+
+        // Âè™ÂÖÅË®±ÔºöÁï∂‰∏ãÊúâÈéñÂÆöÁõÆÊ®ôÊôÇÈñãÂïü
+        if (_lockedTarget == null) return;
+
+        _autoAimTarget = _lockedTarget;
+        _autoAimTargetRenderer = _lockedTargetRenderer;
+        _autoAimActive = true;
+
+        _autoAimPointSmoothed = GetAutoAimPointRaw();
+        _autoAimPointVel = Vector3.zero;
+    }
+
+    private void EndAutoAim()
+    {
+        _autoAimActive = false;
+        _autoAimTarget = null;
+        _autoAimTargetRenderer = null;
+        _autoAimPointVel = Vector3.zero;
+
+        _autoAimOutDistanceTimer = 0f;
+        _autoAimOutAreaTimer = 0f;
+    }
+
+    // =========================
+    // Constrained Lock (Ê†∏ÂøÉ)
+    // =========================
+    private void CrosshairDetect_ConstrainedLock()
+    {
         screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+        float radius = GetLockAreaPixelRadius();
+
+        // ======================================================
+        // AutoAim active: lock target is fixed to _autoAimTarget
+        // ======================================================
+        if (_autoAimActive)
+        {
+            if (_autoAimTarget == null || !_autoAimTarget.gameObject.activeInHierarchy)
+            {
+                // Target gone: AutoAim should end elsewhere too, but keep safe here
+                ClearLock();
+                return;
+            }
+
+            if (_lockedTarget != _autoAimTarget)
+            {
+                _lockedTarget = _autoAimTarget;
+                _lockedTargetRb = _autoAimTarget.GetComponentInParent<Rigidbody>();
+                _lockedTargetRenderer = _autoAimTarget.GetComponentInChildren<Renderer>();
+            }
+        }
+
+        // ======================================================
+        // 1) Have a locked target: maintain/update
+        // ======================================================
+        if (_lockedTarget != null && _lockedTarget.gameObject.activeInHierarchy)
+        {
+            if (_lockedTargetRenderer == null)
+                _lockedTargetRenderer = _lockedTarget.GetComponentInChildren<Renderer>();
+
+            // Only use Renderer.isVisible when NOT auto-aiming
+            bool isVisible = true;
+            if (!_autoAimActive)
+                isVisible = (_lockedTargetRenderer != null) ? _lockedTargetRenderer.isVisible : true;
+
+            targetDistance = Vector3.Distance(playerOrientation.transform.position, _lockedTarget.position);
+
+            // LockOnDistance hard drop (but during AutoAim we do NOT scan for a new one)
+            if (!isVisible || targetDistance > lockOnDistance)
+            {
+                ClearLock();
+                if (_autoAimActive) return; // don't scan new target during AutoAim
+            }
+            else
+            {
+                Vector3 sp = mainCam.WorldToScreenPoint(_lockedTarget.position);
+
+                // Behind camera: drop lock (but during AutoAim we do NOT scan for a new one)
+                if (sp.z <= 0f)
+                {
+                    ClearLock();
+                    if (_autoAimActive) return;
+                }
+                else
+                {
+                    Vector2 targetScreen = new Vector2(sp.x, sp.y);
+                    Vector2 delta = targetScreen - screenCenter;
+
+                    _lockedInsideCircle = (delta.magnitude <= radius + 0.01f);
+
+                    // AutoAim OFF: no clamp; if outside circle -> drop lock and continue to scan/free-aim
+                    if (!_autoAimActive && !_lockedInsideCircle)
+                    {
+                        ClearLock();
+                        // IMPORTANT: do NOT return; allow scanning/free-aim below
+                    }
+                    else
+                    {
+                        // AutoAim ON: clamp when outside; inside follow target normally
+                        Vector2 uiPoint = targetScreen;
+                        if (_autoAimActive && !_lockedInsideCircle)
+                            uiPoint = screenCenter + delta.normalized * radius;
+
+                        // Circle-outside should look like normal crosshair (gray + no tilt)
+                        DriveCrosshairTo(uiPoint, _lockedInsideCircle);
+
+                        // Ray always follows crosshair point (needed for circle-outside firing)
+                        ray = mainCam.ScreenPointToRay(uiPoint);
+
+                        if (_lockedInsideCircle)
+                        {
+                            // Inside circle: TRUE lockOn (shoot target)
+                            lockOn = true;
+                            currentTargetRb = _lockedTargetRb;
+                            targetDirection = (_lockedTarget.position - transform.position).normalized;
+
+                            if (aimingPoint) aimingPoint.position = _lockedTarget.position;
+
+                            if (UIManager.Instance != null)
+                            {
+                                UIManager.Instance.distanceText.text = targetDistance.ToString("F2");
+                                UIManager.Instance.distanceText.color = UIManager.Instance.lockonColor;
+                                UIManager.Instance.distanceText.fontStyle = FontStyles.Bold;
+                            }
+                        }
+                        else
+                        {
+                            // Outside circle (clamped): NOT lockOn (shoot crosshair ray)
+                            lockOn = false;
+                            currentTargetRb = null;
+                            targetDirection = Vector3.zero;
+
+                            if (Physics.Raycast(ray, out RaycastHit hit2, freeAimMaxDistance, ~0, QueryTriggerInteraction.Ignore))
+                            {
+                                if (aimingPoint) aimingPoint.position = hit2.point;
+
+                                if (UIManager.Instance != null)
+                                    UIManager.Instance.distanceText.text = hit2.distance.ToString("F2");
+                            }
+                            else
+                            {
+                                if (aimingPoint) aimingPoint.position = ray.origin + ray.direction * freeAimMaxDistance;
+
+                                if (UIManager.Instance != null)
+                                    UIManager.Instance.distanceText.text = 0f.ToString("F2");
+                            }
+
+                            if (UIManager.Instance != null)
+                            {
+                                UIManager.Instance.distanceText.color = UIManager.Instance.normalColor;
+                                UIManager.Instance.distanceText.fontStyle = FontStyles.Normal;
+                            }
+                        }
+
+                        return; // handled locked-target case
+                    }
+                }
+            }
+        }
+
+        // ======================================================
+        // If AutoAim is active but lock got cleared this frame:
+        // never scan for a new target (prevents target switching)
+        // ======================================================
+        if (_autoAimActive)
+        {
+            return;
+        }
+
+        // ======================================================
+        // 2) No lock: scan closest enemy (must be inside circle + visible + within distance)
+        // ======================================================
         GameObject closestEnemy = null;
         Vector2 closestScreenPoint = Vector2.zero;
         float closestProximity = Mathf.Infinity;
-        enemies = GameManager.Instance.GetEnemies();
+
+        List<GameObject> enemies = GameManager.Instance.GetEnemies();
         for (int i = 0; i < enemies.Count; i++)
         {
-            GameObject enemy = enemies[i];
+            var enemy = enemies[i];
             if (!enemy) continue;
+
             Vector3 sp = mainCam.WorldToScreenPoint(enemy.transform.position);
             if (sp.z <= 0f) continue;
-            Vector2 pt = new(sp.x, sp.y);
+
+            Vector2 pt = new Vector2(sp.x, sp.y);
             float prox = Vector2.Distance(pt, screenCenter);
+
             if (prox < closestProximity)
             {
                 closestProximity = prox;
@@ -140,64 +336,192 @@ public class PlayerAiming : MonoBehaviour
                 closestEnemy = enemy;
             }
         }
-        bool isVisible = false;
-        if (closestEnemy)
+
+        if (closestEnemy != null)
         {
-            targetDirection = (closestEnemy.transform.position - playerOrientation.transform.position).normalized;
-            currentTargetRb = closestEnemy.GetComponentInParent<Rigidbody>();
             Renderer r = closestEnemy.GetComponentInChildren<Renderer>();
-            if (r) isVisible = r.isVisible;
-        }
-        else
-        {
-            targetDirection = Vector3.zero;
-            closestProximity = Mathf.Infinity;
-        }
-        targetDistance = closestEnemy
-            ? Vector3.Distance(playerOrientation.transform.position, closestEnemy.transform.position)
-            : Mathf.Infinity;
-        float pixelRadius = GetLockAreaPixelRadius();
-        bool isInsideLockArea = closestProximity < pixelRadius;
-        Vector3 desiredAimPointPos = aimingPoint ? aimingPoint.position : Vector3.zero;
-        if (isInsideLockArea && targetDistance < lockOnDistance && isVisible)
-        {
-            DriveCrosshairTo(closestScreenPoint, true);
+            bool isVisible = (r != null) ? r.isVisible : true;
 
-            // •u®M©w°u•ÿº–¶Ï∏m°v°A§£≠nµw§¡
-            desiredAimPointPos = closestEnemy.transform.position;
+            targetDistance = Vector3.Distance(playerOrientation.transform.position, closestEnemy.transform.position);
+            bool inside = (closestProximity <= radius);
+            bool ok = inside && isVisible && (targetDistance <= lockOnDistance);
 
-            lockOn = true;
-
-            UIManager.Instance.distanceText.text = targetDistance.ToString("F2");
-            UIManager.Instance.distanceText.color = UIManager.Instance.lockonColor;
-            UIManager.Instance.distanceText.fontStyle = FontStyles.Bold;
-        }
-        else
-        {
-            ray = mainCam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
-            SmoothResetCrosshairToCenter();
-
-            lockOn = false;
-
-            // Free-aim°G•Œ Raycast hit.point ∑Ì•ÿº–°]®S¶≥©R§§¥N•Œ forward*distance°^
-            if (playerOrientation && Physics.Raycast(ray, out RaycastHit hit, freeAimMaxDistance, ~0, QueryTriggerInteraction.Ignore))
+            if (ok)
             {
-                desiredAimPointPos = hit.point;
+                _lockedTarget = closestEnemy.transform;
+                _lockedTargetRb = closestEnemy.GetComponentInParent<Rigidbody>();
+                _lockedTargetRenderer = r;
+                _lockedInsideCircle = true;
+
+                lockOn = true;
+                currentTargetRb = _lockedTargetRb;
+
+                DriveCrosshairTo(closestScreenPoint, true);
+                ray = mainCam.ScreenPointToRay(closestScreenPoint);
+
+                if (aimingPoint) aimingPoint.position = _lockedTarget.position;
+                return;
+            }
+        }
+
+        // ======================================================
+        // 3) Free aim (no lock)
+        // ======================================================
+        lockOn = false;
+        _lockedInsideCircle = false;
+
+        ray = mainCam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+        SmoothResetCrosshairToCenter();
+
+        if (playerOrientation && Physics.Raycast(ray, out RaycastHit hit, freeAimMaxDistance, ~0, QueryTriggerInteraction.Ignore))
+        {
+            if (aimingPoint) aimingPoint.position = hit.point;
+            if (UIManager.Instance != null)
                 UIManager.Instance.distanceText.text = hit.distance.ToString("F2");
-            }
-            else if (playerOrientation)
-            {
-                desiredAimPointPos = playerOrientation.transform.position + (playerOrientation.transform.forward * freeAimMaxDistance);
+        }
+        else if (playerOrientation)
+        {
+            if (aimingPoint) aimingPoint.position = playerOrientation.transform.position + (playerOrientation.transform.forward * freeAimMaxDistance);
+            if (UIManager.Instance != null)
                 UIManager.Instance.distanceText.text = 0f.ToString("F2");
-            }
+        }
 
+        if (UIManager.Instance != null)
+        {
             UIManager.Instance.distanceText.color = UIManager.Instance.normalColor;
             UIManager.Instance.distanceText.fontStyle = FontStyles.Normal;
         }
-
-        // ≥Ã´·≤Œ§@°u•≠∑∆ÆM•Œ°v
-        ApplyAimingPointSmoothing(desiredAimPointPos);
     }
+
+
+    private void ClearLock()
+    {
+        _lockedTarget = null;
+        _lockedTargetRb = null;
+        _lockedTargetRenderer = null;
+        _lockedInsideCircle = false;
+
+        lockOn = false;
+        currentTargetRb = null;
+    }
+
+    // =========================
+    // AutoAim rotation (Exponential + cap when out of circle)
+    // =========================
+    private void LateUpdateAutoAimRotation_ExponentialWithCap()
+    {
+        if (_autoAimTarget == null || playerOrientation == null || mainCam == null)
+        {
+            EndAutoAim();
+            return;
+        }
+
+        // Â¶ÇÊûúÁõÆÊ®ôË¢´ destroy / inactiveÔºöËá™ÂãïÈóúÈñâ
+        if (!_autoAimTarget.gameObject.activeInHierarchy)
+        {
+            EndAutoAim();
+            return;
+        }
+
+        float dt = Time.deltaTime;
+
+        // ======================================================
+        // Auto exit conditions (>= autoAimAutoExitSeconds)
+        // ======================================================
+
+        // 1) Out of lockOnDistance for > N seconds
+        float distToTarget = Vector3.Distance(playerOrientation.transform.position, _autoAimTarget.position);
+        if (distToTarget > lockOnDistance)
+            _autoAimOutDistanceTimer += dt;
+        else
+            _autoAimOutDistanceTimer = 0f;
+
+        // 2) Out of LockArea (crosshair clamped) for > N seconds
+        // _lockedInsideCircle is updated by CrosshairDetect_ConstrainedLock() while AutoAim is active
+        if (!_lockedInsideCircle)
+            _autoAimOutAreaTimer += dt;
+        else
+            _autoAimOutAreaTimer = 0f;
+
+        if (_autoAimOutDistanceTimer >= autoAimAutoExitSeconds_Distance || _autoAimOutAreaTimer >= autoAimAutoExitSeconds_LockArea)
+        {
+            EndAutoAim();
+            return;
+        }
+
+        // ======================================================
+        // Aim point
+        // ======================================================
+        Vector3 raw = GetAutoAimPointRaw();
+
+        if (autoAimPointSmoothTime > 0f)
+            _autoAimPointSmoothed = Vector3.SmoothDamp(_autoAimPointSmoothed, raw, ref _autoAimPointVel, autoAimPointSmoothTime);
+        else
+            _autoAimPointSmoothed = raw;
+
+        // desired rotation from camera position -> aim point
+        Vector3 camPos = mainCam.transform.position;
+        Vector3 dir = _autoAimPointSmoothed - camPos;
+        if (dir.sqrMagnitude < 0.0001f)
+            dir = mainCam.transform.forward;
+
+        Quaternion look = Quaternion.LookRotation(dir.normalized, Vector3.up);
+        Vector3 e = look.eulerAngles;
+
+        float desiredYaw = e.y;
+        float desiredPitch = ClampAngle(NormalizePitch(e.x), BottomClamp, TopClamp);
+        Quaternion targetRot = Quaternion.Euler(desiredPitch, desiredYaw, 0f);
+
+        Quaternion current = playerOrientation.transform.rotation;
+        float angle = Quaternion.Angle(current, targetRot);
+        if (angle < 0.0001f)
+            return;
+
+        // ÊåáÊï∏ÂºèË∑üÈö®ÔºöstepWanted = angle * (1 - exp(-k * dt))
+        float k = Mathf.Max(0f, lockRotateSpeed);
+        float expT = 1f - Mathf.Exp(-k * dt);
+        float stepWanted = angle * expT;
+
+        // Ê∞∏ÈÅ†Áî® AutoAimSpeed Áï∂ max deg/sÔºàÂúàÂÖßÂúàÂ§ñÈÉΩ capÔºâ
+        float maxDegPerSec = 120f;
+        if (PlayerStats.Instance != null)
+            maxDegPerSec = Mathf.Max(0f, PlayerStats.Instance.GetAutoAimSpeed());
+
+        float maxStep = maxDegPerSec * dt;
+        stepWanted = Mathf.Min(stepWanted, maxStep);
+
+        float t = Mathf.Clamp01(stepWanted / angle);
+        Quaternion newRot = Quaternion.Slerp(current, targetRot, t);
+
+        playerOrientation.transform.rotation = newRot;
+        _autoAimLastWriteFrame = Time.frameCount;
+
+        // sync turn (prevents oscillation between systems)
+        Vector3 applied = newRot.eulerAngles;
+        turn.x = applied.y;
+        turn.y = ClampAngle(NormalizePitch(applied.x), BottomClamp, TopClamp);
+    }
+
+
+    private Vector3 GetAutoAimPointRaw()
+    {
+        if (_autoAimTarget == null) return Vector3.zero;
+
+        if (autoAimUseBoundsCenter)
+        {
+            if (_autoAimTargetRenderer == null)
+                _autoAimTargetRenderer = _autoAimTarget.GetComponentInChildren<Renderer>();
+
+            if (_autoAimTargetRenderer != null)
+                return _autoAimTargetRenderer.bounds.center + autoAimOffset;
+        }
+
+        return _autoAimTarget.position + autoAimOffset;
+    }
+
+    // =========================
+    // UI helpers
+    // =========================
     private void DriveCrosshairTo(Vector2 screenPoint, bool tilt)
     {
         if (!crosshairImage) return;
@@ -206,22 +530,17 @@ public class PlayerAiming : MonoBehaviour
         t.position = Vector2.Lerp(t.position, screenPoint, Time.deltaTime * crosshairLerpSpeed);
 
         Vector3 targetTilt = tilt ? new Vector3(0f, 0f, 45f) : Vector3.zero;
-        t.rotation = Quaternion.Euler(
-            Vector3.Lerp(t.rotation.eulerAngles, targetTilt, Time.deltaTime * crosshairTiltLerp)
-        );
+        t.rotation = Quaternion.Euler(Vector3.Lerp(t.rotation.eulerAngles, targetTilt, Time.deltaTime * crosshairTiltLerp));
 
         crosshairImage.color = tilt ? new Color32(24, 180, 0, 200) : new Color32(53, 53, 53, 152);
-        // ™`∑N°Gray •— ApplyTargetCaches() ®M©w°A§£¶b≥o∏ÃßÔ
     }
 
     private void SmoothResetCrosshairToCenter()
     {
         if (!crosshairImage) return;
-        RectTransform t = crosshairImage.rectTransform;
 
-        t.rotation = Quaternion.Euler(
-            Vector3.Lerp(t.rotation.eulerAngles, Vector3.zero, Time.deltaTime * resetTiltLerp)
-        );
+        RectTransform t = crosshairImage.rectTransform;
+        t.rotation = Quaternion.Euler(Vector3.Lerp(t.rotation.eulerAngles, Vector3.zero, Time.deltaTime * resetTiltLerp));
         t.position = Vector2.Lerp(t.position, screenCenter, Time.deltaTime * centerLerpSpeed);
         crosshairImage.color = new Color32(53, 53, 53, 152);
     }
@@ -234,155 +553,39 @@ public class PlayerAiming : MonoBehaviour
         rt.GetWorldCorners(corners);
         return Vector3.Distance(corners[0], corners[3]) * 0.5f;
     }
-    public Rigidbody GetTargetRigidbody() => currentTargetRb;
 
+    // =========================
+    // Public helpers
+    // =========================
+    public Rigidbody GetTargetRigidbody() => currentTargetRb;
     public Ray GetRay() => ray;
 
-    public void SetLockOnDistance(float newLockOnDistance)
-    {
-        lockOnDistance = newLockOnDistance;
-    }
-    public void SetAimAreaSize(float newSize)
-    {
-        AimAreaImage.rectTransform.sizeDelta = new Vector2(newSize, newSize);
-        UIManager.Instance.speedInfo.anchoredPosition = new Vector2((newSize/2)+55,0);
-        UIManager.Instance.distanceInfo.anchoredPosition = new Vector2(-((newSize / 2) + 55), 0);
-    }
+    public void SetLockOnDistance(float newLockOnDistance) => lockOnDistance = newLockOnDistance;
 
-    private void ApplyAimingPointSmoothing(Vector3 desiredPos)
-    {
-        if (!aimingPoint) return;
-
-        bool switching = (lockOn != lastLockOn);
-        float smoothTime = switching ? aimingPointSwitchSmoothTime : aimingPointSmoothTime;
-
-        // §¡¥´º“¶°Æ…≤M±º≥t´◊°A¡◊ßK SmoothDamp ™∫¥›≥t≥y¶®©_©«•œ∞ 
-        if (switching)
-            aimingPointVelocity = Vector3.zero;
-
-        aimingPoint.position = Vector3.SmoothDamp(
-            aimingPoint.position,
-            desiredPos,
-            ref aimingPointVelocity,
-            smoothTime,
-            aimingPointMaxSpeed
-        );
-
-        lastLockOn = lockOn;
-    }
-    public void BeginMeleeDashCameraFocus(Transform target)
-    {
-        if (!enableMeleeDashCameraAssist) return;
-        if (target == null) return;
-        if (playerOrientation == null) return;
-
-        _dashFocusTarget = target;
-        _dashFocusActive = true;
-
-        // ™Òæ‘ dash ¥¡∂°°G±j®Óµ¯¨∞ lock-on°]¡◊ßK CrosshairDetect ß‚ lockOn ±º§F°^
-        lockOn = true;
-
-        // ¶P®B target cache°]ßA≠Ï•ª¥N•Œ≥o≠”µπ PlayerMovement ∞l§H°^
-        currentTargetRb = target.GetComponentInParent<Rigidbody>();
-    }
-
-    public void EndMeleeDashCameraFocus()
-    {
-        _dashFocusActive = false;
-        _dashFocusTarget = null;
-    }
-
-    // ß‚ 0~360 ™∫ pitch ¬‡¶® -180~180°A§Ë´K Clamp
+    // pitch 0..360 -> -180..180
     private static float NormalizePitch(float xDeg)
     {
         if (xDeg > 180f) xDeg -= 360f;
         return xDeg;
     }
 
-    private void UpdateMeleeDashCameraFocus()
+    private static float ClampAngle(float angle, float min, float max)
     {
-        if (_dashFocusTarget == null || playerOrientation == null || mainCam == null)
-        {
-            EndMeleeDashCameraFocus();
-            return;
-        }
+        if (angle < -360f) angle += 360f;
+        if (angle > 360f) angle -= 360f;
+        return Mathf.Clamp(angle, min, max);
+    }
+    public void SetAimAreaSize(float newSize)
+    {
+        if (AimAreaImage == null) return;
 
-        Vector3 aimPoint = GetDashAimPoint(_dashFocusTarget);
+        AimAreaImage.rectTransform.sizeDelta = new Vector2(newSize, newSize);
 
-        // 1) •Œ°u¨€æ˜¶Ï∏m°v∫‚•XØu•øª›≠n™∫¥¬¶V°]¡◊ßK pivot vs camera ™∫µ¯Æt°^
-        Vector3 camPos = mainCam.transform.position;
-        Vector3 dirFromCam = (aimPoint - camPos);
-
-        if (dirFromCam.sqrMagnitude < dashFocusMinDirSqr)
-            dirFromCam = mainCam.transform.forward;
-
-        Quaternion look = Quaternion.LookRotation(dirFromCam.normalized, Vector3.up);
-        Vector3 e = look.eulerAngles;
-
-        float desiredYaw = e.y;
-        float desiredPitch = NormalizePitch(e.x);
-        desiredPitch = ClampAngle(desiredPitch, BottomClamp, TopClamp);
-
-        // 2) •˝∞µ§@¶∏•≠∑∆∏Ú¿H
-        turn.x = Mathf.LerpAngle(turn.x, desiredYaw, Time.deltaTime * dashFocusYawLerp);
-        turn.y = Mathf.LerpAngle(turn.y, desiredPitch, Time.deltaTime * dashFocusPitchLerp);
-        turn.y = ClampAngle(turn.y, BottomClamp, TopClamp);
-
-        playerOrientation.transform.rotation = Quaternion.Euler(turn.y, turn.x, 0f);
-
-        // 3) •Œ viewport ª~Æt∞µ§G¶∏Æ’•ø°]´O√“ß‚•ÿº–±¿¶^µe≠±•ø§§°^
-        Vector3 vp = mainCam.WorldToViewportPoint(aimPoint);
-        if (vp.z > 0f)
-        {
-            float errX = 0.5f - vp.x; // •ÿº–¶b•™ => errX •ø
-            float errY = 0.5f - vp.y; // •ÿº–¶b§U => errY •ø°]•N™Ìß⁄≠Ã¨›§”∞™°^
-
-            float yawStep = Mathf.Clamp(-errX * dashCenterCorrectionYawGain, -dashCenterCorrectionMaxStep, dashCenterCorrectionMaxStep);
-            float pitchStep = Mathf.Clamp(errY * dashCenterCorrectionPitchGain, -dashCenterCorrectionMaxStep, dashCenterCorrectionMaxStep);
-
-            // yaw°G•ÿº–¶b•™ => turn.x ¥Ó§÷°]©π•™¬‡°^=> yawStep ∑|¨O•ø? ©“•Hß⁄≠Ã•Œ += yawStep°]yawStep §wßt≠t∏π°^
-            turn.x = Mathf.Repeat(turn.x + yawStep, 360f);
-
-            // pitch°G•ÿº–¶b§U => ß⁄≠Ã≠n©π§U¨› => turn.y ºW•[
-            turn.y = ClampAngle(turn.y + pitchStep, BottomClamp, TopClamp);
-
-            playerOrientation.transform.rotation = Quaternion.Euler(turn.y, turn.x, 0f);
-        }
-
-        // 4) ∑«¨P©T©w§§§ﬂ + aimingPoint ∞l•ÿº–¬I
-        ray = mainCam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
-        screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
-        DriveCrosshairTo(screenCenter, true);
-        ApplyAimingPointSmoothing(aimPoint);
-
-        // UI°]™u•Œ lock-on ™∫ºÀ¶°°^
-        targetDistance = Vector3.Distance(playerOrientation.transform.position, aimPoint);
+        // Â¶ÇÊûú‰Ω† UIManager ÂÖ•Èù¢ÊúâÂë¢ÂÖ©ÂÄãÔºå‰øùÊåÅÂÖºÂÆπÔºàÂÜáÂ∞±ÊúÉ null-safeÔºâ
         if (UIManager.Instance != null)
         {
-            UIManager.Instance.distanceText.text = targetDistance.ToString("F2");
-            UIManager.Instance.distanceText.color = UIManager.Instance.lockonColor;
-            UIManager.Instance.distanceText.fontStyle = FontStyles.Bold;
+            UIManager.Instance.speedInfo.anchoredPosition = new Vector2((newSize / 2) + 55, 0);
+            UIManager.Instance.distanceInfo.anchoredPosition = new Vector2(-((newSize / 2) + 55), 0);
         }
-    }
-    private Vector3 GetDashAimPoint(Transform t)
-    {
-        if (t == null) return Vector3.zero;
-
-        Vector3 p = t.position;
-
-        if (dashAimUseBoundsCenter)
-        {
-            // ¿u•˝•Œ Collider bounds center°]≥Ã≤≈¶X"•ÿº–§§§ﬂ"°^
-            var col = t.GetComponentInChildren<Collider>();
-            if (col != null)
-                p = col.bounds.center;
-            else
-            {
-                var r = t.GetComponentInChildren<Renderer>();
-                if (r != null) p = r.bounds.center;
-            }
-        }
-
-        return p + dashAimWorldOffset;
     }
 }

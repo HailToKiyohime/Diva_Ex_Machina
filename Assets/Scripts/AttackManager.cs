@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using MoreMountains.Feedbacks;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.XR;
 
@@ -52,6 +53,7 @@ public class MeleeWeaponRuntimeState
 [System.Serializable]
 public class Weapon
 {
+
     public Transform muzzle;
     public GameObject bullet;
 
@@ -79,6 +81,8 @@ public class Weapon
 
 public class AttackManager : MonoBehaviour
 {
+    public PlayerAnimation playerAnimation;
+
     public Weapon leftHandWeapon;
     public Weapon rightHandWeapon;
     public Weapon leftShoulderWeapon;
@@ -536,7 +540,36 @@ public class AttackManager : MonoBehaviour
         {
             for (int x = 0; x < w.range.bulletPerShot; x++)
             {
+                bool isLeft = (w == leftHandWeapon);
+                bool isRight = (w == rightHandWeapon);
+
+                if (isLeft)
+                {
+                    playerAnimation.LeftWeaponMuzzleFlash();
+                }else if (isRight)
+                {
+                    playerAnimation.RightWeaponMuzzleFlash();
+                }
+
                 var currentBullet = Instantiate(bulletPrefab, muzzle.position, Quaternion.identity);
+
+                var bulletComp = currentBullet.GetComponent<Bullet>();
+                if (bulletComp != null)
+                {
+                    // 1) 傷害（已由 ApplyHand / ApplyShoulder 同步到 w.damage）
+                    bulletComp.physicalDamage = w.damage.physicalDamage;
+                    bulletComp.explosionDamage = w.damage.explosionDamage;
+                    bulletComp.energyDamage = w.damage.energyDamage;
+                    bulletComp.coldDamage = w.damage.coldDamage;
+
+                    // 2) 暴擊（先用 PlayerStats 的最終值；之後要做「武器/零件暴擊」再擴充）
+                    var ps = PlayerStats.Instance;
+                    if (ps != null)
+                    {
+                        bulletComp.criticalChance = ps.criticalChance;
+                        bulletComp.criticalMultiplier = ps.criticalMultiplier;
+                    }
+                }
 
                 Vector3 targetPoint;
 
@@ -756,12 +789,12 @@ public class AttackManager : MonoBehaviour
         if (prefab == null || origin == null) return;
 
 
-        Quaternion rot = Quaternion.LookRotation(PlayerAiming.Instance.meshTranssform.forward, Vector3.up);
+        Quaternion rot = Quaternion.LookRotation(PlayerAiming.Instance.meshTransform.forward, Vector3.up);
         GameObject slash = Instantiate(prefab, origin.position, rot);
 
         // ===== 3) 計算 velocity：base + player speed projected =====
         Rigidbody rb = slash.GetComponent<Rigidbody>();
-        rb.linearVelocity = PlayerAiming.Instance.meshTranssform.forward * baseSlashSpeed;
+        rb.linearVelocity = PlayerAiming.Instance.meshTransform.forward * baseSlashSpeed;
         slash.transform.rotation = rot;
 
     }

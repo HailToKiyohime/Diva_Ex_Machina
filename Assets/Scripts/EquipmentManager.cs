@@ -35,9 +35,15 @@ public class EquipmentSlot
 #endif
 }
 
-
 public class EquipmentManager : MonoBehaviour
 {
+    [SerializeField] private Transform leftMuzzleFlash;   // 指到 Hierarchy 那個 muzzle flash (L)
+    [SerializeField] private Transform rightMuzzleFlash;  // 指到 Hierarchy 那個 muzzle flash (R)
+
+    // ✅ NEW: 左右各自 holder（都要係常駐，不要放在武器 prefab 底下）
+    [SerializeField] private Transform leftMuzzleFlashHolder;   // e.g. Player/FXHolders/L_MuzzleFlashHolder
+    [SerializeField] private Transform rightMuzzleFlashHolder;  // e.g. Player/FXHolders/R_MuzzleFlashHolder
+
     public static EquipmentManager Instance { get; private set; }
     public Transform equipmentPage;
     [SerializeField] public List<EquipmentSlot> equipmentSlots = new();
@@ -56,7 +62,7 @@ public class EquipmentManager : MonoBehaviour
     private bool _hookedPlayerStats;
 
     void Awake()
-    {   
+    {
         // If an instance already exists and it's not this one, destroy this new instance
         if (Instance != null && Instance != this)
         {
@@ -216,6 +222,7 @@ public class EquipmentManager : MonoBehaviour
         }
         return false; // §ä¤£¨ì¹ïÀ³¼Ñ
     }
+
     public bool TryEquipWeaponFromInventory(ItemInstance item, Transform mountPoint, int slotIndex)
     {
         if (item == null || item.item == null) return false;
@@ -236,8 +243,19 @@ public class EquipmentManager : MonoBehaviour
             return false;
         }
 
-        if (slot.equipedItem) Destroy(slot.equipedItem);
+        // ✅ NEW: Destroy 舊武器前，先把 muzzle flash Detach 回各自 holder（只針對左右手槽）
+        if (slot.equipedItem)
+        {
+            if (PlayerStats.Instance != null)
+            {
+                if (slotIndex == PlayerStats.Instance.leftWeaponSlotIndex)
+                    DetachMuzzleFlashToHolder(leftMuzzleFlash, leftMuzzleFlashHolder);
+                else if (slotIndex == PlayerStats.Instance.rightWeaponSlotIndex)
+                    DetachMuzzleFlashToHolder(rightMuzzleFlash, rightMuzzleFlashHolder);
+            }
 
+            Destroy(slot.equipedItem);
+        }
 
         if (item is RangeWeaponInstance rwi && rwi.item is RangeWeapon rw)
         {
@@ -249,7 +267,6 @@ public class EquipmentManager : MonoBehaviour
             {
                 rwi.muzzlePoint = FindChildRecursive(slot.equipedItem.transform, "MuzzlePoint");
             }
-
 
             // 1-1) §â RangeWeaponInstance ¤W¦sªºÃC¦â®M¦^¥h
             if (rwi.colors != null && rwi.colors.Count > 0 && !string.IsNullOrEmpty(rwi.shaderName))
@@ -338,11 +355,15 @@ public class EquipmentManager : MonoBehaviour
                 }
             }
 
+            bool isLeftHand = (slotIndex == PlayerStats.Instance.leftWeaponSlotIndex);
+            ParentMuzzleFlashToMuzzle(isLeftHand ? leftMuzzleFlash : rightMuzzleFlash, rwi.muzzlePoint);
+
             PlayerStats.Instance?.RecalculateFromEquipment();
             RefreshEquipmentStatBlock();
             Debug.Log($"Equipped weapon '{rw.itemName}' to slot index {slotIndex}");
             return true;
-        }else if (item is MeleeWeaponInstance mwi && mwi.item is MeleeWeapon mw)
+        }
+        else if (item is MeleeWeaponInstance mwi && mwi.item is MeleeWeapon mw)
         {
             slot.equipedItem = Instantiate(mw.weaponPrefab, mountPoint, false);
 
@@ -480,7 +501,7 @@ public class EquipmentManager : MonoBehaviour
 
                             ApplyCoatingColors(fx, attach.colors); // ✅ 套用鍛造存下來的顏色
 
-                            if (mw.defaultCoatingEffect!=null)
+                            if (mw.defaultCoatingEffect != null)
                             {
                                 var t = FindChildRecursive(slot.equipedItem.transform, mw.defaultCoatingEffect.name);
                                 if (t != null) t.gameObject.SetActive(false);
@@ -498,7 +519,8 @@ public class EquipmentManager : MonoBehaviour
             RefreshEquipmentStatBlock();
             Debug.Log($"Equipped weapon '{mw.itemName}' to slot index {slotIndex}");
             return true;
-        }else if (item is ShoulderWeaponInstance swi && swi.item is ShoulderWeapon sw)
+        }
+        else if (item is ShoulderWeaponInstance swi && swi.item is ShoulderWeapon sw)
         {
             // 1)
             slot.equipedItem = Instantiate(sw.weaponPrefab, mountPoint, false);
@@ -609,12 +631,27 @@ public class EquipmentManager : MonoBehaviour
     public void CleanEquipmentSlot(int equipmentSlotsIndex)
     {
         EquipmentSlot slot = equipmentSlots[equipmentSlotsIndex];
-        Destroy(slot.equipedItem);
+
+        // ✅ NEW: 清左右手武器槽前先 Detach（避免 muzzle flash 跟武器一起被 Destroy）
+        if (slot.equipedItem)
+        {
+            if (PlayerStats.Instance != null)
+            {
+                if (equipmentSlotsIndex == PlayerStats.Instance.leftWeaponSlotIndex)
+                    DetachMuzzleFlashToHolder(leftMuzzleFlash, leftMuzzleFlashHolder);
+                else if (equipmentSlotsIndex == PlayerStats.Instance.rightWeaponSlotIndex)
+                    DetachMuzzleFlashToHolder(rightMuzzleFlash, rightMuzzleFlashHolder);
+            }
+
+            Destroy(slot.equipedItem);
+        }
+
         slot.equipedItem = null;
         slot.item = null;
         PlayerStats.Instance?.RecalculateFromEquipment();
         RefreshEquipmentStatBlock();
     }
+
     private static void SnapRootSoChildMatches(Transform root, Transform child, Transform target, Quaternion childRotationOffset)
     {
         if (root == null || child == null || target == null) return;
@@ -628,6 +665,7 @@ public class EquipmentManager : MonoBehaviour
         Vector3 deltaPos = target.position - child.position;
         root.position += deltaPos;
     }
+
     private static Transform FindChildRecursive(Transform root, string name)
     {
         if (root.name == name) return root;
@@ -638,6 +676,7 @@ public class EquipmentManager : MonoBehaviour
         }
         return null;
     }
+
     private void ApplyCoatingColors(GameObject fxRoot, List<Color> colors)
     {
         if (fxRoot == null || colors == null || colors.Count == 0) return;
@@ -648,7 +687,36 @@ public class EquipmentManager : MonoBehaviour
         if (ecc == null) return;
 
         ecc.colors = new List<Color>(colors); // 把存檔色塞回去
-        ecc.ApplyFromColorsList();            // 套用回每組粒子 :contentReference[oaicite:8]{index=8}
+        ecc.ApplyFromColorsList();            // 套用回每組粒子
+    }
+
+    private static void ParentMuzzleFlashToMuzzle(Transform muzzleFlash, Transform muzzle)
+    {
+        if (muzzleFlash == null || muzzle == null) return;
+
+        // 建議用 false：讓它完全用 muzzle 的 local 座標系（最不易漂）
+        muzzleFlash.SetParent(muzzle, false);
+        muzzleFlash.localPosition = Vector3.zero;
+        muzzleFlash.localRotation = Quaternion.identity;
+        muzzleFlash.localScale = Vector3.one;
+
+        // （可選）避免剛換槍時殘留粒子
+        var ps = muzzleFlash.GetComponentInChildren<ParticleSystem>();
+        if (ps != null) ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+    }
+
+    // ✅ NEW: 收回到指定 holder，避免跟著武器被 Destroy
+    private static void DetachMuzzleFlashToHolder(Transform muzzleFlash, Transform holder)
+    {
+        if (muzzleFlash == null || holder == null) return;
+
+        muzzleFlash.SetParent(holder, false);
+        muzzleFlash.localPosition = Vector3.zero;
+        muzzleFlash.localRotation = Quaternion.identity;
+        muzzleFlash.localScale = Vector3.one;
+
+        var ps = muzzleFlash.GetComponentInChildren<ParticleSystem>();
+        if (ps != null) ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
     }
 
 #if UNITY_EDITOR
@@ -660,4 +728,3 @@ public class EquipmentManager : MonoBehaviour
     }
 #endif
 }
-

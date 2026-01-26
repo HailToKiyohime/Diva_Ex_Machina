@@ -435,10 +435,10 @@ AvatarMask:
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/Shoulder_Weapon/Shoulder
       Weapon l
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/Shoulder_Weapon/Shoulder
       Weapon r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/thigh_stretch.r
     m_Weight: 0
   - m_Path: root/root.x/thigh_stretch.r/leg_stretch.r

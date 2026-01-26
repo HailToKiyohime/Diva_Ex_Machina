@@ -1,4 +1,4 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using UnityEngine.InputSystem;
 
 public class PlayerController : MonoBehaviour
@@ -37,11 +37,11 @@ public class PlayerController : MonoBehaviour
         // Lock gameplay input when in Equipment / Crafting UI
         if (UIManager.Instance != null && UIManager.Instance.currentCameraSet != 0)
         {
-            // ²M±¼²¾°Ê¿é¤J¡AÁ×§K¨¤¦â«ùÄò³Q¤W¤@´V¿é¤J±À°Ê
+            // Â²MÂ±Â¼Â²Â¾Â°ÃŠÂ¿Ã©Â¤JÂ¡AÃÃ—Â§KÂ¨Â¤Â¦Ã¢Â«Ã¹Ã„Ã²Â³QÂ¤WÂ¤@Â´VÂ¿Ã©Â¤JÂ±Ã€Â°ÃŠ
             if (playerMovement != null)
                 playerMovement.HorizontalMovement(0f, 0f);
 
-            return; // ª½±µªı¤î Jump / Dash / Attack / Reload µ¥©Ò¦³¾Ş§@
+            return; // ÂªÂ½Â±ÂµÂªÃ½Â¤Ã® Jump / Dash / Attack / Reload ÂµÂ¥Â©Ã’Â¦Â³Â¾ÃÂ§@
         }
 
         Vector2 movementInput = playerControls.Player.Move.ReadValue<Vector2>();
@@ -55,6 +55,13 @@ public class PlayerController : MonoBehaviour
         if (playerControls.Player.Sprint.WasPressedThisFrame())
         {
             playerMovement.DashAction();
+        }
+
+        // Auto Aim toggle (Middle Mouse)
+        if (playerControls.Player.AutoAim.WasPressedThisFrame())
+        {
+            if (PlayerAiming.Instance != null)
+                PlayerAiming.Instance.ToggleAutoAim();
         }
 
         // Reload gate:

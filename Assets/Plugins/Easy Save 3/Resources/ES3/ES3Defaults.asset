@@ -38,6 +38,9 @@ MonoBehaviour:
     - Assembly-CSharp
     - Assembly-CSharp-firstpass
     - GiantGrey.TileWorldCreator
+    - Lofelt.NiceVibrations
+    - Lofelt.NiceVibrations.Demo
+    - MoreMountains.Tools
     - PotaToon.Runtime
     showAdvancedSettings: 0
   addMgrToSceneAutomatically: 0

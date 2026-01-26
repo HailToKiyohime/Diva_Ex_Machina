@@ -226,6 +226,15 @@ public partial class @PlayerControllers: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""AutoAim"",
+                    ""type"": ""Button"",
+                    ""id"": ""08315718-c5be-483e-8976-373d387ed80f"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -677,6 +686,17 @@ public partial class @PlayerControllers: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""groups"": """",
                     ""action"": ""RightShoulderAttack"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""7c5f9e4c-8ab0-4e2f-bf72-58948f0ee267"",
+                    ""path"": ""<Mouse>/middleButton"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""AutoAim"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
                 }
@@ -1279,6 +1299,7 @@ public partial class @PlayerControllers: IInputActionCollection2, IDisposable
         m_Player_Reload = m_Player.FindAction("Reload", throwIfNotFound: true);
         m_Player_LeftShoulderAttack = m_Player.FindAction("LeftShoulderAttack", throwIfNotFound: true);
         m_Player_RightShoulderAttack = m_Player.FindAction("RightShoulderAttack", throwIfNotFound: true);
+        m_Player_AutoAim = m_Player.FindAction("AutoAim", throwIfNotFound: true);
         // UI
         m_UI = asset.FindActionMap("UI", throwIfNotFound: true);
         m_UI_Navigate = m_UI.FindAction("Navigate", throwIfNotFound: true);
@@ -1387,6 +1408,7 @@ public partial class @PlayerControllers: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player_Reload;
     private readonly InputAction m_Player_LeftShoulderAttack;
     private readonly InputAction m_Player_RightShoulderAttack;
+    private readonly InputAction m_Player_AutoAim;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player".
     /// </summary>
@@ -1459,6 +1481,10 @@ public partial class @PlayerControllers: IInputActionCollection2, IDisposable
         /// </summary>
         public InputAction @RightShoulderAttack => m_Wrapper.m_Player_RightShoulderAttack;
         /// <summary>
+        /// Provides access to the underlying input action "Player/AutoAim".
+        /// </summary>
+        public InputAction @AutoAim => m_Wrapper.m_Player_AutoAim;
+        /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
         public InputActionMap Get() { return m_Wrapper.m_Player; }
@@ -1529,6 +1555,9 @@ public partial class @PlayerControllers: IInputActionCollection2, IDisposable
             @RightShoulderAttack.started += instance.OnRightShoulderAttack;
             @RightShoulderAttack.performed += instance.OnRightShoulderAttack;
             @RightShoulderAttack.canceled += instance.OnRightShoulderAttack;
+            @AutoAim.started += instance.OnAutoAim;
+            @AutoAim.performed += instance.OnAutoAim;
+            @AutoAim.canceled += instance.OnAutoAim;
         }
 
         /// <summary>
@@ -1585,6 +1614,9 @@ public partial class @PlayerControllers: IInputActionCollection2, IDisposable
             @RightShoulderAttack.started -= instance.OnRightShoulderAttack;
             @RightShoulderAttack.performed -= instance.OnRightShoulderAttack;
             @RightShoulderAttack.canceled -= instance.OnRightShoulderAttack;
+            @AutoAim.started -= instance.OnAutoAim;
+            @AutoAim.performed -= instance.OnAutoAim;
+            @AutoAim.canceled -= instance.OnAutoAim;
         }
 
         /// <summary>
@@ -1990,6 +2022,13 @@ public partial class @PlayerControllers: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnRightShoulderAttack(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "AutoAim" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnAutoAim(InputAction.CallbackContext context);
     }
     /// <summary>
     /// Interface to implement callback methods for all input action callbacks associated with input actions defined by "UI" which allows adding and removing callbacks.
