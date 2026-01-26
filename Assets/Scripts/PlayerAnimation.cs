@@ -1,4 +1,4 @@
-using MoreMountains.Feedbacks;
+ï»¿using MoreMountains.Feedbacks;
 using System;
 using Unity.Cinemachine;
 using UnityEngine;
@@ -12,14 +12,14 @@ public class PlayerAnimation : MonoBehaviour
     [SerializeField] private Transform groundPoint;
     int bipedLayer;
     int hoverLayer;
-    int BarehandedLayer; // ¥¼«ù¦³ªZ¾¹
-    int Wielding_Gun_LeftLayer; // «ù¦³³æ¤âºj¡]¥ª¤â¡^
-    int Wielding_Gun_RightLayer; // «ù¦³³æ¤âºj¡]¥k¤â¡^
-    int Dual_Wielding_Weapon_LeftLayer; // Âù¤â«ù¦³ªZ¾¹¡]¥ª¤â¡^
-    int Dual_Wielding_Weapon_RightLayer; // Âù¤â«ù¦³ªZ¾¹¡]¥k¤â¡^
-    int One_Hand_Melee_AttackLayer; // «ù¦³³æ¤âªñ¾ÔªZ¾¹
-    int Shoulder_Weapon_LeftLayer; // ªÓ±¾ªZ¾¹¡]¥ª¡^
-    int Shoulder_Weapon_RightLayer; // ªÓ±¾ªZ¾¹¡]¥k¡^
+    int BarehandedLayer; // æœªæŒæœ‰æ­¦å™¨
+    int Wielding_Gun_LeftLayer; // æŒæœ‰å–®æ‰‹æ§ï¼ˆå·¦æ‰‹ï¼‰
+    int Wielding_Gun_RightLayer; // æŒæœ‰å–®æ‰‹æ§ï¼ˆå³æ‰‹ï¼‰
+    int Dual_Wielding_Weapon_LeftLayer; // é›™æ‰‹æŒæœ‰æ­¦å™¨ï¼ˆå·¦æ‰‹ï¼‰
+    int Dual_Wielding_Weapon_RightLayer; // é›™æ‰‹æŒæœ‰æ­¦å™¨ï¼ˆå³æ‰‹ï¼‰
+    int One_Hand_Melee_AttackLayer; // æŒæœ‰å–®æ‰‹è¿‘æˆ°æ­¦å™¨
+    int Shoulder_Weapon_LeftLayer; // è‚©æ›æ­¦å™¨ï¼ˆå·¦ï¼‰
+    int Shoulder_Weapon_RightLayer; // è‚©æ›æ­¦å™¨ï¼ˆå³ï¼‰
     //Character height adjustment
     private float baseHeight;
     private Vector3 baseCenter;
@@ -35,9 +35,9 @@ public class PlayerAnimation : MonoBehaviour
     public GameObject meleeThrusterFlameR;
 
     // ===== Attack Layer Blend (Smooth) =====
-    [SerializeField] private float weaponHoldBlendTime = 0.15f; // ¥D¤H¥i½Õ¡G«ùºj/Âù«ù¤Á´«ªº²V¦X®É¶¡
-    [SerializeField] private float attackLayerBlendInTime = 0.12f;   // ¥i½Õ¡G¶i¤J Attack Layer ªº®É¶¡
-    [SerializeField] private float attackLayerBlendOutTime = 0.5f;  // ¥i½Õ¡G°h¥X Attack Layer ªº®É¶¡
+    [SerializeField] private float weaponHoldBlendTime = 0.15f; // ä¸»äººå¯èª¿ï¼šæŒæ§/é›™æŒåˆ‡æ›çš„æ··åˆæ™‚é–“
+    [SerializeField] private float attackLayerBlendInTime = 0.12f;   // å¯èª¿ï¼šé€²å…¥ Attack Layer çš„æ™‚é–“
+    [SerializeField] private float attackLayerBlendOutTime = 0.5f;  // å¯èª¿ï¼šé€€å‡º Attack Layer çš„æ™‚é–“
     private Coroutine _attackLayerBlendRoutine;
     private Coroutine _weaponHoldBlendRoutine;
     public event Action OnStartAttacking;
@@ -50,7 +50,9 @@ public class PlayerAnimation : MonoBehaviour
     [SerializeField] private float fovBlendOutTime = 0.15f;
     private Coroutine _fovRoutine;
     public CinemachineCamera Camera;
-
+    // ===== Combo Stop Failsafe =====
+    [SerializeField] private float combo2FailSafeSeconds = 1.0f; // ä¸»äººå¯èª¿ï¼šCombo2 è‹¥æ²’æ­£å¸¸çµæŸï¼Œæœ€æ™šå¤šä¹…å¼·åˆ¶æ”¶å°¾
+    private const string _failsafeMethodName = nameof(ForceStopAttackingFailsafe);
     public MMF_Player leftAttackFeedback;
     public MMF_Player rightAttackFeedback;
     void Awake()
@@ -98,7 +100,7 @@ public class PlayerAnimation : MonoBehaviour
         PlayerStats.Instance.OnThrusterVisualChanged += ApplyThrusterVfxChange;
         PlayerStats.Instance.OnThrusterFlameOffsetChanged += ApplyThrusterFlameTramformChange;
 
-        // ¶i³õ¦P¨B¡]ÃöÁä¡GVFX + Offset ³£­n¡^
+        // é€²å ´åŒæ­¥ï¼ˆé—œéµï¼šVFX + Offset éƒ½è¦ï¼‰
         ApplyLegVisualChange(PlayerStats.Instance.CurrentLegVisual);
         RefreshWeaponHoldLayers();
         ApplyThrusterVfxChange(PlayerStats.Instance.CurrentThruster);
@@ -130,7 +132,7 @@ public class PlayerAnimation : MonoBehaviour
         if (thrusterFlamePointL != null) thrusterFlamePointL.localPosition = offset;
         if (thrusterFlamePointR != null)
         {
-            offset.x = -offset.x; // ¥kÃäªº X ¶b¨ú¤Ï
+            offset.x = -offset.x; // å³é‚Šçš„ X è»¸å–å
             thrusterFlamePointR.localPosition = offset;
         }
     }
@@ -141,12 +143,12 @@ public class PlayerAnimation : MonoBehaviour
         float newHeight = Mathf.Max(0.1f, baseHeight + heightOffset);
         capsuleCollider.height = newHeight;
 
-        // ©T©wÀY³»¡G°ª«×¼W¥[¡Acenter ©¹¤U²¾¤@¥b
+        // å›ºå®šé ­é ‚ï¼šé«˜åº¦å¢åŠ ï¼Œcenter å¾€ä¸‹ç§»ä¸€åŠ
         var c = baseCenter;
         c.y -= (newHeight - baseHeight) * 0.5f;
         capsuleCollider.center = c;
 
-        // ½Õ¾ã groundPoint ¦ì¸m
+        // èª¿æ•´ groundPoint ä½ç½®
         if (groundPoint != null)
         {
             Vector3 gp = groundPoint.localPosition;
@@ -156,10 +158,10 @@ public class PlayerAnimation : MonoBehaviour
     }
     private void ApplyThrusterVfxChange(Thruster thr)
     {
-        // 1) ¥ı²M±¼ÂÂªº¡]Á×§K­«½Æ°ïÅ|¡^
+        // 1) å…ˆæ¸…æ‰èˆŠçš„ï¼ˆé¿å…é‡è¤‡å †ç–Šï¼‰
         ClearThrusterVfxInstances();
 
-        // 2) ¨S¸Ë thruster¡]©Î¨ø¤U¡^¡÷ ²MªÅ«áª½±µµ²§ô
+        // 2) æ²’è£ thrusterï¼ˆæˆ–å¸ä¸‹ï¼‰â†’ æ¸…ç©ºå¾Œç›´æ¥çµæŸ
         if (thr == null) return;
 
         // 3) Instantiate normal flames
@@ -172,7 +174,7 @@ public class PlayerAnimation : MonoBehaviour
                 normalThrusterFlameR = Instantiate(thr.normalThrusterFlame, thrusterFlamePointR.transform, false);
         }
 
-        // 4) Instantiate boosted flames¡]³q±`¹w³]¥ıÃö³¬¡Aµ¥ Boost ®É¦A¶}¡^
+        // 4) Instantiate boosted flamesï¼ˆé€šå¸¸é è¨­å…ˆé—œé–‰ï¼Œç­‰ Boost æ™‚å†é–‹ï¼‰
         if (thr.boostedThrusterFlame != null)
         {
             if (thrusterFlamePointL != null)
@@ -210,7 +212,7 @@ public class PlayerAnimation : MonoBehaviour
     }
     private void ApplyLocomotion(AnimationType type)
     {
-        // ¨Ì§Aªº AnimationType ¹ê»Ú enum ­È½Õ¾ã case
+        // ä¾ä½ çš„ AnimationType å¯¦éš› enum å€¼èª¿æ•´ case
         switch (type)
         {
             case AnimationType.Hover:
@@ -225,7 +227,7 @@ public class PlayerAnimation : MonoBehaviour
         }
     }
 
-    // ===== §A­ì¥»ªº¨ç¦¡¥i¥H«O¯d =====
+    // ===== ä½ åŸæœ¬çš„å‡½å¼å¯ä»¥ä¿ç•™ =====
     public void SetBipedMode() { SetAllLayersOff(); anim.SetLayerWeight(bipedLayer, 1f); }
     public void SetHoverMode() { SetAllLayersOff(); anim.SetLayerWeight(hoverLayer, 1f); }
     public void SetAllLayersOff()
@@ -267,17 +269,17 @@ public class PlayerAnimation : MonoBehaviour
     {
         if (_attackEventFired) return;
         _attackEventFired = true;
-        OnStartAttacking?.Invoke(); // Trail/²É¤lµ¥®ÄªG¾a³o­Ó
+        OnStartAttacking?.Invoke(); // Trail/ç²’å­ç­‰æ•ˆæœé é€™å€‹
     }
     public void ChangeFOVtoAttack()
     {
-        // »İ­n¡u§ğÀ»FOV¡v¤~©I¥s³o­Ó
+        // éœ€è¦ã€Œæ”»æ“ŠFOVã€æ‰å‘¼å«é€™å€‹
         EnsureAttackStartEventFired();
         SmoothSetFov(attackFov, fovBlendInTime);
     }
     public void StartAttack()
     {
-        // ¤£ºŞ¦³¨S¦³§ïFOV¡A¥u­n¶}©l§ğÀ»´N·|Ä²µo¨Æ¥ó ¡÷ Trail ¤@©w·|¥X²{
+        CancelInvoke(_failsafeMethodName); // æ–°å¢é€™è¡Œ
         EnsureAttackStartEventFired();
         anim.SetBool("attacking", true);
     }
@@ -287,7 +289,7 @@ public class PlayerAnimation : MonoBehaviour
         anim.SetBool("attacking", false);
         SetOffAttackLayer();
 
-        _attackEventFired = false;      // ¤¹³\¤U¤@¦¸§ğÀ»¦AÄ²µo OnStartAttacking
+        _attackEventFired = false;      // å…è¨±ä¸‹ä¸€æ¬¡æ”»æ“Šå†è§¸ç™¼ OnStartAttacking
         OnStopAttacking?.Invoke();
     }
     public void InvokeStartAttack(float delay)
@@ -305,12 +307,48 @@ public class PlayerAnimation : MonoBehaviour
     {
         SmoothSetFov(normalFov, fovBlendInTime);
     }
-    public void InvokeStopAttacking()
+    // 0 = ç›¸å®¹èˆŠ eventï¼ˆä¸å¸¶åƒæ•¸ï¼‰
+    // 1 = Combo1 endï¼ˆè‹¥å·²æ’éšŠ Combo2ï¼Œå‰‡ä¸çµæŸï¼‰
+    // 2 = Combo2 endï¼ˆä¸€å®šçµæŸï¼‰
+
+ public void InvokeStopAttacking(int comboEnded)
+{
+    if (anim == null) return;
+
+    // å…ˆå–æ¶ˆæ‰€æœ‰å¯èƒ½çš„æ’ç¨‹ï¼Œé¿å…æ™‚é–“äº¤ç–Š
+    CancelInvoke(nameof(StopAttacking));
+    CancelInvoke(_failsafeMethodName);
+
+    int leftCombo = anim.GetInteger("LeftHandCombo");
+    int rightCombo = anim.GetInteger("RightHandCombo");
+
+    bool nextQueued = (leftCombo >= 2) || (rightCombo >= 2);
+
+    // Combo1 çµå°¾ï¼šè‹¥å·²æ’éšŠ Combo2ï¼Œä¸ç«‹åˆ»çµæŸ attackingï¼Œ
+    // ä½†ä¸€å®šè¦æ›ä¸€å€‹ failsafeï¼Œé¿å… Combo2 æ²’é€²å»/æ²’çµæŸå°è‡´æ°¸é ä¸ resetã€‚
+    if (comboEnded == 1 && nextQueued)
     {
-        if (!IsInvoking(nameof(StopAttacking)))
-        {
-            Invoke("StopAttacking", 0.2f);
-        }
+        Invoke(_failsafeMethodName, combo2FailSafeSeconds);
+        return;
+    }
+
+    // èˆŠç‰ˆç›¸å®¹ï¼ˆcomboEnded==0ï¼‰ï¼šçœ‹èµ·ä¾†åƒ Combo2ï¼ˆ>=2ï¼‰å°±åŒæ¨£æ› failsafe
+    // é€™èƒ½é˜²æ­¢ã€Œevent ä»ç”¨èˆŠç‰ˆä¸å¸¶åƒæ•¸ã€æ™‚å¶ç™¼å¡ä½
+    if (comboEnded == 0 && nextQueued)
+    {
+        Invoke(_failsafeMethodName, combo2FailSafeSeconds);
+        return;
+    }
+
+    // Combo2 çµå°¾ï¼ˆæˆ–æ²’æœ‰ä¸‹ä¸€æ®µï¼‰ï¼šæ­£å¸¸çµæŸ
+    Invoke(nameof(StopAttacking), 0.2f);
+}
+
+    // å¯é¸ï¼šä¸»äººè‹¥æƒ³ Combo2 çµå°¾å®Œå…¨ä¸åš gateï¼Œç›´æ¥ç”¨é€™å€‹
+    public void InvokeStopAttackingForce()
+    {
+        CancelInvoke(nameof(StopAttacking));
+        Invoke(nameof(StopAttacking), 0.2f);
     }
     private void SmoothSetLayerWeight(int layerIndex, float target, float duration)
     {
@@ -362,19 +400,19 @@ public class PlayerAnimation : MonoBehaviour
         bool hasLeft = PlayerStats.Instance.leftHand.HasWeapon;
         bool hasRight = PlayerStats.Instance.rightHand.HasWeapon;
 
-        // ¥ıºâ¥Ø¼ĞÅv­«¡]¤£­n¥ı§â²{¦³Åv­«²M±¼¡A§_«h·|ÅÜ¦¨±q 0 ¶}©lµw¤Á¡^
+        // å…ˆç®—ç›®æ¨™æ¬Šé‡ï¼ˆä¸è¦å…ˆæŠŠç¾æœ‰æ¬Šé‡æ¸…æ‰ï¼Œå¦å‰‡æœƒè®Šæˆå¾ 0 é–‹å§‹ç¡¬åˆ‡ï¼‰
         float targetBare = 0f;
         float targetWL = 0f;
         float targetWR = 0f;
         float targetDL = 0f;
         float targetDR = 0f;
 
-        // 0 §âªZ¾¹¡G®{¤â
+        // 0 æŠŠæ­¦å™¨ï¼šå¾’æ‰‹
         if (!hasLeft && !hasRight)
         {
             targetBare = 1f;
         }
-        // 2 §âªZ¾¹¡GÂù«ù
+        // 2 æŠŠæ­¦å™¨ï¼šé›™æŒ
         else if (hasLeft && hasRight)
         {
             targetDL = 1f;
@@ -390,7 +428,7 @@ public class PlayerAnimation : MonoBehaviour
             else if (PlayerStats.Instance.rightHand.rangeweapon != null) rightHnadWeapon = 2;
             anim.SetInteger("rightHandWeaponType", rightHnadWeapon);
         }
-        // 1 §âªZ¾¹¡G³æ¤â¡]¥ª©Î¥k¡^
+        // 1 æŠŠæ­¦å™¨ï¼šå–®æ‰‹ï¼ˆå·¦æˆ–å³ï¼‰
         else if (hasLeft)
         {
             targetWL = 1f;
@@ -400,7 +438,7 @@ public class PlayerAnimation : MonoBehaviour
             targetWR = 1f;
         }
 
-        // ¥­·Æ²V¦X¨ì¥Ø¼Ğ
+        // å¹³æ»‘æ··åˆåˆ°ç›®æ¨™
         SmoothSetWeaponHoldWeights(
             targetBare,
             targetWL,
@@ -419,7 +457,7 @@ public class PlayerAnimation : MonoBehaviour
     {
         if (anim == null) return;
 
-        // ­Y¼h¤£¦s¦b¡]GetLayerIndex = -1¡^¡A´N©¿²¤
+        // è‹¥å±¤ä¸å­˜åœ¨ï¼ˆGetLayerIndex = -1ï¼‰ï¼Œå°±å¿½ç•¥
         float startBare = (BarehandedLayer >= 0) ? anim.GetLayerWeight(BarehandedLayer) : 0f;
         float startWL = (Wielding_Gun_LeftLayer >= 0) ? anim.GetLayerWeight(Wielding_Gun_LeftLayer) : 0f;
         float startWR = (Wielding_Gun_RightLayer >= 0) ? anim.GetLayerWeight(Wielding_Gun_RightLayer) : 0f;
@@ -429,7 +467,7 @@ public class PlayerAnimation : MonoBehaviour
         if (_weaponHoldBlendRoutine != null)
             StopCoroutine(_weaponHoldBlendRoutine);
 
-        // duration <= 0 ´Nª½±µ³]
+        // duration <= 0 å°±ç›´æ¥è¨­
         if (duration <= 0f)
         {
             if (BarehandedLayer >= 0) anim.SetLayerWeight(BarehandedLayer, barehanded);
@@ -466,7 +504,7 @@ public class PlayerAnimation : MonoBehaviour
             yield return null;
         }
 
-        // ³Ì«áÂê©w¨ìºë·Ç­È
+        // æœ€å¾Œé–å®šåˆ°ç²¾æº–å€¼
         if (BarehandedLayer >= 0) anim.SetLayerWeight(BarehandedLayer, targetBare);
         if (Wielding_Gun_LeftLayer >= 0) anim.SetLayerWeight(Wielding_Gun_LeftLayer, targetWL);
         if (Wielding_Gun_RightLayer >= 0) anim.SetLayerWeight(Wielding_Gun_RightLayer, targetWR);
@@ -539,16 +577,16 @@ public class PlayerAnimation : MonoBehaviour
 
     private static readonly int AttackStateHash = Animator.StringToHash("Attack");
 
-    // °O¿ı¡u¶i¤J Attack state¡vªº®É¶¡ÂI¡]¬í¡^
+    // è¨˜éŒ„ã€Œé€²å…¥ Attack stateã€çš„æ™‚é–“é»ï¼ˆç§’ï¼‰
     private float _leftShoulderAttackEnteredTime = -1f;
     private float _rightShoulderAttackEnteredTime = -1f;
 
-    // ¥Î¨Ó°»´ú¡§­è¶i¤J Attack state¡¨ªºÃäªu
+    // ç”¨ä¾†åµæ¸¬â€œå‰›é€²å…¥ Attack stateâ€çš„é‚Šæ²¿
     private bool _leftShoulderWasInAttack = false;
     private bool _rightShoulderWasInAttack = false;
 
     /// <summary>
-    /// Shoulder layer ¤w§¹¦¨Âà³õ¥B¦b Attack state «á¡A©µ¿ğ fireDelaySeconds ¬í¤~¦^¶Ç true
+    /// Shoulder layer å·²å®Œæˆè½‰å ´ä¸”åœ¨ Attack state å¾Œï¼Œå»¶é² fireDelaySeconds ç§’æ‰å›å‚³ true
     /// </summary>
     public bool IsShoulderWeaponReadyToFire(bool isLeft, float fireDelaySeconds)
     {
@@ -557,10 +595,10 @@ public class PlayerAnimation : MonoBehaviour
         int layer = isLeft ? Shoulder_Weapon_LeftLayer : Shoulder_Weapon_RightLayer;
         if (layer < 0) return false;
 
-        // ÁÙ¦b¥ô¦ó transition ¤¤¡G¤£¤¹³\
+        // é‚„åœ¨ä»»ä½• transition ä¸­ï¼šä¸å…è¨±
         if (anim.IsInTransition(layer))
         {
-            // transition ´Á¶¡¤]µø¬°¥¼¶i¤J attack
+            // transition æœŸé–“ä¹Ÿè¦–ç‚ºæœªé€²å…¥ attack
             if (isLeft) _leftShoulderWasInAttack = false;
             else _rightShoulderWasInAttack = false;
             return false;
@@ -573,7 +611,7 @@ public class PlayerAnimation : MonoBehaviour
         {
             if (inAttack)
             {
-                // ²Ä¤@¦¸¶i¤J Attack ªº¨º¤@´V
+                // ç¬¬ä¸€æ¬¡é€²å…¥ Attack çš„é‚£ä¸€å¹€
                 if (!_leftShoulderWasInAttack)
                 {
                     _leftShoulderWasInAttack = true;
@@ -584,7 +622,7 @@ public class PlayerAnimation : MonoBehaviour
             }
             else
             {
-                // Â÷¶} Attack¡G­«¸m
+                // é›¢é–‹ Attackï¼šé‡ç½®
                 _leftShoulderWasInAttack = false;
                 _leftShoulderAttackEnteredTime = -1f;
                 return false;
@@ -625,14 +663,14 @@ public class PlayerAnimation : MonoBehaviour
     }
 
     // ===== Animation Events =====
-    // ¥ª¤â§ğÀ»°Êµe clip ªº Animation Event ª½±µ¥s©O­Ó
+    // å·¦æ‰‹æ”»æ“Šå‹•ç•« clip çš„ Animation Event ç›´æ¥å«å‘¢å€‹
     public void AnimEvent_SpawnSwordSlash_Left()
     {
         if (attackManager == null) return;
         attackManager.AnimEvent_SpawnSwordSlash_Left();
     }
 
-    // ¥k¤â§ğÀ»°Êµe clip ªº Animation Event ª½±µ¥s©O­Ó
+    // å³æ‰‹æ”»æ“Šå‹•ç•« clip çš„ Animation Event ç›´æ¥å«å‘¢å€‹
     public void AnimEvent_SpawnSwordSlash_Right()   
     {
         if (attackManager == null) return;
@@ -645,5 +683,16 @@ public class PlayerAnimation : MonoBehaviour
     public void RightWeaponMuzzleFlash()
     {
         rightAttackFeedback?.PlayFeedbacks(this.transform.position);
+    }
+    private void ForceStopAttackingFailsafe()
+    {
+        if (anim == null) return;
+
+        // åªåœ¨é‚„å¡è‘— attacking æ™‚æ‰å¼·åˆ¶æ”¶å°¾
+        if (anim.GetBool("attacking"))
+        {
+            Debug.LogWarning("PlayerAnimation: Combo failsafe triggered -> forcing StopAttacking()");
+            StopAttacking();
+        }
     }
 }

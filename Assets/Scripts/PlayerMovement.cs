@@ -87,6 +87,62 @@ public class PlayerMovement : MonoBehaviour
     private Rigidbody meleeDashTargetRb = null;
     private Vector3 meleeDashLastTargetPos = Vector3.zero;
     private bool meleeDashHasLastTargetPos = false;
+
+    [Header("Melee Combo")]
+    [Tooltip("Animator layer name keyword used to locate the melee attack layer. If not found, layer 0 will be used.")]
+    [SerializeField] private string meleeAttackLayerNameContains = "Melee";
+    [Tooltip("Combo input is only accepted when current attack normalizedTime is within this range.")]
+    [Range(0f, 1f)][SerializeField] private float comboInputMinNormalized = 0.25f;
+    [Range(0f, 1f)][SerializeField] private float comboInputMaxNormalized = 0.90f;
+
+    // runtime combo state (0 = none, 1 = combo1, 2 = combo2)
+    private int _leftCombo = 0;
+    private int _rightCombo = 0;
+    private bool _leftComboQueued = false;
+    private bool _rightComboQueued = false;
+
+    private Animator _anim;
+    private int _meleeLayerIndex = 0;
+    private static readonly int Anim_Attacking = Animator.StringToHash("attacking");
+    private static readonly int Anim_LeftHandCombo = Animator.StringToHash("LeftHandCombo");
+    private static readonly int Anim_RightHandCombo = Animator.StringToHash("RightHandCombo");
+
+    [Tooltip("If player presses before the combo window, keep this request for N seconds.")]
+    [SerializeField] private float comboInputBufferSeconds = 0.15f;
+
+    private float _leftComboBufferedUntil = 0f;
+    private float _rightComboBufferedUntil = 0f;
+
+    // If player presses combo during melee dash (before attack animation starts), queue combo2 after dash ends
+    private bool _leftQueueComboAfterDash = false;
+    private bool _rightQueueComboAfterDash = false;
+
+    private void Awake()
+    {
+        // Cache Animator for combo + state checks.
+        if (playerAnimation != null)
+            _anim = playerAnimation.GetComponent<Animator>();
+        if (_anim == null)
+            _anim = GetComponentInChildren<Animator>(true);
+
+        // Best-effort to locate the melee attack layer by name.
+        _meleeLayerIndex = 0;
+        if (_anim != null)
+        {
+            for (int i = 0; i < _anim.layerCount; i++)
+            {
+                string ln = _anim.GetLayerName(i);
+                if (!string.IsNullOrEmpty(ln) && ln.Contains(meleeAttackLayerNameContains))
+                {
+                    _meleeLayerIndex = i;
+                    break;
+                }
+            }
+        }
+
+        ResetMeleeComboState();
+    }
+
     private void OnEnable()
     {
         if (playerAnimation != null)
@@ -102,6 +158,7 @@ public class PlayerMovement : MonoBehaviour
     private void HandleStopAttacking()
     {
         StopMeleeDash();
+        ResetMeleeComboState();
     }
     public void Update()
     {
@@ -203,7 +260,27 @@ public class PlayerMovement : MonoBehaviour
         // 近戰目前先視為「單發」：按一下觸發一次（之後要連段再擴充）
         bool isSingle = isMelee ? true : (w.range.firingMode == 0);
 
+        // ===== Melee dash combo buffer (pressing too fast during dash) =====
+        // If player presses attack while melee dash is still active (attack animation not started yet),
+        // do NOT restart the dash. Instead, remember to queue combo2 after dash ends.
+        if (isMelee && meleeDashActive && attackInput.WasPressedThisFrame())
+        {
+            if (isLeft && _leftCombo == 1) _leftQueueComboAfterDash = true;
+            if (isRight && _rightCombo == 1) _rightQueueComboAfterDash = true;
+            return;
+        }
 
+        // ===== Melee combo input (ONLY while already attacking) =====
+        if (isMelee && attackInput.WasPressedThisFrame() && IsAttackingAnim())
+        {
+            // 先嘗試：如果已在窗口內，立刻 queue combo2
+            if (TryQueueMeleeCombo(attackManager, w))
+                return;
+
+            // 否則：記一次 buffer，等窗口到自動接
+            BufferMeleeComboInput(attackManager, w);
+            return; // 只阻止「攻擊中」的第二下開新 Dash
+        }
         // 1) 收集「想射擊」意圖（單發需要緩存，否則轉完身就不是 this frame 了）
         if (isSingle)
         {
@@ -287,6 +364,7 @@ public class PlayerMovement : MonoBehaviour
 
                     if (isSingle)
                     {
+
                         pendingSingleUntil.Remove(w);
                         alignStartTime.Remove(w);
                     }
@@ -404,8 +482,10 @@ public class PlayerMovement : MonoBehaviour
 
                     meleeDashReachedStopWithin = true;
                     Debug.Log(" 距離目標 <= meleeDashStopWithin");
+                    StopMeleeDash();
                     playerAnimation.InvokeStartAttack(0.1f);
                     playerAnimation.SmoothSetFOV();
+                    ApplyQueuedComboAfterDash();
                 }
                 return;
             }
@@ -451,15 +531,19 @@ public class PlayerMovement : MonoBehaviour
         if (meleeDashDistance > 0f && delta.magnitude >= meleeDashDistance)
         {
             Debug.Log(" delta.magnitude >= meleeDashDistance");
+            StopMeleeDash();
             playerAnimation.StartAttack();
             playerAnimation.SmoothSetFOV();
+            ApplyQueuedComboAfterDash();
             return;
         }
         if (Time.time - meleeDashStartTime > meleeDashMaxDuration)
         {
             Debug.Log(" 超時保護");
+            StopMeleeDash();
             playerAnimation.StartAttack();
             playerAnimation.SmoothSetFOV();
+            ApplyQueuedComboAfterDash();
             return;
         }
         // 3) 施加衝刺速度（真 3D：X/Y/Z 全吃方向）
@@ -469,6 +553,34 @@ public class PlayerMovement : MonoBehaviour
 
     private void StartMeleeDash(AttackManager attackManager, Weapon ownerWeapon, Vector3 targetPoint, float dashSpeed, float dashDistance)
     {
+        // Prevent re-entering melee dash (spamming attack would otherwise extend dash indefinitely)
+        if (meleeDashActive)
+            return;
+
+        // Start of a new melee sequence for this hand.
+        _leftComboBufferedUntil = 0f;
+        _rightComboBufferedUntil = 0f;
+        _leftQueueComboAfterDash = false;
+        _rightQueueComboAfterDash = false;
+
+        if (_anim != null)
+        {
+            bool isLeft = (attackManager != null && ownerWeapon == attackManager.leftHandWeapon);
+            bool isRight = (attackManager != null && ownerWeapon == attackManager.rightHandWeapon);
+
+            if (isLeft)
+            {
+                _leftCombo = 1;
+                _leftComboQueued = false;
+                _anim.SetInteger(Anim_LeftHandCombo, 1);
+            }
+            else if (isRight)
+            {
+                _rightCombo = 1;
+                _rightComboQueued = false;
+                _anim.SetInteger(Anim_RightHandCombo, 1);
+            }
+        }
         if (playerRigidbody == null) return;
         if (dashSpeed <= 0f || dashDistance <= 0f) return;
 
@@ -588,11 +700,12 @@ public class PlayerMovement : MonoBehaviour
 
         Vector3 targetPos = (meleeDashTarget != null) ? meleeDashTarget.position : meleeDashTargetPoint;
         float distToTarget = Vector3.Distance(transform.position, targetPos);
-        if (distToTarget >= meleeDashStopWithin*2)
+        if (distToTarget >= meleeDashStopWithin * 2)
         {
             playerAnimation.ChangeFOVtoAttack();
         }
-
+        _leftComboBufferedUntil = 0f;
+        _rightComboBufferedUntil = 0f;
     }
 
     private void StopMeleeDash()
@@ -927,4 +1040,163 @@ public class PlayerMovement : MonoBehaviour
 
     public bool IsMeleeDashActive => meleeDashActive;
 
+
+    private void ResolveMeleeAttackLayerIndex()
+    {
+        _meleeLayerIndex = 0;
+        if (_anim == null) return;
+
+        int count = _anim.layerCount;
+        if (count <= 0) return;
+
+        for (int i = 0; i < count; i++)
+        {
+            string ln = _anim.GetLayerName(i);
+            if (!string.IsNullOrEmpty(ln) && ln.IndexOf(meleeAttackLayerNameContains, System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                _meleeLayerIndex = i;
+                return;
+            }
+        }
+    }
+
+    private bool IsAttackingAnim()
+    {
+        return _anim != null && _anim.GetBool(Anim_Attacking);
+    }
+
+    private bool TryGetMeleeAttackNormalizedTime(out float normalized)
+    {
+        normalized = 0f;
+        if (_anim == null) return false;
+
+        if (_meleeLayerIndex < 0 || _meleeLayerIndex >= _anim.layerCount)
+            ResolveMeleeAttackLayerIndex();
+
+        var info = _anim.GetCurrentAnimatorStateInfo(_meleeLayerIndex);
+        normalized = info.normalizedTime - Mathf.Floor(info.normalizedTime);
+
+        // Heuristic: only allow combo input when current clip looks like melee attack
+        var clips = _anim.GetCurrentAnimatorClipInfo(_meleeLayerIndex);
+        if (clips == null || clips.Length == 0) return false;
+        var clip = clips[0].clip;
+        if (clip == null) return false;
+
+        string n = clip.name;
+        if (string.IsNullOrEmpty(n)) return false;
+
+        bool looksLikeAttack = n.IndexOf("Attack", System.StringComparison.OrdinalIgnoreCase) >= 0
+                            || n.IndexOf("Piercing", System.StringComparison.OrdinalIgnoreCase) >= 0
+                            || n.IndexOf("Slashing", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        return looksLikeAttack;
+    }
+
+    private bool TryQueueMeleeCombo(AttackManager attackManager, Weapon w)
+    {
+        // Only queue while already attacking (animation-wise).
+        if (!IsAttackingAnim()) return false;
+        if (_anim == null) return false;
+
+        if (!TryGetMeleeAttackNormalizedTime(out float nt)) return false;
+        bool inWindow = (nt >= comboInputMinNormalized && nt <= comboInputMaxNormalized);
+
+        bool buffered = false;
+        bool isLeft = (attackManager != null && w == attackManager.leftHandWeapon);
+        bool isRight = (attackManager != null && w == attackManager.rightHandWeapon);
+
+        if (isLeft) buffered = (Time.time <= _leftComboBufferedUntil);
+        else if (isRight) buffered = (Time.time <= _rightComboBufferedUntil);
+
+        if (!isLeft && !isRight) return false;
+
+        // 既不在窗口內、又沒有有效 buffer → 不接段
+        if (!inWindow && !buffered) return false;
+
+        if (isLeft)
+        {
+            if (_leftCombo <= 0) return false;
+            if (_leftCombo >= 2) return false;
+            if (_leftComboQueued) return true;
+
+            _leftComboQueued = true;
+            _leftCombo = 2;
+            _anim.SetInteger(Anim_LeftHandCombo, 2);
+            _leftComboBufferedUntil = 0f;
+            return true;
+        }
+
+        if (_rightCombo <= 0) return false;
+        if (_rightCombo >= 2) return false;
+        if (_rightComboQueued) return true;
+
+        _rightComboQueued = true;
+        _rightCombo = 2;
+        _anim.SetInteger(Anim_RightHandCombo, 2);
+        _rightComboBufferedUntil = 0f;
+        return true;
+    }
+
+    private void ResetMeleeComboState()
+    {
+        _leftCombo = 0;
+        _rightCombo = 0;
+        _leftComboQueued = false;
+        _rightComboQueued = false;
+
+        if (_anim != null)
+        {
+            _anim.SetInteger(Anim_LeftHandCombo, 0);
+            _anim.SetInteger(Anim_RightHandCombo, 0);
+        }
+        _leftComboBufferedUntil = 0f;
+        _rightComboBufferedUntil = 0f;
+    }
+    private void BufferMeleeComboInput(AttackManager attackManager, Weapon w)
+    {
+        bool isLeft = (attackManager != null && w == attackManager.leftHandWeapon);
+        bool isRight = (attackManager != null && w == attackManager.rightHandWeapon);
+        if (!isLeft && !isRight) return;
+
+        // 只在正在攻擊中、且目前 combo=1 時才允許 buffer（避免亂記）
+        if (!IsAttackingAnim()) return;
+
+        if (isLeft)
+        {
+            if (_leftCombo != 1) return;
+            if (_leftComboQueued) return;
+            _leftComboBufferedUntil = Time.time + comboInputBufferSeconds;
+        }
+        else
+        {
+            if (_rightCombo != 1) return;
+            if (_rightComboQueued) return;
+            _rightComboBufferedUntil = Time.time + comboInputBufferSeconds;
+        }
+    }
+
+
+    // If player pressed the next combo during melee dash (before attack animation starts),
+    // apply it now so Combo1 -> Combo2 transition can happen normally.
+    private void ApplyQueuedComboAfterDash()
+    {
+        if (_anim == null) return;
+
+        if (_leftQueueComboAfterDash)
+        {
+            _leftQueueComboAfterDash = false;
+            _leftComboQueued = true;
+            _leftCombo = 2;
+            _anim.SetInteger(Anim_LeftHandCombo, 2);
+            _leftComboBufferedUntil = 0f;
+        }
+
+        if (_rightQueueComboAfterDash)
+        {
+            _rightQueueComboAfterDash = false;
+            _rightComboQueued = true;
+            _rightCombo = 2;
+            _anim.SetInteger(Anim_RightHandCombo, 2);
+            _rightComboBufferedUntil = 0f;
+        }
+    }
 }
