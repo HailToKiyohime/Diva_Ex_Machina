@@ -496,36 +496,6 @@ public class AttackManager : MonoBehaviour
         return false;
     }
 
-    // Step 2 (simple): melee attack entry point.
-    // For now this only validates the equipped melee weapon and returns true so PlayerMovement can dash.
-    public bool TryStartMeleeAttack(Weapon w)
-    {
-        if (w == null) return false;
-
-        var stats = PlayerStats.Instance;
-        if (stats == null) return false;
-
-        bool isLeft = (w == leftHandWeapon);
-        bool isRight = (w == rightHandWeapon);
-
-        if (!isLeft && !isRight) return false;
-
-        var hand = isLeft ? stats.leftHand : stats.rightHand;
-
-        if (hand.weaponKind != HandWeaponKind.Melee || hand.meleeWeapon == null)
-            return false;
-
-        // cooldown：近戰 reload 期間禁止再觸發
-        if (w.meleeRuntime != null && w.meleeRuntime.reloading)
-            return false;
-
-        // Later: attack speed / animation trigger / hit detection / stamina, etc.
-        Debug.Log($"[AttackManager] Melee attack triggered: {(isLeft ? "Left" : "Right")}");
-
-        return true;
-    }
-
-
     private IEnumerator Shoot(Weapon w, Ray ray)
     {
         w.runtime.readyToShoot = false;
@@ -632,70 +602,6 @@ public class AttackManager : MonoBehaviour
             StartCoroutine(ResetShotCooldown(w));
         }
     }
-
-
-    // Melee reload (cooldown) - after dash.
-    public void StartMeleeReload(Weapon w)
-    {
-        if (w == null) return;
-
-        // 只有真的裝備近戰時才允許進入 melee reload
-        var stats = PlayerStats.Instance;
-        if (stats == null) return;
-
-        bool isLeft = (w == leftHandWeapon);
-        bool isRight = (w == rightHandWeapon);
-        if (!isLeft && !isRight) return;
-
-        var hand = isLeft ? stats.leftHand : stats.rightHand;
-        if (hand == null || hand.weaponKind != HandWeaponKind.Melee || hand.meleeWeapon == null)
-            return;
-
-        if (w.meleeRuntime.reloading) return;
-
-        w.meleeRuntime.reloading = true;
-        w.meleeReloadNormalized = 0f;
-        PushAmmoUI();
-
-        float rt = Mathf.Max(0f, w.melee.reloadTime);
-
-        if (rt <= 0f)
-        {
-            w.meleeReloadNormalized = 1f;
-            PushAmmoUI();
-            FinishMeleeReload(w);
-            PushAmmoUI();
-            return;
-        }
-
-        StartCoroutine(MeleeReloadCoroutine(w, rt));
-    }
-
-    private IEnumerator MeleeReloadCoroutine(Weapon w, float reloadTime)
-    {
-        float elapsed = 0f;
-
-        while (elapsed < reloadTime)
-        {
-            elapsed += Time.deltaTime;
-            w.meleeReloadNormalized = Mathf.Clamp01(elapsed / reloadTime);
-            PushAmmoUI();
-            yield return null;
-        }
-
-        w.meleeReloadNormalized = 1f;
-        PushAmmoUI();
-
-        FinishMeleeReload(w);
-        PushAmmoUI();
-    }
-
-    private void FinishMeleeReload(Weapon w)
-    {
-        w.meleeRuntime.reloading = false;
-        w.meleeReloadNormalized = 0f;
-    }
-
 
     public void StartReload(Weapon w)
     {
