@@ -186,7 +186,10 @@ public class PlayerMovement : MonoBehaviour
 
                 // ✅ 只有「起手」（按下前不是 Attacking）先可以開 melee dash
                 if (!wasAttacking)
+                {
+                    playerRigidbody.linearVelocity = playerRigidbody.linearVelocity *0.1f; // 先減速一半，避免 dash 衝得太快
                     StartMeleeDashAttack(w, isLeft);
+                }
             }
 
             return;
@@ -357,7 +360,7 @@ public class PlayerMovement : MonoBehaviour
 
 
     // =========================
-    // Melee Dash (NEW)
+    // Melee Dash (DROP-IN FIX)
     // =========================
     private void StartMeleeDashAttack(Weapon w, bool isLeftHand)
     {
@@ -368,77 +371,72 @@ public class PlayerMovement : MonoBehaviour
         float maxDist = stats.meleeDashDistance;
         if (maxDist <= 0f) return;
 
-        Vector3 dir;
+        bool allowVertical = (PlayerAiming.Instance.lockOn && PlayerAiming.Instance.aimingPoint != null);
 
-        // 1) Facing + direction source
-        if (PlayerAiming.Instance.lockOn && PlayerAiming.Instance.aimingPoint != null)
+        Vector3 dir = Vector3.zero;
+
+        // 1) Direction source
+        if (allowVertical)
         {
-            // --- NEW: lead / interception direction when lock-on ---
+            // --- lock-on: 3D lead/intercept direction ---
             Vector3 tgtPos = PlayerAiming.Instance.aimingPoint.position;
             Vector3 tgtVel = Vector3.zero;
 
-            // 如果有 target Rigidbody，就用佢嘅速度做攔截
             var targetRb = PlayerAiming.Instance.GetTargetRigidbody();
             if (targetRb != null)
-            {
-                tgtVel = targetRb.linearVelocity; // Unity 6 用 linearVelocity
-                //tgtVel.y = 0f;                    // 近戰 dash 只做水平追擊
-            }
+                tgtVel = targetRb.linearVelocity; // Unity 6
 
-            // 追擊者速度：用 dashSpeed（同普通 dash 一樣）
-            float sB = stats.dashSpeed;
+            float chaserSpeed = stats.dashSpeed;
 
-            // 計攔截方向；如果無解（追唔到）就 fallback 追當前位置
-            if (!Math.InterceptionDirection(tgtPos, transform.position, tgtVel, sB, out dir))
-            {
-                Vector3 toTarget = tgtPos - transform.position;
-                toTarget.y = 0f;
-                dir = (toTarget.sqrMagnitude > 0.0001f)
-                    ? toTarget.normalized
-                    : (characterModel != null ? characterModel.forward : transform.forward);
-            }
+            if (!Math.InterceptionDirection(tgtPos, transform.position, tgtVel, chaserSpeed, out dir))
+                dir = (tgtPos - transform.position);
 
+            if (dir.sqrMagnitude < 0.0001f)
+                dir = (characterModel != null ? characterModel.forward : transform.forward);
+
+            // Clamp pitch so it doesn't become "vertical rocket"
+            float maxUpAngle = 65f; // tweakable
+            Vector3 flat = new Vector3(dir.x, 0f, dir.z);
+
+            Vector3 baseForward = (flat.sqrMagnitude > 0.0001f)
+                ? flat.normalized
+                : (characterModel != null ? characterModel.forward : transform.forward);
+
+            dir = Vector3.RotateTowards(baseForward, dir.normalized, maxUpAngle * Mathf.Deg2Rad, 0f);
+            dir.Normalize();
+        }
+        else
+        {
+            // --- free aim: keep your original horizontal feel ---
+            Ray ray = PlayerAiming.Instance.GetRay();
+
+            if (Physics.Raycast(ray, out RaycastHit hit, maxDist))
+                maxDist = Mathf.Min(hit.distance, maxDist);
+
+            dir = ray.direction;
             dir.y = 0f;
+
             if (dir.sqrMagnitude < 0.0001f)
                 dir = (characterModel != null ? characterModel.forward : transform.forward);
             else
                 dir.Normalize();
         }
-        else
-        {
-            // （原本 free-aim ray 分支）不改
-            Ray ray = PlayerAiming.Instance.GetRay();
 
-            if (Physics.Raycast(ray, out RaycastHit hit, maxDist))
-            {
-                maxDist = Mathf.Min(hit.distance, maxDist);
-            }
-
-            dir = ray.direction;
+        // Only flatten when not lock-on
+        if (!allowVertical)
             dir.y = 0f;
-            if (dir.sqrMagnitude < 0.0001f)
-                dir = characterModel != null ? characterModel.forward : transform.forward;
-            else
-            {
-                dir.Normalize();
-                if (characterModel != null)
-                {
-                    Vector3 f = dir; f.y = 0f;
-                    if (f.sqrMagnitude > 0.0001f)
-                        characterModel.forward = f.normalized;
-                }
-            }
-        }
 
-        dir.y = 0f;
         if (dir.sqrMagnitude < 0.0001f) return;
         dir.Normalize();
+
+        // Visual facing: still rotate only on XZ (prevents weird model tilt)
         if (characterModel != null)
         {
             Vector3 f = dir; f.y = 0f;
             if (f.sqrMagnitude > 0.0001f)
                 characterModel.forward = f.normalized;
         }
+
         // 2) Setup runtime
         _meleeDashActive = true;
         _meleeDashIsLeft = isLeftHand;
@@ -448,20 +446,20 @@ public class PlayerMovement : MonoBehaviour
         _meleeDashDir = dir;
         _meleeDashMaxDistance = maxDist;
 
-        // 3) Reuse dashSpeed + dashDuration feel (accel) from your normal dash
+        // 3) Reuse dash feel (accel)
         Vector3 v = playerRigidbody.linearVelocity;
-        Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
 
         dashDir = dir;
         dashTargetSpeed = stats.dashSpeed;
 
-        float vParallel = Vector3.Dot(horizontalVel, dashDir);
+        // Use full velocity projection (works for both 2D and 3D dash)
+        float vParallel = Vector3.Dot(v, dashDir);
         float deltaVStart = Mathf.Max(0f, dashTargetSpeed - vParallel);
 
         float dur = Mathf.Max(0.02f, dashDuration);
         dashAccel = deltaVStart / dur;
 
-        // 4) Timeout (distance / speed + extra, clamped)
+        // 4) Timeout
         float est = (dashTargetSpeed > 0.01f) ? (maxDist / dashTargetSpeed) : 0.2f;
         _meleeDashTimeout = Mathf.Clamp(est + meleeDashTimeExtra, 0.15f, meleeDashMaxTimeClamp);
     }
@@ -477,20 +475,21 @@ public class PlayerMovement : MonoBehaviour
         float traveled = Vector3.Distance(_meleeDashStartPos, transform.position);
         bool stop = traveled >= _meleeDashMaxDistance;
 
-        // lock-on early stop (Problem 1: YES)
+        // lock-on early stop
         if (!stop && PlayerAiming.Instance != null && PlayerAiming.Instance.lockOn && PlayerAiming.Instance.aimingPoint != null)
         {
             float d = Vector3.Distance(transform.position, PlayerAiming.Instance.aimingPoint.position);
             if (d <= meleeDashStopDistance) stop = true;
         }
 
-        // timeout (wall / blocked)
+        // timeout
         if (!stop && _meleeDashElapsed >= _meleeDashTimeout) stop = true;
 
-        // stuck detect (horizontal speed too low)
         Vector3 v = playerRigidbody.linearVelocity;
-        Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
-        if (horizontalVel.magnitude <= meleeDashStuckSpeed)
+
+        // ✅ stuck detect: use speed ALONG dash direction (fixes air-target false-stuck)
+        float alongSpeed = Mathf.Abs(Vector3.Dot(v, dashDir));
+        if (alongSpeed <= meleeDashStuckSpeed)
             _meleeDashStuckElapsed += dt;
         else
             _meleeDashStuckElapsed = 0f;
@@ -503,8 +502,8 @@ public class PlayerMovement : MonoBehaviour
             return;
         }
 
-        // Push using the same rule as ApplyDashFixed (acceleration mode, cap once reached)
-        float vParallel = Vector3.Dot(horizontalVel, dashDir);
+        // Push (cap once reached)
+        float vParallel = Vector3.Dot(v, dashDir);
         if (vParallel >= dashTargetSpeed) return;
 
         playerRigidbody.AddForce(dashDir * dashAccel, ForceMode.Acceleration);
@@ -778,6 +777,8 @@ public class PlayerMovement : MonoBehaviour
     // 你原本的飛行判定就是靠 flyRequestUntil buffer，這裡沿用同一條準則
     public bool IsFlyingActive => !grounded && Time.time <= flyRequestUntil;
 
+    public bool IsDashActive => Time.time <= dashActiveUntil;
+    public bool IsMeleeDashActive => _meleeDashActive;
     public float VerticalVelocity
     {
         get
@@ -797,6 +798,4 @@ public class PlayerMovement : MonoBehaviour
 
         return false;
     }
-
-    public bool IsDashActive => Time.time <= dashActiveUntil;
 }

@@ -60,12 +60,14 @@ public class FlameEffect : MonoBehaviour
         bool flying = playerMovement.IsFlyingActive;
 
         bool dash = playerMovement.IsDashActive;
-        //bool meleeDash = playerMovement.IsMeleeDashActive;
-        if (dash)
+        bool meleeDash = playerMovement.IsMeleeDashActive;
+
+        if (dash || meleeDash)
         {
             _dashLingerUntil = Time.time + dashOffDelay;
         }
-        bool dashWithLinger = dash || Time.time < _dashLingerUntil;
+
+        bool dashWithLinger = dash || meleeDash || Time.time < _dashLingerUntil;
 
         float vy = playerMovement.VerticalVelocity;
         bool falling = !grounded && !flying && vy < fallingVelocityThreshold;
@@ -77,7 +79,7 @@ public class FlameEffect : MonoBehaviour
         // 4) ¤U¸¨¡G¥u¶} Normal flame
         bool shouldOn = false;
 
-        if (dashWithLinger /*|| meleeDash*/)
+        if (dashWithLinger || meleeDash)
         {
             shouldOn = (flameKind == FlameKind.Melee);
         }

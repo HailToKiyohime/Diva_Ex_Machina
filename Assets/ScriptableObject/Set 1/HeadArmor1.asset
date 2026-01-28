@@ -27,5 +27,5 @@ MonoBehaviour:
     value: 30
   - attribute: 38
     mode: 0
-    value: 30
+    value: 100
   randomBuffs: []

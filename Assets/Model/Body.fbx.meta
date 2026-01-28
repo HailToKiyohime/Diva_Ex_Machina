@@ -22,7 +22,7 @@ ModelImporter:
     animationDoRetargetingWarnings: 0
     importAnimatedCustomProperties: 0
     importConstraints: 0
-    animationCompression: 3
+    animationCompression: 1
     animationRotationError: 0.5
     animationPositionError: 0.5
     animationScaleError: 0.5
@@ -151,7 +151,7 @@ ModelImporter:
       takeName: root|Heavy_Piercing_Melee Attack_Left
       internalID: 5647738045479966720
       firstFrame: 0
-      lastFrame: 7
+      lastFrame: 15
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -180,7 +180,7 @@ ModelImporter:
       takeName: root|Heavy_Piercing_Melee Attack_Right
       internalID: -9007927137977945219
       firstFrame: 0
-      lastFrame: 7
+      lastFrame: 15
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -263,11 +263,11 @@ ModelImporter:
       maskSource: {instanceID: 0}
       additiveReferencePoseFrame: 0
     - serializedVersion: 16
-      name: root|Heavy_Slashing_Melee Attack_Left
-      takeName: root|Heavy_Slashing_Melee Attack_Left
-      internalID: -1025712153639371077
+      name: root|Heavy_Slashing_Melee Attack_Left_1
+      takeName: root|Heavy_Slashing_Melee Attack_Left_1
+      internalID: -8301321518304796959
       firstFrame: 0
-      lastFrame: 8
+      lastFrame: 15
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -292,11 +292,69 @@ ModelImporter:
       maskSource: {instanceID: 0}
       additiveReferencePoseFrame: 0
     - serializedVersion: 16
-      name: root|Heavy_Slashing_Melee Attack_Right
-      takeName: root|Heavy_Slashing_Melee Attack_Right
-      internalID: 4238219737069585996
+      name: root|Heavy_Slashing_Melee Attack_Left_2
+      takeName: root|Heavy_Slashing_Melee Attack_Left_2
+      internalID: 6584583029029968511
       firstFrame: 0
-      lastFrame: 8
+      lastFrame: 15
+      wrapMode: 0
+      orientationOffsetY: 0
+      level: 0
+      cycleOffset: 0
+      loop: 0
+      hasAdditiveReferencePose: 0
+      loopTime: 0
+      loopBlend: 0
+      loopBlendOrientation: 0
+      loopBlendPositionY: 0
+      loopBlendPositionXZ: 0
+      keepOriginalOrientation: 0
+      keepOriginalPositionY: 1
+      keepOriginalPositionXZ: 0
+      heightFromFeet: 0
+      mirror: 0
+      bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
+      curves: []
+      events: []
+      transformMask: []
+      maskType: 3
+      maskSource: {instanceID: 0}
+      additiveReferencePoseFrame: 0
+    - serializedVersion: 16
+      name: root|Heavy_Slashing_Melee Attack_Right_1
+      takeName: root|Heavy_Slashing_Melee Attack_Right_1
+      internalID: -7814257765580034403
+      firstFrame: 0
+      lastFrame: 15
+      wrapMode: 0
+      orientationOffsetY: 0
+      level: 0
+      cycleOffset: 0
+      loop: 0
+      hasAdditiveReferencePose: 0
+      loopTime: 0
+      loopBlend: 0
+      loopBlendOrientation: 0
+      loopBlendPositionY: 0
+      loopBlendPositionXZ: 0
+      keepOriginalOrientation: 0
+      keepOriginalPositionY: 1
+      keepOriginalPositionXZ: 0
+      heightFromFeet: 0
+      mirror: 0
+      bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
+      curves: []
+      events: []
+      transformMask: []
+      maskType: 3
+      maskSource: {instanceID: 0}
+      additiveReferencePoseFrame: 0
+    - serializedVersion: 16
+      name: root|Heavy_Slashing_Melee Attack_Right_2
+      takeName: root|Heavy_Slashing_Melee Attack_Right_2
+      internalID: 6846903176497492321
+      firstFrame: 0
+      lastFrame: 15
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -877,7 +935,7 @@ ModelImporter:
     globalScale: 1
     rootMotionBoneName: 
     hasTranslationDoF: 0
-    hasExtraRoot: 1
+    hasExtraRoot: 0
     skeletonHasParents: 1
   lastHumanDescriptionAvatarSource: {instanceID: 0}
   autoGenerateAvatarMappingIfUnspecified: 1
