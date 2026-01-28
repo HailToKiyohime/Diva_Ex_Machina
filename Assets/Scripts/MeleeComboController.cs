@@ -1,196 +1,255 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 
+/// <summary>
+/// Combo rules (方案 B):
+/// - 每一段只吃一次輸入（不能按住一直 refresh）
+/// - 錯過窗口且沒有 pending：在 Hit_1 / Hit_2 尾段自動 EndAttack() -> Attacking=false，Animator 才能 Exit
+/// - Dash 結束由 PlayerMovement 呼叫 FireHit1FromDash(isLeftHand) 觸發 Hit_1
+/// </summary>
 public class MeleeComboController : MonoBehaviour
 {
-    [Header("References")]
+    [Header("Animator")]
     public Animator anim;
 
-    [Header("Config")]
-    [Tooltip("0 = Heavy Slashing, 1 = Heavy Piercing")]
-    public int weaponStance = 0;
+    [Header("Layer Weight (One_Hand_Melee_Attack)")]
+    [SerializeField] private PlayerAnimation playerAnimation;
 
+    [Tooltip("Animator layer name that contains Dash/Hit_1/Hit_2/Hit_3 states")]
+    [SerializeField] private string meleeLayerName = "One_Hand_Melee_Attack";
+    private int _meleeLayer = -1;
+
+    [Header("Animator Params (match your controller)")]
+    [SerializeField] private string paramAttacking = "Attacking";
+    [SerializeField] private string paramLeftHandAttack = "leftHandAttack";
+    [SerializeField] private string paramRightHandAttack = "rightHandAttack";
+    [SerializeField] private string trigDash = "Dash";
+    [SerializeField] private string trigHit1 = "Hit 1";
+    [SerializeField] private string trigHit2 = "Hit 2";
+    [SerializeField] private string trigHit3 = "Hit 3";
+
+    [Header("State Names (must match Animator state names)")]
+    [SerializeField] private string stateDash = "Dash";
+    [SerializeField] private string stateHit1 = "Hit_1";
+    [SerializeField] private string stateHit2 = "Hit_2";
+    [SerializeField] private string stateHit3 = "Hit_3";
+
+    [Header("Combo Windows (normalizedTime % 1)")]
+    [Tooltip("Buffer validity seconds (for early press). Example: 0.2")]
+    [SerializeField] private float inputBufferTime = 0.2f;
+
+    [Tooltip("When normalized time >= this, buffered input may be consumed.")]
     [Range(0f, 1f)]
-    public float comboConsumeThreshold = 0.9f;   // 去到尾段先消耗 buffer 並出下一段
+    [SerializeField] private float comboWindowOpen = 0.70f;
 
-    [Tooltip("After setting a trigger, give Animator time to enter the attack state before we reset.")]
-    public float enterAttackGraceTime = 0.15f;
+    [Tooltip("After this normalized time, we stop consuming buffer to avoid late hard-cuts.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float comboConsumeThreshold = 0.90f;
 
-    [Header("Input Buffer")]
-    [Tooltip("Seconds to remember a queued input.")]
-    public float inputBufferTime = 0.2f;
+    [Tooltip("If no pending input and we're past this time, end attack (set Attacking=false) so Hit_1/Hit_2 can Exit.")]
+    [Range(0.8f, 1f)]
+    [SerializeField] private float autoEndAt = 0.98f;
 
-    [Header("Runtime")]
-    public int currentCombo = 0;
+    // runtime
+    public int currentCombo = 0;            // 0 none, 1/2/3 current stage
+    private bool _isLeftHand = true;
 
-    private int One_Hand_Melee_AttackLayer = -1;
+    // one-shot buffer per stage
+    private bool _queuedNext = false;
+    private int _queuedFromCombo = 0;       // which combo stage created this queue (prevents stacking)
+    private float _queueExpireTime = 0f;
+    private int _lastQueuedPressFrame = -999999;
 
-    // 記住 combo 屬於邊隻手（比對 full path 用）
-    private bool _activeIsLeftHand = true;
-
-    // 防止剛 SetTrigger 就被 reset
-    private float _enterGraceTimer = 0f;
-
-    // ★ input buffer：>0 代表有一次「待消耗」輸入
-    private float _bufferTimer = 0f;
-    [Header("Combo Forgiveness")]
-    [Range(0f, 1f)] public float comboWindowOpen = 0.75f; // 由 0.9 放寬到 0.75
-    public float lateForgiveness = 0.12f;                 // 播完後仍可接的時間
-    private float _lateTimer = 0f;
-    void Awake()
+    private void Awake()
     {
-        if (anim == null) anim = GetComponent<Animator>();
-        One_Hand_Melee_AttackLayer = anim.GetLayerIndex("One_Hand_Melee_Attack");
+        if (anim == null) anim = GetComponentInChildren<Animator>();
+        if (playerAnimation == null) playerAnimation = GetComponentInParent<PlayerAnimation>();
+        _meleeLayer = (anim != null) ? anim.GetLayerIndex(meleeLayerName) : -1;
     }
 
-    void Update()
+    private void Update()
     {
-        if (anim == null || One_Hand_Melee_AttackLayer < 0) return;
+        if (anim == null || _meleeLayer < 0) return;
 
-        if (_enterGraceTimer > 0f) _enterGraceTimer -= Time.deltaTime;
-        if (_bufferTimer > 0f) _bufferTimer -= Time.deltaTime;
+        // If not attacking, nothing to manage
+        if (!anim.GetBool(paramAttacking))
+            return;
 
-        if (currentCombo == 0) return;
+        var s = anim.GetCurrentAnimatorStateInfo(_meleeLayer);
+        float t = s.normalizedTime % 1f;
 
-        // transition 中唔做 reset / 唔消耗 buffer
-        if (anim.IsInTransition(One_Hand_Melee_AttackLayer)) return;
+        int stage = GetStageFromState(s);
+        if (stage <= 0)
+            return; // not in Dash/Hit states (maybe transitioning)
 
-        var s = anim.GetCurrentAnimatorStateInfo(One_Hand_Melee_AttackLayer);
+        // expire buffer
+        if (_queuedNext && Time.time > _queueExpireTime)
+            ClearQueue();
 
-        if (s.normalizedTime >= 1f)
+        // Auto-end rule:
+        // If we're in Hit_1 or Hit_2, and we're near the end and there is NO queued input,
+        // end the attack so Animator can take Hit_x -> Exit (Attacking=false).
+        if ((stage == 1 || stage == 2) && t >= autoEndAt)
         {
-            _lateTimer = Mathf.Max(_lateTimer, lateForgiveness);
-        }
-
-        if (_lateTimer > 0f)
-            _lateTimer -= Time.deltaTime;
-
-        // grace time 期間：唔好 reset（等 Animator 入 Hit state）
-        if (_enterGraceTimer <= 0f)
-        {
-            // 離開 Hit state -> reset
-            if (!IsInAnyHitState(s, _activeIsLeftHand, weaponStance))
+            if (!_queuedNext)
             {
-                ResetCombo();
-                return;
-            }
-
-            // Hit_3 完結 -> reset
-            if (IsHitState(s, _activeIsLeftHand, weaponStance, 3) && s.normalizedTime >= 1f)
-            {
-                ResetCombo();
+                EndAttack();
                 return;
             }
         }
 
-        // ★ 如果有 buffer，等到窗口打開先消耗並出下一段
-        if (_bufferTimer > 0f)
+        // Consume buffer inside window (only for Hit_1/Hit_2)
+        if (_queuedNext && (stage == 1 || stage == 2))
         {
-            float t = s.normalizedTime % 1f;
-
-            // 窗口打開（較早） OR 播完後寬限時間內
-            if (t > comboWindowOpen || _lateTimer > 0f)
+            if (t >= comboWindowOpen && t <= comboConsumeThreshold)
             {
-                _lateTimer = 0f;
-                ConsumeBufferedInput();
+                // Only allow one advance per stage; queue cannot skip stages.
+                if (stage == 1)
+                {
+                    FireTrigger(trigHit2);
+                    currentCombo = 2;
+                    ClearQueue();
+                    return;
+                }
+                if (stage == 2)
+                {
+                    FireTrigger(trigHit3);
+                    currentCombo = 3;
+                    ClearQueue();
+                    return;
+                }
             }
         }
 
-        // ★ 如果 buffer 放到過期，代表主人按得太早但冇等到窗口（或被打斷）
-        // 你可以選擇過期就 reset，或者乜都唔做。
-        // 我建議「唔自動 reset」，只係失去一次輸入：
-        // if (_bufferTimer <= 0f) { /* do nothing */ }
+        // Hit_3 always ends at tail (even if someone spammed)
+        if (stage == 3 && t >= autoEndAt)
+        {
+            EndAttack();
+            return;
+        }
     }
 
+    /// <summary>
+    /// Called by input (PlayerMovement). For first press: open gate + enter Dash.
+    /// For subsequent presses during attack: queue next (once per stage, with expiry).
+    /// </summary>
     public void MeleeAttack(bool isLeftHand)
     {
-        if (anim == null || One_Hand_Melee_AttackLayer < 0) return;
+        if (anim == null) return;
 
-        _activeIsLeftHand = isLeftHand;
-        anim.SetBool("leftHandAttack", isLeftHand);
+        _isLeftHand = isLeftHand;
 
-        // 起手：即刻出 Hit 1（唔用 buffer）
-        if (currentCombo == 0)
+        // Start new chain
+        if (!anim.GetBool(paramAttacking))
         {
-            FireHitTrigger(1);
-            currentCombo = 1;
-
-            // 清 buffer（避免起手同時排到下一段）
-            _bufferTimer = 0f;
+            BeginAttack(isLeftHand);
             return;
         }
 
-        // 已經喺 combo：只係「記住呢次按鍵」
-        _bufferTimer = inputBufferTime;
+        // Already attacking -> queue next (方案 B)
+        QueueNextOncePerStage();
     }
 
-    private void ConsumeBufferedInput()
+    /// <summary>
+    /// Called by PlayerMovement when melee dash finishes. This MUST fire Hit_1 immediately.
+    /// </summary>
+    public void FireHit1FromDash(bool isLeftHand)
     {
-        // 消耗一次 buffer
-        _bufferTimer = 0f;
+        if (anim == null) return;
 
-        if (currentCombo == 1)
-        {
-            FireHitTrigger(2);
-            currentCombo = 2;
-        }
-        else if (currentCombo == 2)
-        {
-            FireHitTrigger(3);
-            currentCombo = 3;
-        }
-        // currentCombo == 3：唔再接（等 Hit_3 完結 reset）
+        _isLeftHand = isLeftHand;
+
+        // Ensure gate open (safety)
+        if (!anim.GetBool(paramAttacking))
+            BeginAttack(isLeftHand);
+
+        // Fire Hit_1 immediately
+        FireTrigger(trigHit1);
+        currentCombo = 1;
+
+        // After Hit_1 starts, queued-from-dash should count as "from combo 1"
+        // (so spamming during dash doesn't allow stacking to hit3)
+        if (_queuedNext && _queuedFromCombo == 0)
+            _queuedFromCombo = 1;
     }
 
-    private void FireHitTrigger(int hitIndex)
+    private void BeginAttack(bool isLeftHand)
     {
-        anim.SetTrigger($"Hit {hitIndex}");
-        _enterGraceTimer = enterAttackGraceTime;
-    }
+        // Open gate
+        anim.SetBool(paramAttacking, true);
 
-    private void ResetCombo()
-    {
+        // hand routing
+        anim.SetBool(paramLeftHandAttack, isLeftHand);
+        anim.SetBool(paramRightHandAttack, !isLeftHand);
+
+        playerAnimation?.SetToAttackLayer();
+
         currentCombo = 0;
-        _bufferTimer = 0f;
+        ClearQueue();
 
-        anim.ResetTrigger("Hit 1");
-        anim.ResetTrigger("Hit 2");
-        anim.ResetTrigger("Hit 3");
+        // Enter dash state
+        FireTrigger(trigDash);
     }
 
-    // -------------------------
-    // FullPathHash matching
-    // -------------------------
-
-    private bool IsInAnyHitState(AnimatorStateInfo s, bool isLeftHand, int stance)
+    private void EndAttack()
     {
-        return IsHitState(s, isLeftHand, stance, 1)
-            || IsHitState(s, isLeftHand, stance, 2)
-            || IsHitState(s, isLeftHand, stance, 3);
+        // Close gate so Hit_1/Hit_2/Hit_3 can transition to Exit based on Attacking=false
+        anim.SetBool(paramAttacking, false);
+
+        // reset hand flags (prevents weird re-entry)
+        anim.SetBool(paramLeftHandAttack, false);
+        anim.SetBool(paramRightHandAttack, false);
+
+        playerAnimation?.SetOffAttackLayer();
+
+        currentCombo = 0;
+        ClearQueue();
     }
 
-    private bool IsHitState(AnimatorStateInfo s, bool isLeftHand, int stance, int combo)
+    private void QueueNextOncePerStage()
     {
-        string p = BuildFullPath(isLeftHand, stance, combo);
-        if (string.IsNullOrEmpty(p)) return false;
-        return s.fullPathHash == Animator.StringToHash(p);
+        // Prevent "hold refresh": only allow one queue action per frame
+        if (Time.frameCount == _lastQueuedPressFrame)
+            return;
+
+        _lastQueuedPressFrame = Time.frameCount;
+
+        int stage = currentCombo; // 0 during dash, 1/2/3 during hits
+
+        // Can't queue beyond Hit_3
+        if (stage >= 3) return;
+
+        // Already queued for this stage => ignore
+        if (_queuedNext && _queuedFromCombo == stage)
+            return;
+
+        // Set/refresh queue (expiry only when newly queued for this stage)
+        _queuedNext = true;
+        _queuedFromCombo = stage;          // stage 0 = during dash before hit1; stage 1 = during hit1; stage 2 = during hit2
+        _queueExpireTime = Time.time + inputBufferTime;
     }
 
-    public string BuildFullPath(bool isLeftHand, int stance, int combo)
+    private void ClearQueue()
     {
-        string layer = "One_Hand_Melee_Attack.";
+        _queuedNext = false;
+        _queuedFromCombo = 0;
+        _queueExpireTime = 0f;
+    }
 
-        string sm = null;
-        if (isLeftHand)
-            sm = stance == 0 ? "Heavy Slashing_L" :
-                 stance == 1 ? "Heavy Piercing_L" : null;
-        else
-            sm = stance == 0 ? "Heavy Slashing_R" :
-                 stance == 1 ? "Heavy Piercing_R" : null;
+    private void FireTrigger(string trig)
+    {
+        // Clean safety: reset then set to avoid sticky triggers
+        anim.ResetTrigger(trig);
+        anim.SetTrigger(trig);
+    }
 
-        if (sm == null) return null;
-        if (combo < 1 || combo > 3) return null;
-
-        // 依你 Animator：Hit_1 / Hit_2 / Hit_3
-        return $"{layer}{sm}.Hit_{combo}";
+    private int GetStageFromState(AnimatorStateInfo s)
+    {
+        // Dash / Hit_1 / Hit_2 / Hit_3 mapping -> 0..3
+        if (s.IsName(stateDash)) return 0; // dash phase
+        if (s.IsName(stateHit1)) return 1;
+        if (s.IsName(stateHit2)) return 2;
+        if (s.IsName(stateHit3)) return 3;
+        return -1;
     }
 }

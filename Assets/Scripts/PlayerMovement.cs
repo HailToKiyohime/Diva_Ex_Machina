@@ -58,6 +58,26 @@ public class PlayerMovement : MonoBehaviour
     private Vector3 _lastAimHoldForward = Vector3.forward;
     [Header("Melee Attack")]
     public MeleeComboController meleeComboController;
+    [Header("Melee Dash")]
+    [Tooltip("When lock-on: stop dash early if within this distance to aimingPoint.")]
+    [SerializeField] private float meleeDashStopDistance = 1.5f;
+    [Tooltip("Extra time added on top of (distance / dashSpeed) to tolerate tiny stalls.")]
+    [SerializeField] private float meleeDashTimeExtra = 0.08f;
+    [Tooltip("Hard clamp for melee dash timeout.")]
+    [SerializeField] private float meleeDashMaxTimeClamp = 0.6f;
+    [Tooltip("If horizontal speed stays below this for a short time, treat as stuck and end dash.")]
+    [SerializeField] private float meleeDashStuckSpeed = 0.2f;
+    [SerializeField] private float meleeDashStuckTime = 0.10f;
+
+    // runtime
+    private bool _meleeDashActive = false;
+    private bool _meleeDashIsLeft = true;
+    private float _meleeDashElapsed = 0f;
+    private float _meleeDashTimeout = 0f;
+    private float _meleeDashMaxDistance = 0f;
+    private float _meleeDashStuckElapsed = 0f;
+    private Vector3 _meleeDashStartPos;
+    private Vector3 _meleeDashDir;
     public void Update()
     {
         EnergyRegenerationCheck();
@@ -69,11 +89,12 @@ public class PlayerMovement : MonoBehaviour
         GroundCheck();
         ApplyHorizontalMovementFixed(Time.fixedDeltaTime);
         ApplyFlyFixed(Time.fixedDeltaTime); // 新增
+        ApplyMeleeDashFixed(Time.fixedDeltaTime); // NEW: melee dash
         ApplyDashFixed(Time.fixedDeltaTime); // 新增
     }
     private void ApplyHorizontalMovementFixed(float dt)
     {
-        if (Time.time <= dashActiveUntil) return;
+        if (_meleeDashActive || Time.time <= dashActiveUntil) return;
         Vector3 v = playerRigidbody.linearVelocity;
         Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
 
@@ -154,8 +175,18 @@ public class PlayerMovement : MonoBehaviour
         {
             if (attackInput.WasPressedThisFrame())
             {
-                Debug.Log("Melee attack triggered");
-                meleeComboController.MeleeAttack(true);
+                // 先判斷：按下之前係咪已經在攻擊中（Hit_1/2/3 期間都算）
+                bool wasAttacking = false;
+                if (meleeComboController != null && meleeComboController.anim != null)
+                    wasAttacking = meleeComboController.anim.GetBool("Attacking");
+
+                // 永遠先交俾 combo controller（起手會開 gate + 進 Dash，連段會 queue）
+                if (meleeComboController != null)
+                    meleeComboController.MeleeAttack(isLeft);
+
+                // ✅ 只有「起手」（按下前不是 Attacking）先可以開 melee dash
+                if (!wasAttacking)
+                    StartMeleeDashAttack(w, isLeft);
             }
 
             return;
@@ -324,6 +355,174 @@ public class PlayerMovement : MonoBehaviour
     }
 
 
+
+    // =========================
+    // Melee Dash (NEW)
+    // =========================
+    private void StartMeleeDashAttack(Weapon w, bool isLeftHand)
+    {
+        var stats = PlayerStats.Instance;
+        if (stats == null || playerRigidbody == null) return;
+        if (PlayerAiming.Instance == null) return;
+
+        float maxDist = stats.meleeDashDistance;
+        if (maxDist <= 0f) return;
+
+        Vector3 dir;
+
+        // 1) Facing + direction source
+        if (PlayerAiming.Instance.lockOn && PlayerAiming.Instance.aimingPoint != null)
+        {
+            // --- NEW: lead / interception direction when lock-on ---
+            Vector3 tgtPos = PlayerAiming.Instance.aimingPoint.position;
+            Vector3 tgtVel = Vector3.zero;
+
+            // 如果有 target Rigidbody，就用佢嘅速度做攔截
+            var targetRb = PlayerAiming.Instance.GetTargetRigidbody();
+            if (targetRb != null)
+            {
+                tgtVel = targetRb.linearVelocity; // Unity 6 用 linearVelocity
+                //tgtVel.y = 0f;                    // 近戰 dash 只做水平追擊
+            }
+
+            // 追擊者速度：用 dashSpeed（同普通 dash 一樣）
+            float sB = stats.dashSpeed;
+
+            // 計攔截方向；如果無解（追唔到）就 fallback 追當前位置
+            if (!Math.InterceptionDirection(tgtPos, transform.position, tgtVel, sB, out dir))
+            {
+                Vector3 toTarget = tgtPos - transform.position;
+                toTarget.y = 0f;
+                dir = (toTarget.sqrMagnitude > 0.0001f)
+                    ? toTarget.normalized
+                    : (characterModel != null ? characterModel.forward : transform.forward);
+            }
+
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.0001f)
+                dir = (characterModel != null ? characterModel.forward : transform.forward);
+            else
+                dir.Normalize();
+        }
+        else
+        {
+            // （原本 free-aim ray 分支）不改
+            Ray ray = PlayerAiming.Instance.GetRay();
+
+            if (Physics.Raycast(ray, out RaycastHit hit, maxDist))
+            {
+                maxDist = Mathf.Min(hit.distance, maxDist);
+            }
+
+            dir = ray.direction;
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.0001f)
+                dir = characterModel != null ? characterModel.forward : transform.forward;
+            else
+            {
+                dir.Normalize();
+                if (characterModel != null)
+                {
+                    Vector3 f = dir; f.y = 0f;
+                    if (f.sqrMagnitude > 0.0001f)
+                        characterModel.forward = f.normalized;
+                }
+            }
+        }
+
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f) return;
+        dir.Normalize();
+        if (characterModel != null)
+        {
+            Vector3 f = dir; f.y = 0f;
+            if (f.sqrMagnitude > 0.0001f)
+                characterModel.forward = f.normalized;
+        }
+        // 2) Setup runtime
+        _meleeDashActive = true;
+        _meleeDashIsLeft = isLeftHand;
+        _meleeDashElapsed = 0f;
+        _meleeDashStuckElapsed = 0f;
+        _meleeDashStartPos = transform.position;
+        _meleeDashDir = dir;
+        _meleeDashMaxDistance = maxDist;
+
+        // 3) Reuse dashSpeed + dashDuration feel (accel) from your normal dash
+        Vector3 v = playerRigidbody.linearVelocity;
+        Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
+
+        dashDir = dir;
+        dashTargetSpeed = stats.dashSpeed;
+
+        float vParallel = Vector3.Dot(horizontalVel, dashDir);
+        float deltaVStart = Mathf.Max(0f, dashTargetSpeed - vParallel);
+
+        float dur = Mathf.Max(0.02f, dashDuration);
+        dashAccel = deltaVStart / dur;
+
+        // 4) Timeout (distance / speed + extra, clamped)
+        float est = (dashTargetSpeed > 0.01f) ? (maxDist / dashTargetSpeed) : 0.2f;
+        _meleeDashTimeout = Mathf.Clamp(est + meleeDashTimeExtra, 0.15f, meleeDashMaxTimeClamp);
+    }
+
+    private void ApplyMeleeDashFixed(float dt)
+    {
+        if (!_meleeDashActive) return;
+        if (playerRigidbody == null) return;
+
+        _meleeDashElapsed += dt;
+
+        // Stop conditions
+        float traveled = Vector3.Distance(_meleeDashStartPos, transform.position);
+        bool stop = traveled >= _meleeDashMaxDistance;
+
+        // lock-on early stop (Problem 1: YES)
+        if (!stop && PlayerAiming.Instance != null && PlayerAiming.Instance.lockOn && PlayerAiming.Instance.aimingPoint != null)
+        {
+            float d = Vector3.Distance(transform.position, PlayerAiming.Instance.aimingPoint.position);
+            if (d <= meleeDashStopDistance) stop = true;
+        }
+
+        // timeout (wall / blocked)
+        if (!stop && _meleeDashElapsed >= _meleeDashTimeout) stop = true;
+
+        // stuck detect (horizontal speed too low)
+        Vector3 v = playerRigidbody.linearVelocity;
+        Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
+        if (horizontalVel.magnitude <= meleeDashStuckSpeed)
+            _meleeDashStuckElapsed += dt;
+        else
+            _meleeDashStuckElapsed = 0f;
+
+        if (!stop && _meleeDashStuckElapsed >= meleeDashStuckTime) stop = true;
+
+        if (stop)
+        {
+            EndMeleeDashAndFireHit1();
+            return;
+        }
+
+        // Push using the same rule as ApplyDashFixed (acceleration mode, cap once reached)
+        float vParallel = Vector3.Dot(horizontalVel, dashDir);
+        if (vParallel >= dashTargetSpeed) return;
+
+        playerRigidbody.AddForce(dashDir * dashAccel, ForceMode.Acceleration);
+    }
+
+    private void EndMeleeDashAndFireHit1()
+    {
+        if (!_meleeDashActive) return;
+        _meleeDashActive = false;
+        attackFacingActive = false;
+        // Reduce residual horizontal speed a bit (so "dash ends" feels immediate, without hard zero)
+        Vector3 v = playerRigidbody.linearVelocity;
+        Vector3 hv = new Vector3(v.x, 0f, v.z) * 0.5f;
+        playerRigidbody.linearVelocity = new Vector3(hv.x, v.y, hv.z);
+
+        if (meleeComboController != null)
+            meleeComboController.FireHit1FromDash(_meleeDashIsLeft);
+    }
     private void ApplyDashFixed(float dt)
     {
         if (Time.time > dashRequestUntil) return;
