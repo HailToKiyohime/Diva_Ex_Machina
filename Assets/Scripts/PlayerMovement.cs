@@ -68,7 +68,10 @@ public class PlayerMovement : MonoBehaviour
     [Tooltip("If horizontal speed stays below this for a short time, treat as stuck and end dash.")]
     [SerializeField] private float meleeDashStuckSpeed = 0.2f;
     [SerializeField] private float meleeDashStuckTime = 0.10f;
-
+    [Header("Melee Dash Magnetism (Homing)")]
+    [SerializeField] private float meleeDashHomingStrength = 14f;  // 越大越黏
+    [SerializeField] private float meleeDashHomingMaxTurnDegPerSec = 720f; // 限制轉向，避免瞬拐
+    [SerializeField] private float meleeDashLeadFallbackTime = 0.05f; // solver fail 時用的簡易 lead
     // runtime
     private bool _meleeDashActive = false;
     private bool _meleeDashIsLeft = true;
@@ -505,6 +508,55 @@ public class PlayerMovement : MonoBehaviour
         // Push (cap once reached)
         float vParallel = Vector3.Dot(v, dashDir);
         if (vParallel >= dashTargetSpeed) return;
+
+        // ===== Magnetism / Homing (lock-on only) =====
+        if (PlayerAiming.Instance != null &&
+            PlayerAiming.Instance.lockOn &&
+            PlayerAiming.Instance.aimingPoint != null)
+        {
+            Vector3 tgtPos = PlayerAiming.Instance.aimingPoint.position;
+
+            Vector3 tgtVel = Vector3.zero;
+            var targetRb = PlayerAiming.Instance.GetTargetRigidbody();
+            if (targetRb != null) tgtVel = targetRb.linearVelocity; // Unity 6
+
+            // 用你提供嘅 solver：算「攔截點」再朝住佢衝
+            Vector3 interceptPoint;
+            bool ok = Math.InterceptionPoint(
+                tgtPos,                     // a = target position
+                transform.position,         // b = chaser position
+                tgtVel,                     // vA = target velocity
+                dashTargetSpeed > 0.01f ? dashTargetSpeed : PlayerStats.Instance.dashSpeed, // sB = our speed
+                out interceptPoint
+            );
+
+            Vector3 desiredDir;
+            if (ok)
+            {
+                desiredDir = (interceptPoint - transform.position);
+            }
+            else
+            {
+                // solver fail：用簡易 lead 做 fallback
+                Vector3 pred = tgtPos + tgtVel * meleeDashLeadFallbackTime;
+                desiredDir = (pred - transform.position);
+            }
+
+            if (desiredDir.sqrMagnitude > 0.0001f)
+            {
+                desiredDir.Normalize();
+
+                // 轉向限制：避免瞬間「硬拐」造成抖/怪
+                float maxRad = meleeDashHomingMaxTurnDegPerSec * Mathf.Deg2Rad * dt;
+                Vector3 limited = Vector3.RotateTowards(_meleeDashDir, desiredDir, maxRad, 0f);
+
+                // 磁吸平滑（越大越黏）
+                _meleeDashDir = Vector3.Slerp(_meleeDashDir, limited, meleeDashHomingStrength * dt);
+                _meleeDashDir.Normalize();
+
+                dashDir = _meleeDashDir;
+            }
+        }
 
         playerRigidbody.AddForce(dashDir * dashAccel, ForceMode.Acceleration);
     }
