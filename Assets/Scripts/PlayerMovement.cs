@@ -178,6 +178,10 @@ public class PlayerMovement : MonoBehaviour
         {
             if (attackInput.WasPressedThisFrame())
             {
+                // ✅ Block melee attacks while this hand is reloading/cooling down (reload starts after combo ends)
+                if (w != null && w.meleeRuntime != null && w.meleeRuntime.reloading)
+                    return;
+
                 // 先判斷：按下之前係咪已經在攻擊中（Hit_1/2/3 期間都算）
                 bool wasAttacking = false;
                 if (meleeComboController != null && meleeComboController.anim != null)
@@ -190,7 +194,7 @@ public class PlayerMovement : MonoBehaviour
                 // ✅ 只有「起手」（按下前不是 Attacking）先可以開 melee dash
                 if (!wasAttacking)
                 {
-                    playerRigidbody.linearVelocity = playerRigidbody.linearVelocity *0.1f; // 先減速一半，避免 dash 衝得太快
+                    playerRigidbody.linearVelocity = playerRigidbody.linearVelocity * 0.1f; // 先減速一半，避免 dash 衝得太快
                     StartMeleeDashAttack(w, isLeft);
                 }
             }

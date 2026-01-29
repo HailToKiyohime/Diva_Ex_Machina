@@ -650,6 +650,87 @@ public class AttackManager : MonoBehaviour
         w.reloadNormalized = 0f;
     }
 
+    // -------------------------
+    // Melee Reload (Combo End)
+    // -------------------------
+
+    /// <summary>
+    /// Called when a melee combo chain finishes (NOT when it starts).
+    /// This starts the melee reload/cooldown timer for that hand.
+    /// </summary>
+    public void NotifyMeleeComboFinished(bool isLeftHand)
+    {
+        Weapon w = isLeftHand ? leftHandWeapon : rightHandWeapon;
+        if (w == null) return;
+
+        // Only start melee reload if this hand is currently a melee weapon
+        var stats = PlayerStats.Instance;
+        if (stats != null)
+        {
+            var hand = isLeftHand ? stats.leftHand : stats.rightHand;
+            if (hand == null || hand.weaponKind != HandWeaponKind.Melee) return;
+        }
+
+        StartMeleeReload(w);
+    }
+
+    public void StartMeleeReload(Weapon w)
+    {
+        if (w == null) return;
+        if (w.meleeRuntime == null) w.meleeRuntime = new MeleeWeaponRuntimeState();
+        if (w.meleeRuntime.reloading) return;
+
+        w.meleeRuntime.reloading = true;
+        w.meleeReloadNormalized = 0f;
+        PushAmmoUI();
+
+        if (w.melee.reloadTime <= 0f)
+        {
+            w.meleeReloadNormalized = 1f;
+            PushAmmoUI();
+            FinishMeleeReload(w);
+            PushAmmoUI();
+            return;
+        }
+
+        StartCoroutine(MeleeReloadCoroutine(w));
+    }
+
+    private IEnumerator MeleeReloadCoroutine(Weapon w)
+    {
+        float elapsed = 0f;
+        float duration = Mathf.Max(0.0001f, w.melee.reloadTime);
+
+        // Keep ticking even if timescale changes; melee reload is gameplay, so use scaled time.
+        while (elapsed < duration)
+        {
+            // If weapon got cleared/swapped, bail out safely
+            if (w == null || w.meleeRuntime == null || !w.meleeRuntime.reloading)
+                yield break;
+
+            elapsed += Time.deltaTime;
+            w.meleeReloadNormalized = Mathf.Clamp01(elapsed / duration);
+            PushAmmoUI();
+            yield return null;
+        }
+
+        w.meleeReloadNormalized = 1f;
+        PushAmmoUI();
+
+        FinishMeleeReload(w);
+        PushAmmoUI();
+    }
+
+    private void FinishMeleeReload(Weapon w)
+    {
+        if (w == null) return;
+        if (w.meleeRuntime == null) w.meleeRuntime = new MeleeWeaponRuntimeState();
+
+        w.meleeRuntime.reloading = false;
+        w.meleeReloadNormalized = 0f;
+    }
+
+
     private IEnumerator ResetShotCooldown(Weapon w)
     {
         yield return new WaitForSeconds(w.range.timeBetweenShooting);

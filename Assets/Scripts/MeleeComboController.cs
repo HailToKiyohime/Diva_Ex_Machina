@@ -15,6 +15,10 @@ public class MeleeComboController : MonoBehaviour
     [Header("Layer Weight (One_Hand_Melee_Attack)")]
     [SerializeField] private PlayerAnimation playerAnimation;
 
+    [Header("Attack Manager (for melee reload)")]
+    [SerializeField] private AttackManager attackManager;
+
+
     [Tooltip("Animator layer name that contains Dash/Hit_1/Hit_2/Hit_3 states")]
     [SerializeField] private string meleeLayerName = "One_Hand_Melee_Attack";
     private int _meleeLayer = -1;
@@ -62,6 +66,9 @@ public class MeleeComboController : MonoBehaviour
 
     private void Awake()
     {
+        if (attackManager == null)
+            attackManager = GetComponentInParent<AttackManager>();
+
         if (anim == null) anim = GetComponentInChildren<Animator>();
         if (playerAnimation == null) playerAnimation = GetComponentInParent<PlayerAnimation>();
         _meleeLayer = (anim != null) ? anim.GetLayerIndex(meleeLayerName) : -1;
@@ -200,10 +207,18 @@ public class MeleeComboController : MonoBehaviour
         anim.SetBool(paramLeftHandAttack, false);
         anim.SetBool(paramRightHandAttack, false);
 
+        //make sure no triggers are left hanging
+        anim.ResetTrigger(trigHit1);
+        anim.ResetTrigger(trigHit2);
+        anim.ResetTrigger(trigHit3);
+
         playerAnimation?.SetOffAttackLayer();
 
         currentCombo = 0;
         ClearQueue();
+
+        // ✅ combo chain finished -> start melee reload/cooldown (per hand)
+        attackManager?.NotifyMeleeComboFinished(_isLeftHand);
     }
 
     private void QueueNextOncePerStage()
