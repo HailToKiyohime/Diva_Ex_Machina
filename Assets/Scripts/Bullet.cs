@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -27,7 +27,7 @@ public class Bullet : MonoBehaviour
     // -1 = infinite
     public int penetration = 0;
     public int ricochet = 0;
-   [SerializeField] private PlayerAnimation meleeImpactOwnerAnim;
+    [SerializeField] private PlayerAnimation meleeImpactOwnerAnim;
 
     private bool _destroyed;
     private Collider _selfCol;
