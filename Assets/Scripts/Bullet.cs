@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class Bullet : MonoBehaviour
@@ -14,12 +15,36 @@ public class Bullet : MonoBehaviour
     public float lifespan = 5f;
     public Rigidbody rb;
 
-    private bool _hasHit;
+    public bool isMelee = false;
+
+    public LayerMask enemyLayer;
+    public bool ignoreObstacles = false;
+
+    // Your semantics:
+    // 0  = destroy after 1st enemy impact
+    // 1  = pass 1 enemy, destroy after 2nd enemy impact
+    // 2  = pass 2 enemies, destroy after 3rd enemy impact
+    // -1 = infinite
+    public int penetration = 0;
+    public int ricochet = 0;
+   [SerializeField] private PlayerAnimation meleeImpactOwnerAnim;
+
+    private bool _destroyed;
+    private Collider _selfCol;
+
+    // Prevent multi-collider enemies from taking damage multiple times per bullet
+    private readonly HashSet<int> _hitEnemyIds = new HashSet<int>();
+
+    public void SetMeleeImpactOwner(PlayerAnimation ownerAnim)
+    {
+        meleeImpactOwnerAnim = ownerAnim;
+    }
 
     void Start()
     {
         Destroy(gameObject, lifespan);
         rb = GetComponent<Rigidbody>();
+        _selfCol = GetComponent<Collider>();
         StartCoroutine(Predict());
     }
 
@@ -30,8 +55,20 @@ public class Bullet : MonoBehaviour
 
     private void OnTriggerEnter(Collider collider)
     {
-        // 統一走同一套命中處理，避免 Trigger/Linecast 兩邊各做一次
         OnTriggerEnterFixed(collider);
+    }
+
+    private bool IsInEnemyLayer(Collider col)
+    {
+        int bit = 1 << col.gameObject.layer;
+        return (enemyLayer.value & bit) != 0;
+    }
+
+    private int GetPredictMask()
+    {
+        int notBullet = ~LayerMask.GetMask("Bullet");
+        int mask = ignoreObstacles ? enemyLayer.value : notBullet;
+        return mask & notBullet;
     }
 
     protected IEnumerator Predict()
@@ -41,7 +78,7 @@ public class Bullet : MonoBehaviour
         Vector3 prediction = transform.position + rb.linearVelocity * Time.fixedDeltaTime;
 
         RaycastHit hit2;
-        int layerMask = ~LayerMask.GetMask("Bullet");
+        int layerMask = GetPredictMask();
         if (Physics.Linecast(transform.position, prediction, out hit2, layerMask))
         {
             transform.position = hit2.point;
@@ -52,15 +89,35 @@ public class Bullet : MonoBehaviour
         }
     }
 
+    private void DestroyBullet()
+    {
+        if (_destroyed) return;
+        _destroyed = true;
+
+        if (isMelee) Destroy(gameObject, 0.1f);
+        else Destroy(gameObject);
+    }
+
     protected virtual void OnTriggerEnterFixed(Collider other)
     {
-        if (_hasHit) return;
-        _hasHit = true;
+        if (_destroyed) return;
 
-        // 只對 EnemyStats 結算（主人之後要打爆炸物/可破壞物，再擴展介面）
+        // ignoreObstacles => only react to enemyLayer
+        if (ignoreObstacles && !IsInEnemyLayer(other))
+            return;
+
+        // Enemy?
         var enemy = other.GetComponentInParent<EnemyStats>();
-        if (enemy != null)
+        bool isEnemy = (enemy != null) && IsInEnemyLayer(other);
+
+        if (isEnemy)
         {
+            // Avoid double hits on same enemy (multiple colliders)
+            int id = enemy.GetInstanceID();
+            if (_hitEnemyIds.Contains(id)) return;
+            _hitEnemyIds.Add(id);
+
+            // Apply damage FIRST
             float final =
                 physicalDamage * enemy.GetDefenseMultiplier(enemy.physicalDefense) +
                 explosionDamage * enemy.GetDefenseMultiplier(enemy.explosionDefense) +
@@ -72,8 +129,35 @@ public class Bullet : MonoBehaviour
                 final *= Mathf.Max(1f, criticalMultiplier);
 
             enemy.TakeDamage(final);
+
+            // melee impact feedback
+            if (isMelee)
+                meleeImpactOwnerAnim?.AnimEvent_MeleeImpact();
+
+            // Prevent repeated trigger spam while passing through this collider
+            if (_selfCol != null && other != null)
+                Physics.IgnoreCollision(_selfCol, other, true);
+
+            // THEN handle penetration (your semantics)
+            if (penetration == -1)
+            {
+                return; // infinite
+            }
+            else if (penetration > 0)
+            {
+                penetration--; // consume one pass
+                return;        // keep flying
+            }
+            else // penetration == 0
+            {
+                DestroyBullet(); // destroy AFTER this impact
+                return;
+            }
         }
 
-        Destroy(gameObject);
+        // Not enemy:
+        // - if ignoreObstacles was true, we already returned above
+        // - otherwise hit obstacle => destroy
+        DestroyBullet();
     }
 }

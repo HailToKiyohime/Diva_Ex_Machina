@@ -81,6 +81,13 @@ public class PlayerMovement : MonoBehaviour
     private float _meleeDashStuckElapsed = 0f;
     private Vector3 _meleeDashStartPos;
     private Vector3 _meleeDashDir;
+
+    // --- Gravity Lock (for melee attack etc.) ---
+    private int _gravityLockCount = 0;
+    private bool _cachedUseGravity = true;
+
+    [SerializeField] private BoxCollider meleeAttackWall; // A box collider that enables/disables, it is larger than the player collider to prevent enemy from glitching through player during melee attack due to the capsule collider being smaller than the player model and it round shape
+
     public void Update()
     {
         EnergyRegenerationCheck();
@@ -173,11 +180,21 @@ public class PlayerMovement : MonoBehaviour
             var hand = isLeft ? stats.leftHand : stats.rightHand;
         }
 
-
+        bool attacking = meleeComboController.anim.GetBool("Attacking");
         if (IsMeleeHandAttack(attackManager, w))
         {
             if (attackInput.WasPressedThisFrame())
             {
+                // if combo is running, only allow the owner hand to input
+                if (meleeComboController != null && meleeComboController.anim != null)
+                {
+                    if (attacking)
+                    {
+                        // owner hand is meleeComboController's internal _isLeftHand (make a public getter)
+                        if (isLeft != meleeComboController.OwnerIsLeftHand)
+                            return;
+                    }
+                }
                 // ✅ Block melee attacks while this hand is reloading/cooling down (reload starts after combo ends)
                 if (w != null && w.meleeRuntime != null && w.meleeRuntime.reloading)
                     return;
@@ -194,14 +211,15 @@ public class PlayerMovement : MonoBehaviour
                 // ✅ 只有「起手」（按下前不是 Attacking）先可以開 melee dash
                 if (!wasAttacking)
                 {
-                    playerRigidbody.linearVelocity = playerRigidbody.linearVelocity * 0.1f; // 先減速一半，避免 dash 衝得太快
+                    playerRigidbody.linearVelocity = Vector3.zero; 
+                    meleeAttackWall.enabled = true; // enable the melee attack wall collider to prevent enemy from glitching through player during melee attack
                     StartMeleeDashAttack(w, isLeft);
                 }
             }
 
             return;
         }
-        else
+        else if(!attacking)
         {
 
             bool isSingle = w.range.firingMode == 0;
@@ -375,7 +393,7 @@ public class PlayerMovement : MonoBehaviour
         if (stats == null || playerRigidbody == null) return;
         if (PlayerAiming.Instance == null) return;
 
-        float maxDist = stats.meleeDashDistance;
+        float maxDist = stats.GetMeleeDashDistanceForHand(isLeftHand);
         if (maxDist <= 0f) return;
 
         bool allowVertical = (PlayerAiming.Instance.lockOn && PlayerAiming.Instance.aimingPoint != null);
@@ -853,5 +871,39 @@ public class PlayerMovement : MonoBehaviour
         if (w == attackManager.rightHandWeapon) return stats.rightHand.weaponKind == HandWeaponKind.Melee;
 
         return false;
+    }
+
+    public void LockGravity()
+    {
+        if (playerRigidbody == null) return;
+
+        if (_gravityLockCount == 0)
+        {
+            _cachedUseGravity = playerRigidbody.useGravity;
+            playerRigidbody.useGravity = false;   // ✅ gravity = 0
+        }
+
+        _gravityLockCount++;
+    }
+
+    public void UnlockGravity()
+    {
+        if (playerRigidbody == null) return;
+
+        _gravityLockCount = Mathf.Max(0, _gravityLockCount - 1);
+
+        if (_gravityLockCount == 0)
+        {
+            playerRigidbody.useGravity = _cachedUseGravity; // ✅ restore
+        }
+    }
+    public void OnCollisionEnter(Collision collision)
+    {
+        Debug.Log("Hit: " + collision.gameObject + ",tag:" + collision.gameObject.tag + ", linearVelocity: "+ playerRigidbody.linearVelocity.magnitude);
+        if (collision.gameObject.tag == "Enemy" && playerRigidbody.linearVelocity.magnitude > 5f)
+        {
+            Debug.Log("Weeeeeeeee");
+            playerAnimation.MeleeAttackFeedback.PlayFeedbacks(this.transform.position);
+        }
     }
 }

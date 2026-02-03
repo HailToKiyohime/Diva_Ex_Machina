@@ -136,7 +136,8 @@ public class WeaponStats
     }
 }
 [System.Serializable]
-public class ShoulderWeaponStats {
+public class ShoulderWeaponStats
+{
     // 目前這隻手拿的武器種類（None / Range / Melee）
     public ShoulderWeaponKind weaponKind = ShoulderWeaponKind.None;
 
@@ -599,7 +600,8 @@ public class PlayerStats : MonoBehaviour
                     rightHand.rangeweapon = null; // 保持與 AttackManager 相容：近戰時讓 ranged weapon 為 null
                     AddWeaponAndAttachmentBuffs(rightHand, meleeWeaponInst2);
                 }
-            }else if ( i == leftShoulderWeaponSlotIndex)
+            }
+            else if (i == leftShoulderWeaponSlotIndex)
             {
                 if (inst is ShoulderWeaponInstance shoulderWeaponInst)
                 {
@@ -607,7 +609,8 @@ public class PlayerStats : MonoBehaviour
                     leftShoulder.shoulderweapon = shoulderWeaponInst;
                     AddShoulderWeaponAndAttachmentBuffs(leftShoulder, shoulderWeaponInst);
                 }
-            }else if (i == rightShoulderWeaponSlotIndex)
+            }
+            else if (i == rightShoulderWeaponSlotIndex)
             {
                 if (inst is ShoulderWeaponInstance shoulderWeaponInst)
                 {
@@ -692,6 +695,8 @@ public class PlayerStats : MonoBehaviour
             case Attributes.FiringMode:
             case Attributes.CriticalChance:
             case Attributes.CriticalMultiplier:
+            case Attributes.MeleeDashDistance:
+            case Attributes.MeleeReloadTime:
                 return true;
             default:
                 return false;
@@ -728,6 +733,48 @@ public class PlayerStats : MonoBehaviour
                 ApplyMultiplierToGlobal(buff);
         }
     }
+
+    // ======= helpers: apply buffs to a single scalar (keep buff math inside PlayerStats) =======
+    private static float ApplyBuffListToValue(List<EquipmentBuff> buffs, Attributes attr, float baseValue)
+    {
+        if (buffs == null) return baseValue;
+
+        float v = baseValue;
+
+        // Pass 1: Add
+        for (int i = 0; i < buffs.Count; i++)
+        {
+            var b = buffs[i];
+            if (b.attribute != attr) continue;
+            if (b.mode == BuffApplyMode.Add) v += b.value;
+        }
+
+        // Pass 2: Multiplier
+        for (int i = 0; i < buffs.Count; i++)
+        {
+            var b = buffs[i];
+            if (b.attribute != attr) continue;
+            if (b.mode == BuffApplyMode.Multiplier) v *= (1f + b.value);
+        }
+
+        return v;
+    }
+
+    // The effective melee dash distance for the specified hand:
+    // base PlayerStats.meleeDashDistance, then apply that hand's weapon-side buffs (weapon + attachments + armor weapon-side buffs).
+    public float GetMeleeDashDistanceForHand(bool isLeftHand)
+    {
+        var hand = isLeftHand ? leftHand : rightHand;
+        return ApplyBuffListToValue(hand.buffs, Attributes.MeleeDashDistance, meleeDashDistance);
+    }
+
+    // The effective melee reload/cooldown time for the specified hand:
+    public float GetMeleeReloadTimeForHand(bool isLeftHand, float baseReloadTime)
+    {
+        var hand = isLeftHand ? leftHand : rightHand;
+        return ApplyBuffListToValue(hand.buffs, Attributes.MeleeReloadTime, baseReloadTime);
+    }
+
     void ApplyAddToGlobal(EquipmentBuff buff)
     {
         switch (buff.attribute)
@@ -793,7 +840,7 @@ public class PlayerStats : MonoBehaviour
             case Attributes.MaxHealth: maxHealth *= m; break;
             case Attributes.AimingDistance: aimingDistance *= m; break;
             case Attributes.LockOnRange: lockOnRange *= m; break;
-            case Attributes.AutoAimSpeed: autoAimSpeed *= m; break; 
+            case Attributes.AutoAimSpeed: autoAimSpeed *= m; break;
 
             case Attributes.MeleeDashDistance: meleeDashDistance *= m; break;
             case Attributes.MeleeReloadTime: meleeReloadTime *= m; break;
@@ -860,4 +907,5 @@ public class PlayerStats : MonoBehaviour
             AddBuffListToWeapon(target, part.buffs);
         }
     }
+
 }

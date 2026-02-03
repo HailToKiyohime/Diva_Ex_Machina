@@ -22,13 +22,13 @@ MonoBehaviour:
   buffs:
   - attribute: 0
     mode: 0
-    value: 10
+    value: 80
   - attribute: 35
     mode: 1
-    value: 0.1
+    value: 1
   - attribute: 36
     mode: 1
-    value: 0.2
+    value: 1.5
   - attribute: 8
     mode: 0
     value: 1.5

@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using UnityEngine.Animations.Rigging;
 
 /// <summary>
 /// Combo rules (方案 B):
@@ -54,6 +55,12 @@ public class MeleeComboController : MonoBehaviour
     [Range(0.8f, 1f)]
     [SerializeField] private float autoEndAt = 0.98f;
 
+
+    [SerializeField] private BoxCollider meleeAttackWall; // A box collider that enables/disables, it is larger than the player collider to prevent enemy from glitching through player during melee attack due to the capsule collider being smaller than the player model and it round shape
+
+
+    public int handInUse = 0; // 0 none, 1 left, 2 right 
+
     // runtime
     public int currentCombo = 0;            // 0 none, 1/2/3 current stage
     private bool _isLeftHand = true;
@@ -63,7 +70,13 @@ public class MeleeComboController : MonoBehaviour
     private int _queuedFromCombo = 0;       // which combo stage created this queue (prevents stacking)
     private float _queueExpireTime = 0f;
     private int _lastQueuedPressFrame = -999999;
+    public bool OwnerIsLeftHand => _isLeftHand;
 
+    // --- failsafe: prevent permanent Attacking lock if Dash->Hit1 handoff fails ---
+    [SerializeField] private float dashFailSafeSeconds = 1.5f;
+    private float _attackStartTime = -999f;
+
+    [SerializeField] private PlayerMovement playerMovement;
     private void Awake()
     {
         if (attackManager == null)
@@ -72,6 +85,9 @@ public class MeleeComboController : MonoBehaviour
         if (anim == null) anim = GetComponentInChildren<Animator>();
         if (playerAnimation == null) playerAnimation = GetComponentInParent<PlayerAnimation>();
         _meleeLayer = (anim != null) ? anim.GetLayerIndex(meleeLayerName) : -1;
+
+        if (playerMovement == null)
+            playerMovement = GetComponentInParent<PlayerMovement>();
     }
 
     private void Update()
@@ -86,8 +102,24 @@ public class MeleeComboController : MonoBehaviour
         float t = s.normalizedTime % 1f;
 
         int stage = GetStageFromState(s);
-        if (stage <= 0)
-            return; // not in Dash/Hit states (maybe transitioning)
+
+        // stage < 0 才代表「不在 Dash/Hit」，stage==0 是 Dash，不能 early-return
+        if (stage < 0)
+            return;
+
+        // expire buffer (Dash 期間也要讓它過期，避免卡 queue)
+        if (_queuedNext && Time.time > _queueExpireTime)
+            ClearQueue();
+
+        // ✅ Dash failsafe: if we're stuck in Dash too long, release Attacking gate
+        if (stage == 0)
+        {
+            if (Time.time - _attackStartTime >= dashFailSafeSeconds)
+            {
+                EndAttack();
+            }
+            return; // Dash 期間不做 Hit_1/2/3 消耗窗口邏輯
+        }
 
         // expire buffer
         if (_queuedNext && Time.time > _queueExpireTime)
@@ -144,16 +176,21 @@ public class MeleeComboController : MonoBehaviour
     {
         if (anim == null) return;
 
-        _isLeftHand = isLeftHand;
+        bool isAttacking = anim.GetBool(paramAttacking);
 
-        // Start new chain
-        if (!anim.GetBool(paramAttacking))
+        // ✅ combo 期間：另一隻手輸入一律忽略（防止偷換 owner）
+        if (isAttacking && isLeftHand != _isLeftHand)
+            return;
+
+        // 起手：先鎖定 owner，再 BeginAttack
+        if (!isAttacking)
         {
+            _isLeftHand = isLeftHand;   // ✅ ONLY set here
             BeginAttack(isLeftHand);
             return;
         }
 
-        // Already attacking -> queue next (方案 B)
+        // 已在攻擊：只 queue（同手）
         QueueNextOncePerStage();
     }
 
@@ -164,18 +201,20 @@ public class MeleeComboController : MonoBehaviour
     {
         if (anim == null) return;
 
-        _isLeftHand = isLeftHand;
+        // 如果已經在攻擊中：另一手不能 hijack
+        if (anim.GetBool(paramAttacking) && isLeftHand != _isLeftHand)
+            return;
 
-        // Ensure gate open (safety)
+        // ✅ only set owner if we're starting a new chain
+        if (!anim.GetBool(paramAttacking))
+            _isLeftHand = isLeftHand;
+
         if (!anim.GetBool(paramAttacking))
             BeginAttack(isLeftHand);
 
-        // Fire Hit_1 immediately
         FireTrigger(trigHit1);
         currentCombo = 1;
 
-        // After Hit_1 starts, queued-from-dash should count as "from combo 1"
-        // (so spamming during dash doesn't allow stacking to hit3)
         if (_queuedNext && _queuedFromCombo == 0)
             _queuedFromCombo = 1;
     }
@@ -184,7 +223,7 @@ public class MeleeComboController : MonoBehaviour
     {
         // Open gate
         anim.SetBool(paramAttacking, true);
-
+        _attackStartTime = Time.time;
         // hand routing
         anim.SetBool(paramLeftHandAttack, isLeftHand);
         anim.SetBool(paramRightHandAttack, !isLeftHand);
@@ -193,24 +232,22 @@ public class MeleeComboController : MonoBehaviour
 
         currentCombo = 0;
         ClearQueue();
-
         // Enter dash state
+        ResetTrigger(trigDash);
         FireTrigger(trigDash);
+
+        playerMovement?.LockGravity();
     }
 
     private void EndAttack()
     {
-        // Close gate so Hit_1/Hit_2/Hit_3 can transition to Exit based on Attacking=false
+        bool isLeftHand = _isLeftHand;  // ✅ ending hand = chain owner
+
         anim.SetBool(paramAttacking, false);
 
         // reset hand flags (prevents weird re-entry)
-        anim.SetBool(paramLeftHandAttack, false);
-        anim.SetBool(paramRightHandAttack, false);
-
-        //make sure no triggers are left hanging
-        anim.ResetTrigger(trigHit1);
-        anim.ResetTrigger(trigHit2);
-        anim.ResetTrigger(trigHit3);
+        if (_isLeftHand) anim.SetBool(paramLeftHandAttack, false);
+        else anim.SetBool(paramRightHandAttack, false);
 
         playerAnimation?.SetOffAttackLayer();
 
@@ -218,7 +255,15 @@ public class MeleeComboController : MonoBehaviour
         ClearQueue();
 
         // ✅ combo chain finished -> start melee reload/cooldown (per hand)
-        attackManager?.NotifyMeleeComboFinished(_isLeftHand);
+        attackManager?.NotifyMeleeComboFinished(isLeftHand);
+
+        anim.ResetTrigger(trigHit1);
+        anim.ResetTrigger(trigHit2);
+        anim.ResetTrigger(trigHit3);
+        anim.ResetTrigger(trigDash);
+
+        playerMovement?.UnlockGravity();
+        meleeAttackWall.enabled = false;
     }
 
     private void QueueNextOncePerStage()
@@ -254,10 +299,13 @@ public class MeleeComboController : MonoBehaviour
     private void FireTrigger(string trig)
     {
         // Clean safety: reset then set to avoid sticky triggers
-        anim.ResetTrigger(trig);
+        anim.ResetTrigger(trig); 
         anim.SetTrigger(trig);
     }
-
+    private void ResetTrigger(string trig)
+    {
+        anim.ResetTrigger(trig);
+    }
     private int GetStageFromState(AnimatorStateInfo s)
     {
         // Dash / Hit_1 / Hit_2 / Hit_3 mapping -> 0..3

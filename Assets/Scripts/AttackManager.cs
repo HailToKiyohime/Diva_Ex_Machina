@@ -104,7 +104,7 @@ public class AttackManager : MonoBehaviour
     private ShoulderWeaponInstance _rightShoulderWeaponSource;
 
     [Header("Optional: used to add player velocity to sword slash")]
-    [SerializeField] private Rigidbody playerRb;
+    [SerializeField] public Rigidbody playerRb;
 
     private void Awake()
     {
@@ -337,6 +337,16 @@ public class AttackManager : MonoBehaviour
             outWeapon.muzzle = hand.meleeWeapon.muzzlePoint;
             outWeapon.melee.reloadTime = hand.GetAttribute(Attributes.ReloadTime);
             outWeapon.melee.item = hand.meleeWeapon.item as MeleeWeapon;
+
+            // ✅ 同步近戰傷害（避免 w.damage 是 0 或殘留舊值）
+            float meleeOutput = hand.GetAttribute(Attributes.MeleeOutput);
+            if (meleeOutput <= 0f) meleeOutput = 1f; // 保底：如果你沒給 MeleeOutput 的 base buff
+
+            outWeapon.damage.physicalDamage = hand.GetAttribute(Attributes.PhysicalDamage) * meleeOutput;
+            outWeapon.damage.explosionDamage = hand.GetAttribute(Attributes.ExplosionDamage) * meleeOutput;
+            outWeapon.damage.energyDamage = hand.GetAttribute(Attributes.EnergyDamage) * meleeOutput;
+            outWeapon.damage.coldDamage = hand.GetAttribute(Attributes.ColdDamage) * meleeOutput;
+
             // weaponObject：MeleeWeaponInstance 目前沒有提供 Transform，這裡保持 null（需要的話之後再接）
             outWeapon.melee.swordSlashPrefab = (outWeapon.melee.item != null) ? outWeapon.melee.item.swordSlash : null;
             outWeapon.melee.weaponObject = null;
@@ -671,10 +681,10 @@ public class AttackManager : MonoBehaviour
             if (hand == null || hand.weaponKind != HandWeaponKind.Melee) return;
         }
 
-        StartMeleeReload(w);
+        StartMeleeReload(w, isLeftHand);
     }
 
-    public void StartMeleeReload(Weapon w)
+    public void StartMeleeReload(Weapon w, bool isLeftHand)
     {
         if (w == null) return;
         if (w.meleeRuntime == null) w.meleeRuntime = new MeleeWeaponRuntimeState();
@@ -693,13 +703,21 @@ public class AttackManager : MonoBehaviour
             return;
         }
 
-        StartCoroutine(MeleeReloadCoroutine(w));
+        StartCoroutine(MeleeReloadCoroutine(w, isLeftHand));
     }
 
-    private IEnumerator MeleeReloadCoroutine(Weapon w)
+    private IEnumerator MeleeReloadCoroutine(Weapon w, bool isLeftHand)
     {
         float elapsed = 0f;
-        float duration = Mathf.Max(0.0001f, w.melee.reloadTime);
+
+        var stats = PlayerStats.Instance;
+        float baseReload = (w != null) ? w.melee.reloadTime : 0f;
+
+        // ✅ per-hand melee reload time（buff 計算留喺 PlayerStats）
+        float duration = (stats != null)
+            ? Mathf.Max(0.0001f, stats.GetMeleeReloadTimeForHand(isLeftHand, baseReload))
+            : Mathf.Max(0.0001f, baseReload);
+
 
         // Keep ticking even if timescale changes; melee reload is gameplay, so use scaled time.
         while (elapsed < duration)
@@ -779,6 +797,25 @@ public class AttackManager : MonoBehaviour
 
         Quaternion rot = Quaternion.LookRotation(PlayerAiming.Instance.meshTransform.forward, Vector3.up);
         GameObject slash = Instantiate(prefab, origin.position, rot);
+
+        // ✅ 把近戰武器傷害/暴擊塞進 slash prefab 的 Bullet.cs
+        var bulletComp = slash.GetComponent<Bullet>();
+        if (bulletComp != null)
+        {
+            bulletComp.physicalDamage = w.damage.physicalDamage;
+            bulletComp.explosionDamage = w.damage.explosionDamage;
+            bulletComp.energyDamage = w.damage.energyDamage;
+            bulletComp.coldDamage = w.damage.coldDamage;
+
+            var ps = PlayerStats.Instance;
+            if (ps != null)
+            {
+                bulletComp.criticalChance = ps.criticalChance;
+                bulletComp.criticalMultiplier = ps.criticalMultiplier;
+                bulletComp.SetMeleeImpactOwner(playerAnimation);
+            }
+        }
+
 
         // ===== 3) 計算 velocity：base + player speed projected =====
         Rigidbody rb = slash.GetComponent<Rigidbody>();

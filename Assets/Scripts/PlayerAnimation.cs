@@ -50,8 +50,9 @@ public class PlayerAnimation : MonoBehaviour
     private Coroutine _fovRoutine;
     public CinemachineCamera Camera;
 
-    public MMF_Player leftAttackFeedback;
-    public MMF_Player rightAttackFeedback;
+    public MMF_Player leftAttackFeedback;//Range
+    public MMF_Player rightAttackFeedback;//Range
+    public MMF_Player MeleeAttackFeedback;
     void Awake()
     {
         anim = anim != null ? anim : GetComponent<Animator>();
@@ -629,7 +630,10 @@ public class PlayerAnimation : MonoBehaviour
     {
         rightAttackFeedback?.PlayFeedbacks(this.transform.position);
     }
-
+    public void AnimEvent_MeleeImpact()
+    {
+        MeleeAttackFeedback?.PlayFeedbacks(this.transform.position);
+    }
 
     // ===== Animation Events =====
     // 左手攻擊動畫 clip 的 Animation Event 直接叫呢個
@@ -644,5 +648,13 @@ public class PlayerAnimation : MonoBehaviour
     {
         if (attackManager == null) return;
         attackManager.AnimEvent_SpawnSwordSlash_Right();
+    }
+    public void OnCollisionEnter(Collision collision)
+    {
+        Debug.Log("Hit:" + collision.gameObject);
+        if (collision.gameObject.tag == "Enemy" && attackManager.playerRb.linearVelocity.magnitude > 8f)
+        {
+            MeleeAttackFeedback.PlayFeedbacks(this.transform.position);
+        }
     }
 }

@@ -17,7 +17,7 @@ public class EnemyBrain : MonoBehaviour
     [SerializeField] private float repathCooldown = 0.25f;
 
     [Header("State Switch")]
-    [Tooltip("避免距離在 combatRange 邊界抖動時狀態瘋狂切換（>0 建議 0.5~2）")]
+    [Tooltip("Hysteresis buffer to prevent state flipping near combat range (0.5~2 is common).")]
     [SerializeField] private float combatRangeHysteresis = 1.0f;
 
     private CreatePath pathFinder;
@@ -27,7 +27,13 @@ public class EnemyBrain : MonoBehaviour
     private float _nextAllowedRepathTime;
 
     private FirearmControlSystem firearmSystem;
-    [SerializeField] private float fireConeDeg = 10f;
+    [SerializeField] private float fireConeDeg = 5f;
+
+    // ============================
+    // Attack Limiter
+    // Only enemies holding a slot are allowed to shoot.
+    // ============================
+    private bool _hasAttackSlot;
 
     private void Awake()
     {
@@ -36,23 +42,43 @@ public class EnemyBrain : MonoBehaviour
         firearmSystem = GetComponent<FirearmControlSystem>();
     }
 
+    private void OnDisable()
+    {
+        ReleaseAttackSlot();
+    }
+
+    private void OnDestroy()
+    {
+        ReleaseAttackSlot();
+    }
+
     private void Update()
     {
         if (pathFinder == null || movement == null) return;
+
         if (pathFinder.Target == null)
         {
+            ReleaseAttackSlot();
             SetState(EnemyState.Idle);
             movement.HorizontalMovement(0f, 0f);
             return;
         }
+
         if (firearmSystem != null)
         {
             firearmSystem.target = pathFinder.Target;
         }
-        // A) 先根據距離切狀態（含 hysteresis）
+
+        // A) Decide state by distance (+ hysteresis)
         UpdateStateByDistance();
 
-        // B) 再跑狀態行為
+        // If we somehow lost our slot, force out of Attacking
+        if (currentState == EnemyState.Attacking && !_hasAttackSlot)
+        {
+            SetState(EnemyState.Chasing);
+        }
+
+        // B) State behavior
         switch (currentState)
         {
             case EnemyState.Idle:
@@ -72,19 +98,27 @@ public class EnemyBrain : MonoBehaviour
     private void UpdateStateByDistance()
     {
         float dist = Vector3.Distance(transform.position, pathFinder.Target.position);
-        float enterAttack = pathFinder.CombatRange;                     // 進攻判斷線
-        float exitAttack = pathFinder.CombatRange + combatRangeHysteresis; // 離開進攻（回到追擊）判斷線
+        float enterAttack = pathFinder.CombatRange;
+        float exitAttack = pathFinder.CombatRange + combatRangeHysteresis;
 
         if (currentState != EnemyState.Attacking)
         {
             if (dist <= enterAttack)
-                SetState(EnemyState.Attacking);
+            {
+                // IMPORTANT: only enter Attacking if we can claim a slot
+                if (TryClaimAttackSlot())
+                    SetState(EnemyState.Attacking);
+                else
+                    SetState(EnemyState.Chasing);
+            }
             else
+            {
                 SetState(EnemyState.Chasing);
+            }
         }
         else
         {
-            // 已在 Attacking：拉開到 exitAttack 才切回 Chasing，避免抖動
+            // Already Attacking: only leave when beyond exit threshold
             if (dist >= exitAttack)
                 SetState(EnemyState.Chasing);
         }
@@ -97,8 +131,9 @@ public class EnemyBrain : MonoBehaviour
         // Exit old
         switch (currentState)
         {
-            case EnemyState.Chasing:
-                // 需要的話可在這裡做追擊結束清理
+            case EnemyState.Attacking:
+                // Leaving Attacking => release slot
+                ReleaseAttackSlot();
                 break;
         }
 
@@ -107,25 +142,51 @@ public class EnemyBrain : MonoBehaviour
         // Enter new
         switch (currentState)
         {
+            case EnemyState.Idle:
+                ReleaseAttackSlot();
+                break;
+
             case EnemyState.Chasing:
-                // 進入追擊：立刻算一次路，避免剛切回來還沿用舊 corner
+                // Enter chasing: refresh path
                 pathFinder.FindPath();
                 _nextAllowedRepathTime = 0f;
                 break;
 
             case EnemyState.Attacking:
-                // 進入攻擊：先停一下（真正攻擊行為你之後再接 AttackManager/動畫）
+                // Enter attacking: stop input this frame; actual movement/fire handled in DoAttacking
                 movement.HorizontalMovement(0f, 0f);
                 break;
         }
     }
 
+    private bool TryClaimAttackSlot()
+    {
+        if (_hasAttackSlot) return true;
+
+        // If there's no GameManager, just allow (fail-open)
+        if (GameManager.Instance == null)
+        {
+            _hasAttackSlot = true;
+            return true;
+        }
+
+        _hasAttackSlot = GameManager.Instance.TryClaimAttackSlot(this);
+        return _hasAttackSlot;
+    }
+
+    private void ReleaseAttackSlot()
+    {
+        if (!_hasAttackSlot) return;
+        _hasAttackSlot = false;
+
+        if (GameManager.Instance != null)
+            GameManager.Instance.ReleaseAttackSlot(this);
+    }
+
     private void DoChasing()
     {
-        // 1) 若已到路徑終點附近，就立即重算路徑（沿用你原本邏輯）
         TryRepathIfPathFinished();
 
-        // 2) 正常沿路徑移動（沿用你原本邏輯）
         nextMoveLocation = pathFinder.FindNextMoveLocation(transform);
 
         Vector3 dir = nextMoveLocation - transform.position;
@@ -154,11 +215,8 @@ public class EnemyBrain : MonoBehaviour
 
     private void DoAttacking()
     {
-        // 最小版本：攻擊狀態先停住（或你想用 circularPathFinding 在近距離繞圈也行）
-        // 1) 若已到路徑終點附近，就立即重算路徑（沿用你原本邏輯）
         TryRepathIfPathFinished();
 
-        // 2) 正常沿路徑移動（沿用你原本邏輯）
         nextMoveLocation = pathFinder.FindNextMoveLocation(transform);
 
         Vector3 dir = nextMoveLocation - transform.position;
@@ -184,11 +242,12 @@ public class EnemyBrain : MonoBehaviour
 
         movement.HorizontalMovement(moveX, moveZ);
 
-        // 之後要接：面向目標、播放攻擊動畫、觸發 AttackManager 等
-        // 只有 Attacking 狀態才觸發開火（主人需求 #3）
+        // Only shoot if we currently hold an attack slot
+        if (!_hasAttackSlot) return;
+
         if (firearmSystem != null && currentState == EnemyState.Attacking)
         {
-            firearmSystem.RequestFireAll(fireConeDeg); // 主人需求 #1 + #2
+            firearmSystem.RequestFireAll(fireConeDeg);
         }
     }
 
