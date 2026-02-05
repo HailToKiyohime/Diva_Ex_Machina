@@ -6,6 +6,7 @@ TagManager:
   tags:
   - DropItem
   - Enemy
+  - Mobile Platform
   layers:
   - Default
   - TransparentFX
@@ -19,7 +20,7 @@ TagManager:
   - Enemy
   - Bullet
   - Drop Item
-  - 
+  - Mobile Platform
   - 
   - 
   - 

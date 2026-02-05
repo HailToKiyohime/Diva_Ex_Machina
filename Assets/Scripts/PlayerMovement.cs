@@ -88,6 +88,9 @@ public class PlayerMovement : MonoBehaviour
 
     [SerializeField] private BoxCollider meleeAttackWall; // A box collider that enables/disables, it is larger than the player collider to prevent enemy from glitching through player during melee attack due to the capsule collider being smaller than the player model and it round shape
 
+
+
+
     public void Update()
     {
         EnergyRegenerationCheck();
@@ -101,26 +104,33 @@ public class PlayerMovement : MonoBehaviour
         ApplyFlyFixed(Time.fixedDeltaTime); // 新增
         ApplyMeleeDashFixed(Time.fixedDeltaTime); // NEW: melee dash
         ApplyDashFixed(Time.fixedDeltaTime); // 新增
+
     }
     private void ApplyHorizontalMovementFixed(float dt)
     {
         if (_meleeDashActive || Time.time <= dashActiveUntil) return;
-        Vector3 v = playerRigidbody.linearVelocity;
-        Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
 
-        // 沒輸入：用 deceleration 拉回 0（只處理 x/z，保留 y）
+        Vector3 platformVel = GetMobilePlatformVelocity();
+
+        // 用「相對平台」速度來做加速/減速
+        Vector3 vWorld = playerRigidbody.linearVelocity;
+        Vector3 vRel = vWorld - platformVel;
+
+        Vector3 horizontalRel = new Vector3(vRel.x, 0f, vRel.z);
+
         if (moveDirection.sqrMagnitude < 0.0001f)
         {
-            horizontalVel = Vector3.MoveTowards(horizontalVel, Vector3.zero, PlayerStats.Instance.decelerationSpeed * dt);
-            playerRigidbody.linearVelocity = new Vector3(horizontalVel.x, v.y, horizontalVel.z);
+            horizontalRel = Vector3.MoveTowards(horizontalRel, Vector3.zero, PlayerStats.Instance.decelerationSpeed * dt);
+            Vector3 outRel = new Vector3(horizontalRel.x, vRel.y, horizontalRel.z);
+            playerRigidbody.linearVelocity = outRel + platformVel;   // ✅ 設定一次，不累加
             return;
         }
 
-        // 有輸入：用 acceleration 推向目標水平速度（同樣只處理 x/z）
-        Vector3 targetHorizontalVel = moveDirection * PlayerStats.Instance.sprintSpeed;
-        horizontalVel = Vector3.MoveTowards(horizontalVel, targetHorizontalVel, PlayerStats.Instance.accelerationSpeed * dt);
+        Vector3 targetHorizontalRel = moveDirection * PlayerStats.Instance.sprintSpeed;
+        horizontalRel = Vector3.MoveTowards(horizontalRel, targetHorizontalRel, PlayerStats.Instance.accelerationSpeed * dt);
 
-        playerRigidbody.linearVelocity = new Vector3(horizontalVel.x, v.y, horizontalVel.z);
+        Vector3 outRel2 = new Vector3(horizontalRel.x, vRel.y, horizontalRel.z);
+        playerRigidbody.linearVelocity = outRel2 + platformVel;      // ✅ 設定一次，不累加
     }
 
     private void ApplyFlyFixed(float dt)
@@ -905,5 +915,32 @@ public class PlayerMovement : MonoBehaviour
             Debug.Log("Weeeeeeeee");
             playerAnimation.MeleeAttackFeedback.PlayFeedbacks(this.transform.position);
         }
+
     }
+    // Mobile Platform carry (velocity-based)
+    private bool _onMobilePlatform = false;
+    private Rigidbody _mobilePlatformRb = null;
+    public void OnTriggerStay(Collider other)
+    {
+        if (other.CompareTag("Mobile Platform"))
+        {
+            _mobilePlatformRb = other.GetComponentInParent<Rigidbody>();
+            _onMobilePlatform = (_mobilePlatformRb != null);
+        }
+    }
+    public void OnTriggerExit(Collider other)
+    {
+        if (other.CompareTag("Mobile Platform"))
+        {
+            _onMobilePlatform = false;
+            _mobilePlatformRb = null;
+        }
+    }
+
+    private Vector3 GetMobilePlatformVelocity()
+    {
+        if (!_onMobilePlatform || _mobilePlatformRb == null) return Vector3.zero;
+        return _mobilePlatformRb.linearVelocity; // Unity 6
+    }
+
 }
