@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.AI;
+
 public class CreatePath : MonoBehaviour
 {
     public Transform target;
@@ -17,29 +18,62 @@ public class CreatePath : MonoBehaviour
     [SerializeField] private float normalRangeBrainUpdateTime;
 
     private float elapsed = 0.0f;
-
-    // 新增：持久化本回合的 updateTime
     private float currentUpdateTime;
 
     public bool circularPathFinding = false;
 
     [Header("Circular Orbit")]
-    [SerializeField] private float orbitStepDeg = 20f;   // 每次重算前進幾度
+    [SerializeField] private float orbitStepDeg = 20f;
     [SerializeField] private float orbitRadius = 10f;
-    [SerializeField] private bool orbitClockwise = true; // true=順時針(角度遞減), false=逆時針(角度遞增)
-    [SerializeField] private bool orbitUseCurrentAsStart = true; // 初始角度用敵人目前方位，或用 random
+    [SerializeField] private bool orbitClockwise = true;
+    [SerializeField] private bool orbitUseCurrentAsStart = true;
     private float orbitAngleDeg;
     private bool orbitAngleInitialized;
 
+    // ============================
+    // Ship Nav Projection (NEW)
+    // ============================
+    [Header("Ship Nav Projection")]
+    [SerializeField] private bool onShipNav = false;
+    [SerializeField] private Transform realShipRoot;
+    [SerializeField] private Transform ghostShipRoot;
+
     public float CombatRange => combatRange;
     public Transform Target => target;
+
     void Start()
     {
         path = new NavMeshPath();
         elapsed = 0.0f;
-
-        // 初始化一個門檻
         currentUpdateTime = normalRangeBrainUpdateTime;
+    }
+
+    // ============================
+    // Public API (NEW)
+    // ============================
+    public void SetOnShipNav(Transform realShip, Transform ghostShip, Transform newTarget)
+    {
+        onShipNav = true;
+        realShipRoot = realShip;
+        ghostShipRoot = ghostShip;
+        target = newTarget;
+
+        // 船上通常不需要 orbit 初始角度沿用（避免奇怪跳動）
+        orbitAngleInitialized = false;
+
+        FindPath();
+        elapsed = 0f;
+    }
+
+    public void SetOverworldNav(Transform newTarget)
+    {
+        onShipNav = false;
+        realShipRoot = null;
+        ghostShipRoot = null;
+        target = newTarget;
+
+        FindPath();
+        elapsed = 0f;
     }
 
     void Update()
@@ -53,65 +87,86 @@ public class CreatePath : MonoBehaviour
         {
             elapsed = 0f;
 
-            // 先算路徑（你原本的邏輯）
-            Vector3 navmeshPoint;
-            NavMeshHit hit;
+            FindPath();
 
-
-            navmeshPoint = GetDestinationPoint(target.position);
-
-
-            if (NavMesh.SamplePosition(navmeshPoint, out hit, 100.0f, NavMesh.AllAreas))
-            {
-                NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, path);
-            }
-
-            // 重點：更新完這次才決定「下一次」要等多久
+            // 更新下一次刷新頻率（維持你原本行為）
             if (targetDistance < combatRange)
                 currentUpdateTime = Random.Range(combatRangeBrainMinUpdateTime, combatRangeBrainMaxUpdateTime);
             else
                 currentUpdateTime = normalRangeBrainUpdateTime;
         }
 
-        for (int i = 0; i < path.corners.Length - 1; i++)
-            Debug.DrawLine(path.corners[i], path.corners[i + 1], Color.red);
-    }
-    public void FindPath()
-    {
-        Vector3 navmeshPoint;
-        NavMeshHit hit;
-
-        navmeshPoint = GetDestinationPoint(target.position);
-
-
-        if (NavMesh.SamplePosition(navmeshPoint, out hit, 100.0f, NavMesh.AllAreas))
+        // Debug：corners 是「計算座標系」下的點（船上模式會畫在 ghostShip 那邊）
+        if (path != null && path.corners != null)
         {
-            NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, path);
+            for (int i = 0; i < path.corners.Length - 1; i++)
+                Debug.DrawLine(path.corners[i], path.corners[i + 1], Color.red);
         }
     }
 
-    public NavMeshPath GetPath()
+    public void FindPath()
     {
-        return path;
+        if (target == null) return;
+
+        Vector3 startWorld = transform.position;
+        Vector3 endWorld = target.position;
+
+        // 1) 取得計算用 start/end（可能投影到 ghost）
+        Vector3 navStart = startWorld;
+        Vector3 navEnd = endWorld;
+
+        if (onShipNav && realShipRoot != null && ghostShipRoot != null)
+        {
+            navStart = ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, startWorld);
+            navEnd = ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, endWorld);
+        }
+
+        // 2) 目的地點：Overworld 用你原本 random offset；OnShip 先用「純目標」
+        Vector3 navmeshPoint = navEnd;
+
+        if (!onShipNav)
+        {
+            navmeshPoint = GetDestinationPoint(endWorld); // 你原本行為：帶 offset / orbit
+        }
+        else
+        {
+            // 船上模式建議先穩定：不要 random offset（避免把點偏到牆後）
+            // 如果你之後想要船上也有 offset，我可以再幫你加「在 ghost 空間 offset」版本
+        }
+
+        NavMeshHit hit;
+        if (NavMesh.SamplePosition(navmeshPoint, out hit, 100.0f, NavMesh.AllAreas))
+        {
+            NavMesh.CalculatePath(navStart, hit.position, NavMesh.AllAreas, path);
+        }
     }
-    public Transform GetTarget()
-    {
-        return target;
-    }
+
+    public NavMeshPath GetPath() => path;
+    public Transform GetTarget() => target;
+
     public Vector3 FindNextMoveLocation(Transform objectTransform)
     {
         if (path == null || objectTransform == null) return Vector3.zero;
 
         int len = path.corners != null ? path.corners.Length : 0;
         if (len == 0) return objectTransform.position;
-        if (len == 1) return path.corners[0];
+
+        if (len == 1)
+            return ProjectCornerToReal(path.corners[0]);
+
+        // ✅ 用同座標系去找最近 corner
+        Vector3 queryPos = objectTransform.position;
+        if (onShipNav && realShipRoot != null && ghostShipRoot != null)
+        {
+            queryPos = ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, objectTransform.position);
+        }
 
         float lowestDistance = Mathf.Infinity;
         int currentPointIndex = 0;
 
         for (int i = 0; i < len - 1; i++)
         {
-            float d = Vector3.Distance(path.corners[i], objectTransform.position);
+            float d = Vector3.Distance(path.corners[i], queryPos);
             if (d < lowestDistance)
             {
                 lowestDistance = d;
@@ -119,24 +174,35 @@ public class CreatePath : MonoBehaviour
             }
         }
 
-        int nextIndex = currentPointIndex + 1;
-        return path.corners[nextIndex];
+        int nextIndex = Mathf.Clamp(currentPointIndex + 1, 0, len - 1);
+        return ProjectCornerToReal(path.corners[nextIndex]);
     }
+
+    private Vector3 ProjectCornerToReal(Vector3 cornerWorld)
+    {
+        if (onShipNav && realShipRoot != null && ghostShipRoot != null)
+        {
+            return ShipNavProjector.GhostToRealPoint(realShipRoot, ghostShipRoot, cornerWorld);
+        }
+        return cornerWorld;
+    }
+
     public Vector3 GetDestinationPoint(Vector3 targetPosition)
     {
         float targetDistance = Vector3.Distance(transform.position, target.position);
+
         if (targetDistance < combatRange)
         {
             if (circularPathFinding)
             {
                 return GetNextOrbitPoint(
-                transform,
-                target,
-                orbitRadius + Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset),
-                orbitStepDeg,
-                orbitClockwise,
-                orbitUseCurrentAsStart,
-                target.position.y
+                    transform,
+                    target,
+                    orbitRadius + Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset),
+                    orbitStepDeg,
+                    orbitClockwise,
+                    orbitUseCurrentAsStart,
+                    target.position.y
                 );
             }
 
@@ -154,17 +220,15 @@ public class CreatePath : MonoBehaviour
                 target.position.z + Random.Range(-10f, 10f)
             );
         }
-
     }
 
-
     public Vector3[] BuildPointsAround(
-    Transform center,
-    float radius,
-    int count = 8,
-    float startAngleDeg = 0f,
-    bool keepCenterY = true
-)
+        Transform center,
+        float radius,
+        int count = 8,
+        float startAngleDeg = 0f,
+        bool keepCenterY = true
+    )
     {
         if (count <= 0) return System.Array.Empty<Vector3>();
 
@@ -189,16 +253,15 @@ public class CreatePath : MonoBehaviour
     }
 
     private Vector3 GetNextOrbitPoint(
-    Transform self,
-    Transform centerTarget,
-    float radius,
-    float stepDeg,
-    bool clockwise,
-    bool useCurrentAsStart,
-    float centerY
-)
+        Transform self,
+        Transform centerTarget,
+        float radius,
+        float stepDeg,
+        bool clockwise,
+        bool useCurrentAsStart,
+        float centerY
+    )
     {
-        // 初始化角度（只做一次）
         if (!orbitAngleInitialized)
         {
             if (useCurrentAsStart)
@@ -206,7 +269,6 @@ public class CreatePath : MonoBehaviour
                 Vector3 toEnemy = self.position - centerTarget.position;
                 toEnemy.y = 0f;
 
-                // 如果剛好重疊，避免 Atan2(0,0) 造成不穩
                 if (toEnemy.sqrMagnitude < 0.0001f)
                     orbitAngleDeg = Random.Range(0f, 360f);
                 else
@@ -220,15 +282,11 @@ public class CreatePath : MonoBehaviour
             orbitAngleInitialized = true;
         }
 
-        // 推進角度：順/逆時針
         orbitAngleDeg += (clockwise ? -stepDeg : stepDeg);
-
-        // 角度保持在 0~360 內，避免長期累積變很大（非必要但乾淨）
         orbitAngleDeg = Mathf.Repeat(orbitAngleDeg, 360f);
 
         float rad = orbitAngleDeg * Mathf.Deg2Rad;
 
-        // 回傳未校正的圓周點（y 給你控制：通常用 target 的 y）
         return new Vector3(
             centerTarget.position.x + Mathf.Cos(rad) * radius,
             centerY,
