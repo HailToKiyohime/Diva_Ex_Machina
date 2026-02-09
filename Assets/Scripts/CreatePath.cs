@@ -53,6 +53,8 @@ public class CreatePath : MonoBehaviour
     // ============================
     public void SetOnShipNav(Transform realShip, Transform ghostShip, Transform newTarget)
     {
+        // 切換到船上導航模式：啟用投影，設定船根和目標
+        Debug.Log("Switching to Ship Navigation Mode");
         onShipNav = true;
         realShipRoot = realShip;
         ghostShipRoot = ghostShip;

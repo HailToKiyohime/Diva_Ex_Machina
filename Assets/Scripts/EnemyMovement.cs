@@ -24,6 +24,15 @@ public class EnemyMovement : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] private float minTurnSpeedFactor = 0.2f;
 
+
+    // ============================
+    // Mobile Platform carry (same as PlayerMovement)
+    // ============================
+    [Header("Mobile Platform Carry")]
+    [SerializeField] private string mobilePlatformTag = "Mobile Platform";
+    private bool _onMobilePlatform = false;
+    private Rigidbody _mobilePlatformRb = null;
+
     void Awake()
     {
         stats = GetComponent<EnemyStats>();
@@ -61,44 +70,48 @@ public class EnemyMovement : MonoBehaviour
     {
         if (stats == null || enemyRigidbody == null) return;
 
-        Vector3 v = enemyRigidbody.linearVelocity;
-        Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
+        Vector3 platformVel = GetMobilePlatformVelocity();
 
-        // 1) 無輸入：照你原本邏輯用 decelerationSpeed 歸零
+        // ✅ 用「相對平台」速度來做加速/減速
+        Vector3 vWorld = enemyRigidbody.linearVelocity;
+        Vector3 vRel = vWorld - platformVel;
+
+        Vector3 horizontalRel = new Vector3(vRel.x, 0f, vRel.z);
+
+        // 1) 無輸入：相對速度歸零（平台速度仍會保留）
         if (moveDirection.sqrMagnitude < 0.0001f)
         {
-            horizontalVel = Vector3.MoveTowards(horizontalVel, Vector3.zero, stats.decelerationSpeed * dt);
-            enemyRigidbody.linearVelocity = new Vector3(horizontalVel.x, v.y, horizontalVel.z);
+            horizontalRel = Vector3.MoveTowards(horizontalRel, Vector3.zero, stats.decelerationSpeed * dt);
+            Vector3 outRel = new Vector3(horizontalRel.x, vRel.y, horizontalRel.z);
+            enemyRigidbody.linearVelocity = outRel + platformVel;   // ✅ 加回平台速度
             return;
         }
 
-        // 2) 有輸入：計 target 水平速度，但如果轉向角太大，先減速（用 decelerationSpeed）
+        // 2) 有輸入：計 target 相對水平速度，轉向大時減速
         Vector3 desiredDir = moveDirection;
         desiredDir.y = 0f;
         if (desiredDir.sqrMagnitude > 0.0001f) desiredDir.Normalize();
 
-        // 用 rotateRoot（或剛體）作為「目前面向」
-        Vector3 facing = (rotateRoot != null) ? rotateRoot.forward : enemyRigidbody.transform.forward;
-        facing.y = 0f;
-        if (facing.sqrMagnitude > 0.0001f) facing.Normalize();
+        // 夾角（用 rotateRoot forward）
+        Vector3 forward = rotateRoot != null ? rotateRoot.forward : transform.forward;
+        forward.y = 0f;
+        if (forward.sqrMagnitude > 0.0001f) forward.Normalize();
 
-        float angle = 0f;
-        if (facing.sqrMagnitude > 0.0001f && desiredDir.sqrMagnitude > 0.0001f)
-            angle = Vector3.Angle(facing, desiredDir);
+        float angle = Vector3.Angle(forward, desiredDir);
 
-        // 角度映射：45° -> 1.0 speed；到 turnSlowFullAngle -> minTurnSpeedFactor
-        float t = 0f;
-        if (angle > turnSlowStartAngle)
-            t = Mathf.InverseLerp(turnSlowStartAngle, Mathf.Max(turnSlowStartAngle + 0.01f, turnSlowFullAngle), angle);
+        // angle -> speedFactor（大轉向走慢）
+        float t = Mathf.InverseLerp(turnSlowStartAngle, turnSlowFullAngle, angle);
+        float speedFactor = Mathf.Lerp(1f, minTurnSpeedFactor, Mathf.Clamp01(t));
 
-        float speedFactor = Mathf.Lerp(1f, minTurnSpeedFactor, t);
-        Vector3 targetHorizontalVel = desiredDir * (stats.speed * speedFactor);
+        Vector3 targetHorizontalRel = desiredDir * (stats.speed * speedFactor);
 
-        // ✅ 關鍵：大轉向時用 decelerationSpeed 拉低速度，角度細先用 accelerationSpeed
+        // ✅ 關鍵：大轉向時用 decelerationSpeed 拉低速度，角度小用 accelerationSpeed
         float rate = (angle > turnSlowStartAngle) ? stats.decelerationSpeed : stats.accelerationSpeed;
 
-        horizontalVel = Vector3.MoveTowards(horizontalVel, targetHorizontalVel, rate * dt);
-        enemyRigidbody.linearVelocity = new Vector3(horizontalVel.x, v.y, horizontalVel.z);
+        horizontalRel = Vector3.MoveTowards(horizontalRel, targetHorizontalRel, rate * dt);
+
+        Vector3 outRel2 = new Vector3(horizontalRel.x, vRel.y, horizontalRel.z);
+        enemyRigidbody.linearVelocity = outRel2 + platformVel;      // ✅ 加回平台速度
     }
 
     public void SetWorldMoveDirection(Vector3 worldDir)
@@ -106,27 +119,46 @@ public class EnemyMovement : MonoBehaviour
         worldDir.y = 0f;
 
         if (worldDir.sqrMagnitude < 0.0001f)
-        {
             moveDirection = Vector3.zero;
-            return;
-        }
-
-        moveDirection = worldDir.normalized; // 直接用世界方向，AI 最穩
+        else
+            moveDirection = worldDir.normalized;
     }
 
     private void RotateToMoveDirectionFixed(float dt)
     {
-        // 沒有移動輸入就不轉（避免停下來還亂轉）
-        if (moveDirection.sqrMagnitude < 0.0001f) return;
+        if (rotateRoot == null) return;
 
         Vector3 dir = moveDirection;
         dir.y = 0f;
         if (dir.sqrMagnitude < 0.0001f) return;
-        dir.Normalize();
 
         Quaternion targetRot = Quaternion.LookRotation(dir, Vector3.up);
-        Quaternion newRot = Quaternion.RotateTowards(enemyRigidbody.rotation, targetRot, turnSpeedDeg * dt);
+        rotateRoot.rotation = Quaternion.RotateTowards(rotateRoot.rotation, targetRot, turnSpeedDeg * dt);
+    }
+    // ============================
+    // Trigger: detect platform rb (same idea as PlayerMovement)
+    // ============================
+    public void OnTriggerStay(Collider other)
+    {
+        if (other.CompareTag(mobilePlatformTag))
+        {
+            _mobilePlatformRb = other.GetComponentInParent<Rigidbody>();
+            _onMobilePlatform = (_mobilePlatformRb != null);
+        }
+    }
 
-        enemyRigidbody.MoveRotation(newRot);
+    public void OnTriggerExit(Collider other)
+    {
+        if (other.CompareTag(mobilePlatformTag))
+        {
+            _onMobilePlatform = false;
+            _mobilePlatformRb = null;
+        }
+    }
+
+    private Vector3 GetMobilePlatformVelocity()
+    {
+        if (!_onMobilePlatform || _mobilePlatformRb == null) return Vector3.zero;
+        return _mobilePlatformRb.linearVelocity; // Unity 6
     }
 }
