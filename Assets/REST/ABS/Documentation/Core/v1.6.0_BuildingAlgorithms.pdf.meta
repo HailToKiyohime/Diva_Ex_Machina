@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 4de7f6b65d6c1d04c81c8864644c573c
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Documentation/Core/v1.6.0_BuildingAlgorithms.pdf
+  uploadId: 782656

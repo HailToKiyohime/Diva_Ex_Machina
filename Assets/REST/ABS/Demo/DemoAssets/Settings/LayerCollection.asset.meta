@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: e885d78c086483e4e836d19daf0f502e
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/DemoAssets/Settings/LayerCollection.asset
+  uploadId: 782656

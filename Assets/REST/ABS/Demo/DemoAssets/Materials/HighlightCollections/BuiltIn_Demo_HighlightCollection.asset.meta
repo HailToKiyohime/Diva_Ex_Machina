@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 4501087183343b145bf01e6db4310b86
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/DemoAssets/Materials/HighlightCollections/BuiltIn_Demo_HighlightCollection.asset
+  uploadId: 782656

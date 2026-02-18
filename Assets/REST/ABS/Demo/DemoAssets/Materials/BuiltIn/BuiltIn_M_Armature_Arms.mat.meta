@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: f82722757c7d9ab42b035f1da1644b7a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/DemoAssets/Materials/BuiltIn/BuiltIn_M_Armature_Arms.mat
+  uploadId: 782656

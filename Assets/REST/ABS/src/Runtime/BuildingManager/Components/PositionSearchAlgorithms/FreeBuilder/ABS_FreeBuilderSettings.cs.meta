@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 38cace18f85b31a4d9bc73e11bc3e15b
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/src/Runtime/BuildingManager/Components/PositionSearchAlgorithms/FreeBuilder/ABS_FreeBuilderSettings.cs
+  uploadId: 782656

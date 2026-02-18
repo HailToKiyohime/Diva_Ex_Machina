@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 940703ba3bf25cb47b95e6312fd10186, type: 3}
+  m_Name: HDRP_DemoHighlightCollection
+  m_EditorClassIdentifier: 
+  m_PendingHighlightMaterial: {fileID: 2100000, guid: aaba3ca04e975d24f8bafdb1f8103a35,
+    type: 2}
+  m_BlockedHighlightMaterial: {fileID: 2100000, guid: 65c4d3f466c19fc4280141fcce1d8a29,
+    type: 2}
+  m_DestroyHighlightMaterial: {fileID: 2100000, guid: a6021b9d560e5374695d755ef89932e2,
+    type: 2}
+  m_PreBuiltHighlightMaterial: {fileID: 2100000, guid: 7afb9a8ed50837c44a65ac7874df5bbf,
+    type: 2}
+  m_CustomHighlightMaterials: []

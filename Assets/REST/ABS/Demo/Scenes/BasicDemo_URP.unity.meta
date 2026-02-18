@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 2d30f377867bc744cbe05794dde878e2
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/Scenes/BasicDemo_URP.unity
+  uploadId: 782656

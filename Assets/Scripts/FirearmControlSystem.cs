@@ -162,7 +162,7 @@ public class FirearmControlSystem : MonoBehaviour
         if (fa.bulletSpeed > 0.01f)
         {
             // Math.InterceptionPoint(a=targetPos, b=origin, vA=targetVel, sB=projectileSpeed, out c)
-            if (Math.InterceptionPoint(target.position, origin, _targetVel, fa.bulletSpeed, out var c))
+            if (ProjectileCalculation.InterceptionPoint(target.position, origin, _targetVel, fa.bulletSpeed, out var c))
                 aimPoint = c;
         }
         _lastAimPoint[idx] = aimPoint;

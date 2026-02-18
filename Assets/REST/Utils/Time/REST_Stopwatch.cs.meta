@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: dcd38e19cc6f4c44ea49e0e319ba498a
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/Utils/Time/REST_Stopwatch.cs
+  uploadId: 782656

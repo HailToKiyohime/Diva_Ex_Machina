@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 061984e9ab38eae4aa05e24135880bb1
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Documentation/Core/v1.6.0_BuildingManager.pdf
+  uploadId: 782656

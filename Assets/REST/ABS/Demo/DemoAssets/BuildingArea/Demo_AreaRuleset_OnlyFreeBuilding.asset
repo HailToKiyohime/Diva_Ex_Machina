@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b79eb4988c8c0414f995af169327afa1, type: 3}
+  m_Name: Demo_AreaRuleset_OnlyFreeBuilding
+  m_EditorClassIdentifier: 
+  m_Rules:
+    m_EntityList:
+    - m_Name: Rule
+      m_PermissionType: 0
+      m_ScreeningType: 1
+      m_BEAreaTypes: 
+      m_BuildingElementObjects:
+      - {fileID: 1399600060067807322, guid: 1cc5548678f8c3448a379b81c2a03667, type: 3}
+      - {fileID: -6665706877177161585, guid: 26e170d214ee7e446b68e4d42b6932de, type: 3}
+      - {fileID: -6665706877177161585, guid: 6baa072c174215f4f803f6147c7e4f2d, type: 3}
+      - {fileID: -6665706877177161585, guid: 829608ed709e10f4f909e3bf7a30b985, type: 3}
+      - {fileID: 630701550678915331, guid: f71af316c92b5384fb1abc63b5c03120, type: 3}
+      - {fileID: -6665706877177161585, guid: 1a8e40cf5242b7d44bb812c5298c6f08, type: 3}
+  m_BasePermissionType: 1

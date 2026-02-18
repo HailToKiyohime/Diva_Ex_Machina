@@ -1,0 +1,64 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 38cace18f85b31a4d9bc73e11bc3e15b, type: 3}
+  m_Name: FreeBuildingSettings
+  m_EditorClassIdentifier: 
+  m_SearchRadius: 2
+  m_BuildRadius: 3
+  m_ElementVisiblity: 0
+  m_AllowPositionSearchAtRaycastEndPosition: 1
+  m_AlignPositionToGround: 1
+  m_PrioritizePreBuilt: 1
+  m_UseFoundationLogic: 0
+  m_LayerCollection: {fileID: 11400000, guid: e885d78c086483e4e836d19daf0f502e, type: 2}
+  m_RotationStrategy: 3
+  m_RotationYDegree: 22.5
+  m_AlignRotationToGroundStrategy: 0
+  m_MaximumRotationAlignment: 90
+  m_EnableAlignRotationToBuildingElements: 0
+  m_ElementRotaionAlignmentStrategy: 2
+  m_EnableDragBuilding: 1
+  m_DragBuildingLimitX: 0
+  m_DragBuildingLimitXAmount: 1
+  m_DragBuildingLimitZ: 0
+  m_DragBuildingLimitZAmount: 1
+  m_AllowDragBuildingWithoutHit: 1
+  m_RepositionStrategy: 1
+  m_AllowPlacementDuringMovement: 1
+  m_RepositionMoveSpeed: 50
+  m_RepositionRotateSpeed: 50
+  m_OverrideStrategy: 0
+  m_OverrideElementRuleset: {fileID: 0}
+  m_PositionValidationElementCollisionCheck: 1
+  m_ElementCollisionFailureHandling: 1
+  m_PositionValidationCollisionCheck: 0
+  m_CollisionFailureHandling: 1
+  m_CheckUnderGroundPosition: 1
+  m_GroundedCheck: 0
+  m_GroundedCheckFailureHandling: 1
+  m_GroundedCheckSizeMultipler: 1.01
+  m_BuildableGroundValidation: 0
+  m_BuildableGroundValidationFailureHandling: 1
+  m_BuildableGround_ShouldAllCheckHit: 0
+  m_BuildableGround_RangeOffset: 0.1
+  m_BuildableGround_RangeLimit: 0.3
+  m_AllowBuildingInTheAir: 0
+  m_AddMaximumHeightToAirBuilding: 1
+  m_AirPositionReferencePoint: 2
+  m_MaximumAirHeight: 2
+  m_SpecialRuleValidation: 0
+  m_SpecialRuleValidationFailureHandling: 1
+  m_BuildOnTopOfElement: 0
+  m_BuildOnTopOfElementResultHandling: 2
+  m_ShouldSnapToFoundationFailureHandling: 1
+  m_StabiltyFailureHandling: 1
+  m_EnableAttachementConnection: 1

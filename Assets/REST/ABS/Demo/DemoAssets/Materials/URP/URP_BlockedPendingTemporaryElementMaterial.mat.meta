@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: eed359a3ce92fea4796d3cee9b8f3f37
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/DemoAssets/Materials/URP/URP_BlockedPendingTemporaryElementMaterial.mat
+  uploadId: 782656

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: dc1daf92d27ec2443980beee7637cdd2
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ProjectSettings/ABS_ProjectSettings.asset
+  uploadId: 782656

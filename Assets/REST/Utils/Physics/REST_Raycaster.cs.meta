@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 3e3839225772f664fa04caed312d2d56
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/Utils/Physics/REST_Raycaster.cs
+  uploadId: 782656

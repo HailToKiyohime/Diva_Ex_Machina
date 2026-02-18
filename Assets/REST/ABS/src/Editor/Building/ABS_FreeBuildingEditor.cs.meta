@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 275aebbd588d3024d97dba7c47224bb7
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/src/Editor/Building/ABS_FreeBuildingEditor.cs
+  uploadId: 782656

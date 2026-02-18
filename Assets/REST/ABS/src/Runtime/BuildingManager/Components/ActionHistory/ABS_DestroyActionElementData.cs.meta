@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 4bfe78f7e34192f4dada8b5d3821ec86
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/src/Runtime/BuildingManager/Components/ActionHistory/ABS_DestroyActionElementData.cs
+  uploadId: 782656

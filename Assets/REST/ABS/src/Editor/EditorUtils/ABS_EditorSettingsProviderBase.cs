@@ -1,0 +1,62 @@
+//*********************************************************************
+//  Dependencies: System
+using System.Collections.Generic;
+
+//  Dependencies: Unity
+using UnityEditor;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+//  Dependencies: REST
+
+//*********************************************************************
+
+namespace REST.AdvancedBuildSystem.Editor
+{
+    public abstract class ABS_EditorSettingsProviderBase<SettingsProviderType> : SettingsProvider
+        where SettingsProviderType : ScriptableObject
+    {
+        private SerializedObject serializedSettings;
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        #region Constructor
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        
+        public ABS_EditorSettingsProviderBase(string path, SettingsScope scope) : base(path, scope) { }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        #endregion // Constructor
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        #region Implementation of SettingsProvider
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        public override void OnActivate(string searchContext, VisualElement rootElement)
+        {
+            SettingsProviderType settings = GetSettings();
+            serializedSettings = new SerializedObject(settings);
+            OnActivateImpl(serializedSettings);
+        }
+
+        public override void OnGUI(string searchContext)
+        {
+            OnGUIImpl(searchContext);
+            serializedSettings.ApplyModifiedProperties();
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        #endregion // Implementation of SettingsProvider
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        #region Abstract Functions
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        protected abstract HashSet<string> GetKeywords();
+
+        protected abstract void OnGUIImpl(string searchContext);
+        protected abstract void OnActivateImpl(SerializedObject p_SerializedObject);
+        protected abstract SettingsProviderType GetSettings();
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        #endregion // Abstract Functions
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    }
+}

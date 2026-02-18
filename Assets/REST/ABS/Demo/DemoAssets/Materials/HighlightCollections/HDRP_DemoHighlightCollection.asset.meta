@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: b36be42bacdedcb4b873a05beafeb44f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/DemoAssets/Materials/HighlightCollections/HDRP_DemoHighlightCollection.asset
+  uploadId: 782656

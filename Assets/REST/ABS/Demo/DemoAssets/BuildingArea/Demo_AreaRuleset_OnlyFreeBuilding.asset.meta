@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: bf47b56535aaf9e4a996db6c16ceef12
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/DemoAssets/BuildingArea/Demo_AreaRuleset_OnlyFreeBuilding.asset
+  uploadId: 782656

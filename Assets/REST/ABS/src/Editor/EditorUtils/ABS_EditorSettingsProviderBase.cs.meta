@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: e2977c2c539f4744b8425592b57018c7
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/src/Editor/EditorUtils/ABS_EditorSettingsProviderBase.cs
+  uploadId: 782656

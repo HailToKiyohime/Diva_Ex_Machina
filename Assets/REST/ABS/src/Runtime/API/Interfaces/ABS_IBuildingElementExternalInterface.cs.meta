@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 2a0f9e57582784e4ab3ac761cbf636a0
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/src/Runtime/API/Interfaces/ABS_IBuildingElementExternalInterface.cs
+  uploadId: 782656

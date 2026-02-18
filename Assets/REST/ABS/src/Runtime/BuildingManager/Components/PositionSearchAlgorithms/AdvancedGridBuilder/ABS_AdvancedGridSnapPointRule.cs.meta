@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: f004a21e9e686b2428110d624d74e685
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/src/Runtime/BuildingManager/Components/PositionSearchAlgorithms/AdvancedGridBuilder/ABS_AdvancedGridSnapPointRule.cs
+  uploadId: 782656

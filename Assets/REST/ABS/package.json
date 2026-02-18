@@ -1,0 +1,8 @@
+{
+    "name": "com.rest.advancedbuildsystem",
+    "displayName": "Advanced Build System",
+    "version": "1.0.0",
+    "unity": "2022.3",
+    "dependencies": {
+    }
+  }

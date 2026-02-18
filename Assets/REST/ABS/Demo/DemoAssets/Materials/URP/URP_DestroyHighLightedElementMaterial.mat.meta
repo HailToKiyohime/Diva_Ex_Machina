@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 79857f7342339144785a2b59af81b4ae
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/DemoAssets/Materials/URP/URP_DestroyHighLightedElementMaterial.mat
+  uploadId: 782656

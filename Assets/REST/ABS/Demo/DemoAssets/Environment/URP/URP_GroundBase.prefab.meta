@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 86fd9fd2937154c40be5770f0e433632
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/DemoAssets/Environment/URP/URP_GroundBase.prefab
+  uploadId: 782656

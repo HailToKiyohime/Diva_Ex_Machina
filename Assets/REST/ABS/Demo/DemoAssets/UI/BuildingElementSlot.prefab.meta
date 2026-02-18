@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 381e99500bad6284e8a5c55c02dc67e9
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/DemoAssets/UI/BuildingElementSlot.prefab
+  uploadId: 782656

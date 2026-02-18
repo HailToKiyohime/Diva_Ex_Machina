@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 8099042c7e05b704a9de3397dae74b73
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/Scenes/BasicDemo_HDRP.unity
+  uploadId: 782656

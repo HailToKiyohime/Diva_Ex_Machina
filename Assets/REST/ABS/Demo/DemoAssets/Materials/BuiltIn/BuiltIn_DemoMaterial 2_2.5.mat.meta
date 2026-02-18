@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 68a5830d26272d049a299472fe8cabfa
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/DemoAssets/Materials/BuiltIn/BuiltIn_DemoMaterial
+    2_2.5.mat
+  uploadId: 782656

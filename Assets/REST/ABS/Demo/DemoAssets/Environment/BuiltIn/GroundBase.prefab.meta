@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: bc14beddb5194644fae892df0f798cf6
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/DemoAssets/Environment/BuiltIn/GroundBase.prefab
+  uploadId: 782656

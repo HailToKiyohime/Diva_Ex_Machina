@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: e0af7f7acf0c45a45b1d4be7cac55c80
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/DemoAssets/Settings/FreeBuildingSettings.asset
+  uploadId: 782656

@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: c5883f042bacd0047954efab987b539c
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/src/Runtime/Building/ABS_AdvancedGridBuilding.cs
+  uploadId: 782656

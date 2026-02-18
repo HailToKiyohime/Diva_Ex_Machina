@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: cec25eefd0910194288e8f903479d806
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/DemoAssets/Materials/URP/URP_DemoMaterialSurface_1.mat
+  uploadId: 782656

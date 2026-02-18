@@ -7,10 +7,9 @@ using UnityEngine.AI;
 public class CreatePath : MonoBehaviour
 {
     public Transform target;
-    public Vector3[] midwayPoint;
     private NavMeshPath path;
 
-    [Range(1, 50)]
+    [Range(1, 100)]
     [SerializeField] private float combatRange;
     [SerializeField] private float randomCombatRangeOffset;
     [SerializeField] private float combatRangeBrainMinUpdateTime;
@@ -132,14 +131,22 @@ public class CreatePath : MonoBehaviour
         }
         else
         {
-            // 船上模式建議先穩定：不要 random offset（避免把點偏到牆後）
-            // 如果你之後想要船上也有 offset，我可以再幫你加「在 ghost 空間 offset」版本
+            // 船上模式：在 ghost 空間套用與 GetDestinationPoint 相同的邏輯
+            navmeshPoint = GetDestinationPoint_OnShipLocal(startWorld, endWorld);
         }
 
         NavMeshHit hit;
+        NavMeshHit hit2;
         if (NavMesh.SamplePosition(navmeshPoint, out hit, 100.0f, NavMesh.AllAreas))
         {
-            NavMesh.CalculatePath(navStart, hit.position, NavMesh.AllAreas, path);
+            if (NavMesh.SamplePosition(navStart, out hit2, 100.0f, NavMesh.AllAreas))
+            {
+                NavMesh.CalculatePath(hit2.position, hit.position, NavMesh.AllAreas, path);
+            }
+            else
+            {
+                NavMesh.CalculatePath(navStart, hit.position, NavMesh.AllAreas, path);
+            }
         }
     }
 
@@ -293,6 +300,95 @@ public class CreatePath : MonoBehaviour
             centerTarget.position.x + Mathf.Cos(rad) * radius,
             centerY,
             centerTarget.position.z + Mathf.Sin(rad) * radius
+        );
+    }
+
+    private Vector3 GetDestinationPoint_OnShipLocal(Vector3 selfWorld, Vector3 targetWorld)
+    {
+        if (realShipRoot == null || ghostShipRoot == null)
+            return GetDestinationPointInSpace(selfWorld, targetWorld, targetWorld.y);
+
+        Vector3 selfLocal = realShipRoot.InverseTransformPoint(selfWorld);
+        Vector3 targetLocal = realShipRoot.InverseTransformPoint(targetWorld);
+
+        float yLocal = targetLocal.y;
+
+        Vector3 destLocal = GetDestinationPointInSpace(selfLocal, targetLocal, yLocal);
+
+        Vector3 destWorldGhost = ghostShipRoot.TransformPoint(destLocal);
+        return destWorldGhost;
+    }
+    private Vector3 GetDestinationPointInSpace(Vector3 selfPos, Vector3 targetPos, float targetY)
+    {
+        float targetDistance = Vector3.Distance(selfPos, targetPos);
+
+        if (targetDistance < combatRange)
+        {
+            if (circularPathFinding)
+            {
+                return GetNextOrbitPoint_Pos(
+                    selfPos,
+                    targetPos,
+                    orbitRadius + Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset),
+                    orbitStepDeg,
+                    orbitClockwise,
+                    orbitUseCurrentAsStart,
+                    targetY
+                );
+            }
+
+            return new Vector3(
+                targetPos.x + Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset),
+                targetY,
+                targetPos.z + Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset)
+            );
+        }
+
+        return new Vector3(
+            targetPos.x + Random.Range(-10f, 10f),
+            targetY,
+            targetPos.z + Random.Range(-10f, 10f)
+        );
+    }
+    private Vector3 GetNextOrbitPoint_Pos(
+    Vector3 selfPos,
+    Vector3 centerPos,
+    float radius,
+    float stepDeg,
+    bool clockwise,
+    bool useCurrentAsStart,
+    float centerY
+)
+    {
+        if (!orbitAngleInitialized)
+        {
+            if (useCurrentAsStart)
+            {
+                Vector3 toEnemy = selfPos - centerPos;
+                toEnemy.y = 0f;
+
+                if (toEnemy.sqrMagnitude < 0.0001f)
+                    orbitAngleDeg = Random.Range(0f, 360f);
+                else
+                    orbitAngleDeg = Mathf.Atan2(toEnemy.z, toEnemy.x) * Mathf.Rad2Deg;
+            }
+            else
+            {
+                orbitAngleDeg = Random.Range(0f, 360f);
+            }
+
+            orbitAngleInitialized = true;
+        }
+
+        orbitAngleDeg += (clockwise ? -stepDeg : stepDeg);
+        orbitAngleDeg = Mathf.Repeat(orbitAngleDeg, 360f);
+
+        float rad = orbitAngleDeg * Mathf.Deg2Rad;
+
+        return new Vector3(
+            centerPos.x + Mathf.Cos(rad) * radius,
+            centerY,
+            centerPos.z + Mathf.Sin(rad) * radius
         );
     }
 }

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a727712ab0baba341b951d4c4fe2bd31
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/DemoAssets/Materials/URP/URP_M_Armature_Arms.mat
+  uploadId: 782656

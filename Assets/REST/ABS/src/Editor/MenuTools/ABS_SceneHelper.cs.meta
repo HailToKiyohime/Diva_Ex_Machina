@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 62b352d5ef28255498a20a4c454f9a3c
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/src/Editor/MenuTools/ABS_SceneHelper.cs
+  uploadId: 782656

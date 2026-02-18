@@ -423,7 +423,7 @@ public class PlayerMovement : MonoBehaviour
 
             float chaserSpeed = stats.dashSpeed;
 
-            if (!Math.InterceptionDirection(tgtPos, transform.position, tgtVel, chaserSpeed, out dir))
+            if (!ProjectileCalculation.InterceptionDirection(tgtPos, transform.position, tgtVel, chaserSpeed, out dir))
                 dir = (tgtPos - transform.position);
 
             if (dir.sqrMagnitude < 0.0001f)
@@ -554,7 +554,7 @@ public class PlayerMovement : MonoBehaviour
 
             // 用你提供嘅 solver：算「攔截點」再朝住佢衝
             Vector3 interceptPoint;
-            bool ok = Math.InterceptionPoint(
+            bool ok = ProjectileCalculation.InterceptionPoint(
                 tgtPos,                     // a = target position
                 transform.position,         // b = chaser position
                 tgtVel,                     // vA = target velocity

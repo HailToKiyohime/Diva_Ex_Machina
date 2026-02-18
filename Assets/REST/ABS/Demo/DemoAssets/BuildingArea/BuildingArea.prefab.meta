@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 821a35b7e9c62174c8defd90d6a6700e
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/DemoAssets/BuildingArea/BuildingArea.prefab
+  uploadId: 782656

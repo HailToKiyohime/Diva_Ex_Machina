@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: cfe14756a669fa846b819e09e53a7212
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/DemoAssets/Settings/AdvancedGridBuildingSettings_2.5.asset
+  uploadId: 782656

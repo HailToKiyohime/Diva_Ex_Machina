@@ -1,0 +1,72 @@
+//*********************************************************************
+//  Dependencies: System
+
+//  Dependencies: Unity
+
+//  Dependencies: REST
+
+//*********************************************************************
+
+namespace REST.AdvancedBuildSystem.Editor
+{
+    internal class ABS_SceneHelper : ABS_EditorWindowBase
+    {
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        #region Properties
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        private ABS_EditorTabView m_TabView = null;
+
+        private ABS_SceneHelperAnalizer m_Analyzer = new ABS_SceneHelperAnalizer();
+        private ABS_SceneHelperObjects m_Objects = new ABS_SceneHelperObjects();
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        #endregion Properties
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        #region Constructor
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        public ABS_SceneHelper() : base()
+        {
+            m_TabView = new ABS_EditorTabView(3);
+            m_TabView.AddCallback("Objects", ShowObjectsView);
+            m_TabView.AddCallback("Analyzer", ShowAnalyzeView);
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        #endregion Constructor
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        #region Implementation of ABS_EditorWindowBase
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        
+        public static void ShowWindow()
+        {
+            GetWindow<ABS_SceneHelper>("ABS_SceneHelper");
+        }
+
+        public void OnEnable()
+        {
+            m_Analyzer.Init(m_EditorStyleContainer);
+        }
+
+        protected override void OnGUIImpl()
+        {
+            AddHeaderSection("Scene Helper");
+            m_TabView.Show(m_EditorStyleContainer);
+        }
+
+        private void ShowAnalyzeView()
+        {
+            m_Analyzer.AnalyzeView(m_EditorStyleContainer);
+        }
+
+        private void ShowObjectsView()
+        {
+            m_Objects.ObjectsView(m_EditorStyleContainer);
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        #endregion Implementation of ABS_EditorWindowBase
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    }
+}

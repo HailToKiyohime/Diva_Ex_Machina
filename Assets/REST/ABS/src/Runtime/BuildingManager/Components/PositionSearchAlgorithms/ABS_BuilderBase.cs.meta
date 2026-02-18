@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: d21be1eef0f2b77419e35a4c80ceb182
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/src/Runtime/BuildingManager/Components/PositionSearchAlgorithms/ABS_BuilderBase.cs
+  uploadId: 782656

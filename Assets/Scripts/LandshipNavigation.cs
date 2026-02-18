@@ -4,7 +4,6 @@ using UnityEngine;
 public class LandshipNavigation : MonoBehaviour
 {
     public static LandshipNavigation Instance { get; private set; }
-    public Transform[] dockingPoint;     // docking points (trigger)
     public Transform ghostShip;          // Ghost ship root (contains baked navmesh)
     public Transform core;               // Core target on real ship
     private void Awake()
@@ -20,8 +19,4 @@ public class LandshipNavigation : MonoBehaviour
         }
     }
 
-    public Transform[] GetDockingPoints()
-    {
-        return dockingPoint;
-    }
 }

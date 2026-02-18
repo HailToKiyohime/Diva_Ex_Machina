@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: a915b2939b7b7b848bed260c707a6403
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Documentation/Core/v1.6.0_BuildingElement.pdf
+  uploadId: 782656

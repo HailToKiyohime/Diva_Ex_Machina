@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: fd9547d19cd60f84e8179010e5ecfbcb
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/src/Editor/BuildingArea/ABS_BuildingAreaRulesetEditor.cs
+  uploadId: 782656

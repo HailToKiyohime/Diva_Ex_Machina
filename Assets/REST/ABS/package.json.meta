@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 704bd106949169a469986f62b0d2200b
+TextScriptImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/package.json
+  uploadId: 782656

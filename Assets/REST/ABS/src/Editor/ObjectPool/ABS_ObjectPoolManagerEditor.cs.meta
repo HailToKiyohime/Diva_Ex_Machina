@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 46c882e8bec024347bad364a73b7cdb5
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/src/Editor/ObjectPool/ABS_ObjectPoolManagerEditor.cs
+  uploadId: 782656

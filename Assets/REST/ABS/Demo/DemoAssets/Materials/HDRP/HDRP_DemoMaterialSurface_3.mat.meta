@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: cba0ac5152af2fd48a53ef90d691fb90
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 283793
+  packageName: Advanced Building System
+  packageVersion: 1.6
+  assetPath: Assets/REST/ABS/Demo/DemoAssets/Materials/HDRP/HDRP_DemoMaterialSurface_3.mat
+  uploadId: 782656

@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 940703ba3bf25cb47b95e6312fd10186, type: 3}
+  m_Name: BuiltIn_Demo_HighlightCollection
+  m_EditorClassIdentifier: 
+  m_PendingHighlightMaterial: {fileID: 2100000, guid: ebdd9fec1b77fad4499221d0189abd9b, type: 2}
+  m_BlockedHighlightMaterial: {fileID: 2100000, guid: 96ce538e1fa596c468775e6b1d8ac14b, type: 2}
+  m_DestroyHighlightMaterial: {fileID: 2100000, guid: 96ce538e1fa596c468775e6b1d8ac14b, type: 2}
+  m_PreBuiltHighlightMaterial: {fileID: 2100000, guid: e2f92a45ba9f9ff4280f9453196baf8e, type: 2}
+  m_CustomHighlightMaterials: []
