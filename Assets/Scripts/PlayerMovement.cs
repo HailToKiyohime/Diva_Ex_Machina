@@ -910,12 +910,13 @@ public class PlayerMovement : MonoBehaviour
     public void OnCollisionEnter(Collision collision)
     {
         Debug.Log("Hit: " + collision.gameObject + ",tag:" + collision.gameObject.tag + ", linearVelocity: "+ playerRigidbody.linearVelocity.magnitude);
+        /*
         if (collision.gameObject.tag == "Enemy" && playerRigidbody.linearVelocity.magnitude > 5f)
         {
             Debug.Log("Weeeeeeeee");
             playerAnimation.MeleeAttackFeedback.PlayFeedbacks(this.transform.position);
         }
-
+        */
     }
     // Mobile Platform carry (velocity-based)
     private bool _onMobilePlatform = false;

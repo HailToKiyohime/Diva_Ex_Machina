@@ -1,102 +1,220 @@
 using UnityEngine;
 
-[ExecuteAlways]
 public class BuildingGrid : MonoBehaviour
 {
     [System.Serializable]
-    public struct GridData
+    public class GridData
     {
-        [Min(0.01f)] public float cellSize;
-        [Min(1)] public int gridSizeX;
-        [Min(1)] public int gridSizeY;
+        public float cellSize = 1f;
+        public int gridSizeX = 10;
+        public int gridSizeY = 10;
+        public float gridHeight = 0f;
 
-        // Height offset from transform.position, along transform.up
-        public float gridHeight;
+        // offset in "cell size"
+        public int centreOffsetX = 0;
+        public int centreOffsetY = 0;
 
-        // Center offset in cell units
-        public float centreOffsetX; // + along transform.right
-        public float centreOffsetY; // + along transform.forward
+        // occupancy, true = occupied (unusable)
+        public BoolMatrix occupied;
     }
 
-    [Header("Grids")]
     public GridData[] grids;
 
-    private Vector3 XAxisWorld => transform.right;
-    private Vector3 YAxisWorld => transform.forward;
+    [Header("Gizmos")]
+    public bool drawGrid = true;
+    public bool drawOccupiedCells = true;
+    public float gizmoYOffset = 0.01f;
+
+    public void EnsureOccupancy(int gridIndex)
+    {
+        if (grids == null || gridIndex < 0 || gridIndex >= grids.Length) return;
+
+        var g = grids[gridIndex];
+        if (g.gridSizeX <= 0 || g.gridSizeY <= 0) return;
+
+        if (g.occupied == null)
+            g.occupied = new BoolMatrix();
+
+        if (g.occupied.cells == null || g.occupied.width != g.gridSizeX || g.occupied.height != g.gridSizeY)
+            g.occupied.Resize(g.gridSizeX, g.gridSizeY);
+    }
+
+    public bool IsOccupied(int gridIndex, int x, int y)
+    {
+        if (grids == null || gridIndex < 0 || gridIndex >= grids.Length) return true;
+
+        var g = grids[gridIndex];
+        if (x < 0 || x >= g.gridSizeX || y < 0 || y >= g.gridSizeY) return true;
+
+        EnsureOccupancy(gridIndex);
+        return g.occupied.Get(x, y);
+    }
+
+    public void SetOccupied(int gridIndex, int x, int y, bool value)
+    {
+        if (grids == null || gridIndex < 0 || gridIndex >= grids.Length) return;
+
+        var g = grids[gridIndex];
+        if (x < 0 || x >= g.gridSizeX || y < 0 || y >= g.gridSizeY) return;
+
+        EnsureOccupancy(gridIndex);
+        g.occupied.Set(x, y, value);
+    }
+
+    // anchorX/Y = hit cell, footprint (0,0) will map onto (anchorX, anchorY)
+    public bool CanPlaceFootprint(int gridIndex, int anchorX, int anchorY, BoolMatrix footprint, out bool anyOutOfBounds)
+    {
+        anyOutOfBounds = false;
+
+        if (footprint == null || footprint.cells == null || footprint.width <= 0 || footprint.height <= 0)
+            return false;
+
+        if (grids == null || gridIndex < 0 || gridIndex >= grids.Length)
+            return false;
+
+        var g = grids[gridIndex];
+        EnsureOccupancy(gridIndex);
+
+        bool anyCell = false;
+
+        for (int fy = 0; fy < footprint.height; fy++)
+        {
+            for (int fx = 0; fx < footprint.width; fx++)
+            {
+                if (!footprint.Get(fx, fy)) continue;
+
+                anyCell = true;
+
+                int gx = anchorX + fx;
+                int gy = anchorY + fy;
+
+                if (gx < 0 || gx >= g.gridSizeX || gy < 0 || gy >= g.gridSizeY)
+                {
+                    anyOutOfBounds = true;
+                    return false;
+                }
+
+                if (g.occupied.Get(gx, gy))
+                    return false;
+            }
+        }
+
+        return anyCell;
+    }
+
+    public void PlaceFootprint(int gridIndex, int anchorX, int anchorY, BoolMatrix footprint)
+    {
+        if (footprint == null || footprint.cells == null) return;
+        if (grids == null || gridIndex < 0 || gridIndex >= grids.Length) return;
+
+        EnsureOccupancy(gridIndex);
+
+        for (int fy = 0; fy < footprint.height; fy++)
+        {
+            for (int fx = 0; fx < footprint.width; fx++)
+            {
+                if (!footprint.Get(fx, fy)) continue;
+
+                int gx = anchorX + fx;
+                int gy = anchorY + fy;
+
+                SetOccupied(gridIndex, gx, gy, true);
+            }
+        }
+    }
+
+    public Vector3 GetCellWorldCenter(int gridIndex, int cellX, int cellY)
+    {
+        var g = grids[gridIndex];
+
+        Transform t = transform;
+        Vector3 right = t.right;
+        Vector3 forward = t.forward;
+        Vector3 up = t.up;
+
+        Vector3 baseCenter =
+            t.position + up * g.gridHeight +
+            right * (g.centreOffsetX * g.cellSize) +
+            forward * (g.centreOffsetY * g.cellSize);
+
+        float width = g.gridSizeX * g.cellSize;
+        float depth = g.gridSizeY * g.cellSize;
+
+        Vector3 origin =
+            baseCenter - right * (width * 0.5f) - forward * (depth * 0.5f);
+
+        Vector3 cellMin =
+            origin + right * (cellX * g.cellSize) + forward * (cellY * g.cellSize);
+
+        return cellMin + right * (g.cellSize * 0.5f) + forward * (g.cellSize * 0.5f) + up * gizmoYOffset;
+    }
 
     private void OnDrawGizmos()
     {
         if (grids == null) return;
 
-        for (int i = 0; i < grids.Length; i++)
+        for (int gi = 0; gi < grids.Length; gi++)
         {
-            DrawGrid(grids[i]);
+            var g = grids[gi];
+            if (g.cellSize <= 0f || g.gridSizeX <= 0 || g.gridSizeY <= 0) continue;
+
+            Transform t = transform;
+            Vector3 right = t.right;
+            Vector3 forward = t.forward;
+            Vector3 up = t.up;
+
+            Vector3 baseCenter =
+                t.position + up * g.gridHeight +
+                right * (g.centreOffsetX * g.cellSize) +
+                forward * (g.centreOffsetY * g.cellSize);
+
+            float width = g.gridSizeX * g.cellSize;
+            float depth = g.gridSizeY * g.cellSize;
+
+            Vector3 origin =
+                baseCenter - right * (width * 0.5f) - forward * (depth * 0.5f);
+
+            if (drawGrid)
+            {
+                Gizmos.color = Color.gray;
+
+                for (int x = 0; x <= g.gridSizeX; x++)
+                {
+                    Vector3 a = origin + right * (x * g.cellSize) + up * gizmoYOffset;
+                    Vector3 b = a + forward * (depth);
+                    Gizmos.DrawLine(a, b);
+                }
+
+                for (int y = 0; y <= g.gridSizeY; y++)
+                {
+                    Vector3 a = origin + forward * (y * g.cellSize) + up * gizmoYOffset;
+                    Vector3 b = a + right * (width);
+                    Gizmos.DrawLine(a, b);
+                }
+            }
+
+            if (drawOccupiedCells)
+            {
+                EnsureOccupancy(gi);
+
+                Gizmos.color = new Color(1f, 0f, 0f, 0.35f);
+
+                for (int y = 0; y < g.gridSizeY; y++)
+                {
+                    for (int x = 0; x < g.gridSizeX; x++)
+                    {
+                        if (!g.occupied.Get(x, y)) continue;
+
+                        Vector3 c = GetCellWorldCenter(gi, x, y);
+                        Vector3 size = right * (g.cellSize) + forward * (g.cellSize);
+                        Gizmos.DrawCube(c, new Vector3(
+                            Mathf.Abs(Vector3.Dot(size, Vector3.right)),
+                            0.001f,
+                            Mathf.Abs(Vector3.Dot(size, Vector3.forward))
+                        ));
+                    }
+                }
+            }
         }
-    }
-
-    private void DrawGrid(GridData g)
-    {
-        if (g.cellSize <= 0f || g.gridSizeX <= 0 || g.gridSizeY <= 0) return;
-
-        Vector3 center = GetGridCenterWorld(g);
-        Vector3 origin = GetGridOriginWorld(g, center);
-
-        // Draw vertical lines
-        for (int x = 0; x <= g.gridSizeX; x++)
-        {
-            Vector3 start = origin + XAxisWorld * (x * g.cellSize);
-            Vector3 end = start + YAxisWorld * (g.gridSizeY * g.cellSize);
-            Gizmos.DrawLine(start, end);
-        }
-
-        // Draw horizontal lines
-        for (int y = 0; y <= g.gridSizeY; y++)
-        {
-            Vector3 start = origin + YAxisWorld * (y * g.cellSize);
-            Vector3 end = start + XAxisWorld * (g.gridSizeX * g.cellSize);
-            Gizmos.DrawLine(start, end);
-        }
-
-        // Draw center marker
-        float m = Mathf.Min(g.cellSize * 0.25f, 0.5f);
-        Gizmos.DrawLine(center, center + XAxisWorld * m);
-        Gizmos.DrawLine(center, center + YAxisWorld * m);
-        Gizmos.DrawLine(center, center + transform.up * m);
-    }
-
-    private Vector3 GetGridCenterWorld(GridData g)
-    {
-        Vector3 baseCenter = transform.position + transform.up * g.gridHeight;
-        Vector3 offset = XAxisWorld * (g.centreOffsetX * g.cellSize)
-                       + YAxisWorld * (g.centreOffsetY * g.cellSize);
-        return baseCenter + offset;
-    }
-
-    private Vector3 GetGridOriginWorld(GridData g, Vector3 center)
-    {
-        float width = g.gridSizeX * g.cellSize;
-        float depth = g.gridSizeY * g.cellSize;
-
-        return center
-               - XAxisWorld * (width * 0.5f)
-               - YAxisWorld * (depth * 0.5f);
-    }
-
-    public Vector3 GetCellCenterWorld(int gridIndex, int x, int y)
-    {
-        if (grids == null || grids.Length == 0) return transform.position;
-
-        gridIndex = Mathf.Clamp(gridIndex, 0, grids.Length - 1);
-        GridData g = grids[gridIndex];
-
-        x = Mathf.Clamp(x, 0, g.gridSizeX - 1);
-        y = Mathf.Clamp(y, 0, g.gridSizeY - 1);
-
-        Vector3 center = GetGridCenterWorld(g);
-        Vector3 origin = GetGridOriginWorld(g, center);
-
-        return origin
-               + XAxisWorld * ((x + 0.5f) * g.cellSize)
-               + YAxisWorld * ((y + 0.5f) * g.cellSize);
     }
 }

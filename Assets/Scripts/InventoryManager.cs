@@ -594,6 +594,26 @@ public class InventoryManager : MonoBehaviour
             return;
         }
 
+        // 只對「一般 ItemInstance」做堆疊
+        int stackMax = Mathf.Max(1, item.maxStack);
+        if (stackMax > 1)
+        {
+            for (int i = 0; i < inventory.Count; i++)
+            {
+                var inst = inventory[i];
+                if (inst == null) continue;
+
+                // 避免把 RangeWeaponInstance / ArmorInstance 之類的也拿去疊
+                if (inst.GetType() != typeof(ItemInstance)) continue;
+
+                if (inst.item == item && inst.amount < stackMax)
+                {
+                    inst.amount += 1;
+                    return;
+                }
+            }
+        }
+
         inventory.Add(new ItemInstance { item = item, amount = 1 });
     }
 

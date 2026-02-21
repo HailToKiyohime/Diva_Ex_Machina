@@ -66,7 +66,7 @@ public class EnemyBrain : MonoBehaviour
 
         if (firearmSystem != null)
         {
-            firearmSystem.target = pathFinder.Target;
+            firearmSystem.defaultTarget = pathFinder.Target;
         }
 
         // A) Decide state by distance (+ hysteresis)
