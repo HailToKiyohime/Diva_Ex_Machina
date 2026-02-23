@@ -6,12 +6,15 @@ public class UIManager : MonoBehaviour
 {
     public static UIManager Instance { get; private set; }
     [SerializeField] private GameObject CombatCameraSet;
+    [SerializeField] private GameObject BuildingCameraSet;
     [SerializeField] private GameObject CharacterEquipmentCameraSet;
     [SerializeField] private GameObject CharacterCraftingCameraSet;
 
     [SerializeField] private GameObject CombatUICanvas;
     [SerializeField] private GameObject CharacterEquipmentCanvas;
     [SerializeField] private GameObject CharacterCraftingCanvas;
+
+
     public int currentCameraSet = 0; // 0: Combat, 1: Equipment, 2: Crafting
     [Header("Combat UI")]
     public TextMeshProUGUI speedText;
@@ -73,39 +76,56 @@ public class UIManager : MonoBehaviour
         }else if (Input.GetKeyDown(KeyCode.Keypad3))
         {
             currentCameraSet = 2;
+        }else if (Input.GetKeyDown(KeyCode.Keypad4))
+        {
+            currentCameraSet = 3;
         }
         switch (currentCameraSet)
-        {
-            case 0:
-                CombatCameraSet.SetActive(true);
-                CharacterEquipmentCameraSet.SetActive(false);
-                CharacterCraftingCameraSet.SetActive(false);
-                CombatUICanvas.SetActive(true);
-                CharacterEquipmentCanvas.SetActive(false);
-                CharacterCraftingCanvas.SetActive(false);
-                Cursor.lockState = CursorLockMode.Locked;
-                Cursor.visible = false;
-                break;
-            case 1:
-                CombatCameraSet.SetActive(false);
-                CharacterEquipmentCameraSet.SetActive(true);
-                CharacterCraftingCameraSet.SetActive(false);
-                CombatUICanvas.SetActive(false);
-                CharacterEquipmentCanvas.SetActive(true);
-                CharacterCraftingCanvas.SetActive(false);
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
-                break;
-            case 2:
-                CombatCameraSet.SetActive(false);
-                CharacterEquipmentCameraSet.SetActive(false);
-                CharacterCraftingCameraSet.SetActive(true);
-                CombatUICanvas.SetActive(false);
-                CharacterEquipmentCanvas.SetActive(true);
-                CharacterCraftingCanvas.SetActive(true);
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
-                break;
+            {
+                case 0:
+                    CombatCameraSet.SetActive(true);
+                    BuildingCameraSet.SetActive(false);
+                    CharacterEquipmentCameraSet.SetActive(false);
+                    CharacterCraftingCameraSet.SetActive(false);
+                    CombatUICanvas.SetActive(true);
+                    CharacterEquipmentCanvas.SetActive(false);
+                    CharacterCraftingCanvas.SetActive(false);
+                    Cursor.lockState = CursorLockMode.Locked;
+                    Cursor.visible = false;
+                    break;
+                case 1:
+                    CombatCameraSet.SetActive(false);
+                    BuildingCameraSet.SetActive(false);
+                    CharacterEquipmentCameraSet.SetActive(true);
+                    CharacterCraftingCameraSet.SetActive(false);
+                    CombatUICanvas.SetActive(false);
+                    CharacterEquipmentCanvas.SetActive(true);
+                    CharacterCraftingCanvas.SetActive(false);
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+                    break;
+                case 2:
+                    CombatCameraSet.SetActive(false);
+                    BuildingCameraSet.SetActive(false);
+                    CharacterEquipmentCameraSet.SetActive(false);
+                    CharacterCraftingCameraSet.SetActive(true);
+                    CombatUICanvas.SetActive(false);
+                    CharacterEquipmentCanvas.SetActive(true);
+                    CharacterCraftingCanvas.SetActive(true);
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+                    break;
+                case 3:
+                    CombatCameraSet.SetActive(false);
+                    BuildingCameraSet.SetActive(true);
+                    CharacterEquipmentCameraSet.SetActive(false);
+                    CharacterCraftingCameraSet.SetActive(false);
+                    CombatUICanvas.SetActive(false);
+                    CharacterEquipmentCanvas.SetActive(false);
+                    CharacterCraftingCanvas.SetActive(false);
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+                    break;
         }
     }
     private void LateUpdate()

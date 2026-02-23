@@ -17,7 +17,7 @@ MonoBehaviour:
     height: 1
     cells: 01
   buildingPrefab: {fileID: 4415953370039347569, guid: d74edf37d8495bf429245e6ca24be3e0, type: 3}
-  pendingPrefab: {fileID: 919132149155446097, guid: c0bdc015263435a4e809402d5aa1b07a, type: 3}
+  pendingPrefab: {fileID: 4415953370039347569, guid: ad39db56f43075541aabdac073126a6b, type: 3}
   pendingMaterial: {fileID: 2100000, guid: f49a0f73144f5da4f888afca2f121877, type: 2}
   unavailableMaterial: {fileID: 2100000, guid: 1dc657abc81635f49a03e7616d61e1fe, type: 2}
   buildingMaterial: {fileID: 0}

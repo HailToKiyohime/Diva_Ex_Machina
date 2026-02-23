@@ -1,11 +1,20 @@
 using UnityEngine;
-
+using UnityEngine.UI;
 public class BuildSystem : MonoBehaviour
 {
+
+    [SerializeField] private Toggle[] buildToggles;
+
     [Header("Raycast")]
     public Camera cam;
     public LayerMask buildableLayers;
     public float maxDistance = 500f;
+
+    [Header("TopDown RawImage Input")]
+    public bool useRawImageInput = true;
+    public RawImage gridRawImage;          // 顯示 RenderTexture 的 RawImage
+    public Camera topDownCamera;           // 用來渲染 grid 的上視角相機
+    public Canvas uiCanvas;                // RawImage 所在的 Canvas（Screen Space Overlay 也可以留空）
 
     [Header("Blueprint")]
     public int currentFootprintIndex = 0;
@@ -47,26 +56,78 @@ public class BuildSystem : MonoBehaviour
     private int _previewCellY;
     private bool _previewCanPlace;
 
+    public bool buildModeOn = false;
     private void Awake()
     {
         if (!cam) cam = Camera.main;
     }
 
+    private void OnEnable()
+    {
+        HookBuildToggles(true);
+        EvaluateBuildTogglesNow();
+    }
+
     private void OnDisable()
     {
+        HookBuildToggles(false);
         DestroyPreview();
     }
+    private void HookBuildToggles(bool hook)
+    {
+        if (buildToggles == null) return;
+
+        for (int i = 0; i < buildToggles.Length; i++)
+        {
+            var t = buildToggles[i];
+            if (!t) continue;
+
+            if (hook) t.onValueChanged.AddListener(OnAnyBuildToggleChanged);
+            else t.onValueChanged.RemoveListener(OnAnyBuildToggleChanged);
+        }
+    }
+
+    private void OnAnyBuildToggleChanged(bool _)
+    {
+        EvaluateBuildTogglesNow();
+    }
+
+    private void EvaluateBuildTogglesNow()
+    {
+        if (buildToggles == null || buildToggles.Length == 0) return;
+
+        bool anyOff = false;
+        bool allOff = true;
+
+        for (int i = 0; i < buildToggles.Length; i++)
+        {
+            var t = buildToggles[i];
+            if (!t) continue;
+
+            if (!t.isOn) anyOff = true;
+            if (t.isOn) allOff = false;
+        }
+
+        // 你如果真的是「任何一個 off 就清掉」
+        // if (anyOff) ClearBuildingFootprints();
+
+        // 通常更像是「全部都 off 才清掉」
+        if (allOff) ClearBuildingFootprints();
+    }
+
 
     private void Update()
     {
-        UpdateHitCell();
-        HandleRotateInput();
+        if (buildModeOn) {
+            UpdateHitCell();
+            HandleRotateInput();
 
-        if (enablePreview) UpdatePreview();
-        else DestroyPreview();
+            if (enablePreview) UpdatePreview();
+            else DestroyPreview();
 
-        if (placeOnLeftClick && Input.GetMouseButtonDown(0))
-            TryPlaceCurrentBlueprint();
+            if (placeOnLeftClick && Input.GetMouseButtonDown(0))
+                TryPlaceCurrentBlueprint();
+        }
     }
 
     private void HandleRotateInput()
@@ -97,9 +158,17 @@ public class BuildSystem : MonoBehaviour
         _hitCellX = -1;
         _hitCellY = -1;
 
-        if (!cam) return;
+        Ray ray;
 
-        Ray ray = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+        if (useRawImageInput && TryGetRayFromRawImage(out ray))
+        {
+            // ok
+        }
+        else
+        {
+            if (!cam) return;
+            ray = cam.ScreenPointToRay(Input.mousePosition);
+        }
 
         if (!Physics.Raycast(ray, out RaycastHit hit, maxDistance, buildableLayers))
             return;
@@ -116,6 +185,42 @@ public class BuildSystem : MonoBehaviour
         _hitGridIndex = gridIndex;
         _hitCellX = cellX;
         _hitCellY = cellY;
+    }
+
+    private bool TryGetRayFromRawImage(out Ray ray)
+    {
+        ray = default;
+
+        if (!gridRawImage || !topDownCamera) return false;
+
+        RectTransform rt = gridRawImage.rectTransform;
+
+        Camera eventCam = null;
+        if (uiCanvas && uiCanvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            eventCam = uiCanvas.worldCamera;
+
+        Vector2 screenPos = Input.mousePosition;
+
+        if (!RectTransformUtility.RectangleContainsScreenPoint(rt, screenPos, eventCam))
+            return false;
+
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(rt, screenPos, eventCam, out Vector2 local))
+            return false;
+
+        Rect rect = rt.rect;
+
+        float nx = (local.x - rect.xMin) / rect.width;
+        float ny = (local.y - rect.yMin) / rect.height;
+
+        if (nx < 0f || nx > 1f || ny < 0f || ny > 1f)
+            return false;
+
+        Rect uvRect = gridRawImage.uvRect;
+        float u = uvRect.x + nx * uvRect.width;
+        float v = uvRect.y + ny * uvRect.height;
+
+        ray = topDownCamera.ViewportPointToRay(new Vector3(u, v, 0f));
+        return true;
     }
 
     private BuildBlueprint GetCurrentBlueprint()
@@ -504,4 +609,18 @@ public class BuildSystem : MonoBehaviour
 
         return false;
     }
+
+    public void SetBuildingFootprints(int index)
+    {
+        buildModeOn = true;
+        currentFootprintIndex = index;
+    }
+    public void ClearBuildingFootprints()
+    {
+        buildModeOn = false;
+        currentFootprintIndex = 0;
+    }
+
+
+
 }

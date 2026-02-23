@@ -99,6 +99,7 @@ public class PlayerMovement : MonoBehaviour
     }
     public void FixedUpdate()
     {
+        CarryWithPlatformRotation(Time.fixedDeltaTime);
         GroundCheck();
         ApplyHorizontalMovementFixed(Time.fixedDeltaTime);
         ApplyFlyFixed(Time.fixedDeltaTime); // 新增
@@ -221,7 +222,8 @@ public class PlayerMovement : MonoBehaviour
                 // ✅ 只有「起手」（按下前不是 Attacking）先可以開 melee dash
                 if (!wasAttacking)
                 {
-                    playerRigidbody.linearVelocity = Vector3.zero; 
+                    Vector3 platformVel0 = GetMobilePlatformVelocity();
+                    playerRigidbody.linearVelocity = platformVel0;
                     meleeAttackWall.enabled = true; // enable the melee attack wall collider to prevent enemy from glitching through player during melee attack
                     StartMeleeDashAttack(w, isLeft);
                 }
@@ -482,14 +484,16 @@ public class PlayerMovement : MonoBehaviour
         _meleeDashMaxDistance = maxDist;
 
         // 3) Reuse dash feel (accel)
-        Vector3 v = playerRigidbody.linearVelocity;
+        Vector3 platformVel = GetMobilePlatformVelocity();
+        Vector3 vWorld = playerRigidbody.linearVelocity;
+        Vector3 vRel = vWorld - platformVel;
 
         dashDir = dir;
         dashTargetSpeed = stats.dashSpeed;
 
         // Use full velocity projection (works for both 2D and 3D dash)
-        float vParallel = Vector3.Dot(v, dashDir);
-        float deltaVStart = Mathf.Max(0f, dashTargetSpeed - vParallel);
+        float vParallelRel = Vector3.Dot(vRel, dashDir);
+        float deltaVStart = Mathf.Max(0f, dashTargetSpeed - vParallelRel);
 
         float dur = Mathf.Max(0.02f, dashDuration);
         dashAccel = deltaVStart / dur;
@@ -506,28 +510,24 @@ public class PlayerMovement : MonoBehaviour
 
         _meleeDashElapsed += dt;
 
-        // Stop conditions
         float traveled = Vector3.Distance(_meleeDashStartPos, transform.position);
         bool stop = traveled >= _meleeDashMaxDistance;
 
-        // lock-on early stop
         if (!stop && PlayerAiming.Instance != null && PlayerAiming.Instance.lockOn && PlayerAiming.Instance.aimingPoint != null)
         {
             float d = Vector3.Distance(transform.position, PlayerAiming.Instance.aimingPoint.position);
             if (d <= meleeDashStopDistance) stop = true;
         }
 
-        // timeout
         if (!stop && _meleeDashElapsed >= _meleeDashTimeout) stop = true;
 
-        Vector3 v = playerRigidbody.linearVelocity;
+        Vector3 platformVel = GetMobilePlatformVelocity();
+        Vector3 vWorld = playerRigidbody.linearVelocity;
+        Vector3 vRel = vWorld - platformVel;
 
-        // ✅ stuck detect: use speed ALONG dash direction (fixes air-target false-stuck)
-        float alongSpeed = Mathf.Abs(Vector3.Dot(v, dashDir));
-        if (alongSpeed <= meleeDashStuckSpeed)
-            _meleeDashStuckElapsed += dt;
-        else
-            _meleeDashStuckElapsed = 0f;
+        float alongSpeedRel = Mathf.Abs(Vector3.Dot(vRel, dashDir));
+        if (alongSpeedRel <= meleeDashStuckSpeed) _meleeDashStuckElapsed += dt;
+        else _meleeDashStuckElapsed = 0f;
 
         if (!stop && _meleeDashStuckElapsed >= meleeDashStuckTime) stop = true;
 
@@ -537,11 +537,9 @@ public class PlayerMovement : MonoBehaviour
             return;
         }
 
-        // Push (cap once reached)
-        float vParallel = Vector3.Dot(v, dashDir);
-        if (vParallel >= dashTargetSpeed) return;
+        float vParallelRel = Vector3.Dot(vRel, dashDir);
+        if (vParallelRel >= dashTargetSpeed) return;
 
-        // ===== Magnetism / Homing (lock-on only) =====
         if (PlayerAiming.Instance != null &&
             PlayerAiming.Instance.lockOn &&
             PlayerAiming.Instance.aimingPoint != null)
@@ -550,26 +548,21 @@ public class PlayerMovement : MonoBehaviour
 
             Vector3 tgtVel = Vector3.zero;
             var targetRb = PlayerAiming.Instance.GetTargetRigidbody();
-            if (targetRb != null) tgtVel = targetRb.linearVelocity; // Unity 6
+            if (targetRb != null) tgtVel = targetRb.linearVelocity;
 
-            // 用你提供嘅 solver：算「攔截點」再朝住佢衝
             Vector3 interceptPoint;
             bool ok = ProjectileCalculation.InterceptionPoint(
-                tgtPos,                     // a = target position
-                transform.position,         // b = chaser position
-                tgtVel,                     // vA = target velocity
-                dashTargetSpeed > 0.01f ? dashTargetSpeed : PlayerStats.Instance.dashSpeed, // sB = our speed
+                tgtPos,
+                transform.position,
+                tgtVel,
+                dashTargetSpeed > 0.01f ? dashTargetSpeed : PlayerStats.Instance.dashSpeed,
                 out interceptPoint
             );
 
             Vector3 desiredDir;
-            if (ok)
-            {
-                desiredDir = (interceptPoint - transform.position);
-            }
+            if (ok) desiredDir = (interceptPoint - transform.position);
             else
             {
-                // solver fail：用簡易 lead 做 fallback
                 Vector3 pred = tgtPos + tgtVel * meleeDashLeadFallbackTime;
                 desiredDir = (pred - transform.position);
             }
@@ -578,11 +571,9 @@ public class PlayerMovement : MonoBehaviour
             {
                 desiredDir.Normalize();
 
-                // 轉向限制：避免瞬間「硬拐」造成抖/怪
                 float maxRad = meleeDashHomingMaxTurnDegPerSec * Mathf.Deg2Rad * dt;
                 Vector3 limited = Vector3.RotateTowards(_meleeDashDir, desiredDir, maxRad, 0f);
 
-                // 磁吸平滑（越大越黏）
                 _meleeDashDir = Vector3.Slerp(_meleeDashDir, limited, meleeDashHomingStrength * dt);
                 _meleeDashDir.Normalize();
 
@@ -598,10 +589,13 @@ public class PlayerMovement : MonoBehaviour
         if (!_meleeDashActive) return;
         _meleeDashActive = false;
         attackFacingActive = false;
-        // Reduce residual horizontal speed a bit (so "dash ends" feels immediate, without hard zero)
-        Vector3 v = playerRigidbody.linearVelocity;
-        Vector3 hv = new Vector3(v.x, 0f, v.z) * 0.5f;
-        playerRigidbody.linearVelocity = new Vector3(hv.x, v.y, hv.z);
+
+        Vector3 platformVel = GetMobilePlatformVelocity();
+        Vector3 vWorld = playerRigidbody.linearVelocity;
+        Vector3 vRel = vWorld - platformVel;
+
+        Vector3 hvRel = new Vector3(vRel.x, 0f, vRel.z) * 0.5f;
+        playerRigidbody.linearVelocity = new Vector3(hvRel.x, vRel.y, hvRel.z) + platformVel;
 
         if (meleeComboController != null)
             meleeComboController.FireHit1FromDash(_meleeDashIsLeft);
@@ -616,25 +610,27 @@ public class PlayerMovement : MonoBehaviour
             return;
         }
 
-        Vector3 v = playerRigidbody.linearVelocity;
-        Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
+        Vector3 platformVel = GetMobilePlatformVelocity();
 
-        float vParallel = Vector3.Dot(horizontalVel, dashDir);
+        // 用「相對平台」速度來判斷是否達標
+        Vector3 vWorld = playerRigidbody.linearVelocity;
+        Vector3 vRel = vWorld - platformVel;
 
-        // 達標就不要再推，避免疊加
-        if (vParallel >= dashTargetSpeed) return;
+        Vector3 horizontalRel = new Vector3(vRel.x, 0f, vRel.z);
+        float vParallelRel = Vector3.Dot(horizontalRel, dashDir);
 
-        // 固定加速度（不受質量影響）
+        if (vParallelRel >= dashTargetSpeed) return;
+
+        // 推力仍然是世界空間，會同等增加 world 與 relative（因為平台速度是常數項）
         playerRigidbody.AddForce(dashDir * dashAccel, ForceMode.Acceleration);
     }
+
     public bool DashAction()
     {
         var stats = PlayerStats.Instance;
         if (stats == null) return false;
 
         if (Time.time < nextDashTime) return false;
-
-        // 修正：能量不足就不啟動
         if (stats.currentEnergy <= 0) return false;
 
         Vector3 dir;
@@ -645,20 +641,23 @@ public class PlayerMovement : MonoBehaviour
         if (dir.sqrMagnitude < 0.0001f) return false;
         dir.Normalize();
 
-        // 先算 dash 的固定加速度（只看水平）
-        Vector3 v = playerRigidbody.linearVelocity;
-        Vector3 horizontalVel = new Vector3(v.x, 0f, v.z);
+        Vector3 platformVel = GetMobilePlatformVelocity();
+
+        // 用「相對平台」速度來計算起始差值
+        Vector3 vWorld = playerRigidbody.linearVelocity;
+        Vector3 vRel = vWorld - platformVel;
+
+        Vector3 horizontalRel = new Vector3(vRel.x, 0f, vRel.z);
 
         dashDir = dir;
         dashTargetSpeed = stats.dashSpeed;
 
-        float vParallel = Vector3.Dot(horizontalVel, dashDir);
-        float deltaVStart = Mathf.Max(0f, dashTargetSpeed - vParallel);
+        float vParallelRel = Vector3.Dot(horizontalRel, dashDir);
+        float deltaVStart = Mathf.Max(0f, dashTargetSpeed - vParallelRel);
 
-        // 固定加速度：整段 dashDuration 都用這個值
-        dashAccel = deltaVStart / dashDuration;
+        float dur = Mathf.Max(0.02f, dashDuration);
+        dashAccel = deltaVStart / dur;
 
-        // 扣能量
         stats.currentEnergy -= stats.dashEnergyCost;
 
         dashRequestUntil = Time.time + dashInputBuffer;
@@ -670,7 +669,6 @@ public class PlayerMovement : MonoBehaviour
 
         return true;
     }
-
     public void FlyAction()
     {
         // 空中且有能量才允許提出飛行請求
@@ -921,21 +919,35 @@ public class PlayerMovement : MonoBehaviour
     // Mobile Platform carry (velocity-based)
     private bool _onMobilePlatform = false;
     private Rigidbody _mobilePlatformRb = null;
+    private Transform _mobilePlatformTf;
+    private Quaternion _mobilePlatformLastRot;
+    private bool _mobilePlatformRotInit;
     public void OnTriggerStay(Collider other)
     {
-        if (other.CompareTag("Mobile Platform"))
+        if (!other.CompareTag("Mobile Platform")) return;
+
+        var rb = other.GetComponentInParent<Rigidbody>();
+        if (rb == null) return;
+
+        if (_mobilePlatformRb != rb)
         {
-            _mobilePlatformRb = other.GetComponentInParent<Rigidbody>();
-            _onMobilePlatform = (_mobilePlatformRb != null);
+            _mobilePlatformRb = rb;
+            _mobilePlatformTf = rb.transform;
+
+            _mobilePlatformLastRot = rb.rotation;
+            _mobilePlatformRotInit = true;
         }
+
+        _onMobilePlatform = true;
     }
     public void OnTriggerExit(Collider other)
     {
-        if (other.CompareTag("Mobile Platform"))
-        {
-            _onMobilePlatform = false;
-            _mobilePlatformRb = null;
-        }
+        if (!other.CompareTag("Mobile Platform")) return;
+
+        _onMobilePlatform = false;
+        _mobilePlatformRb = null;
+        _mobilePlatformTf = null;
+        _mobilePlatformRotInit = false;
     }
 
     private Vector3 GetMobilePlatformVelocity()
@@ -943,5 +955,42 @@ public class PlayerMovement : MonoBehaviour
         if (!_onMobilePlatform || _mobilePlatformRb == null) return Vector3.zero;
         return _mobilePlatformRb.linearVelocity; // Unity 6
     }
+    private void CarryWithPlatformRotation(float dt)
+    {
+        if (!_onMobilePlatform || _mobilePlatformRb == null || _mobilePlatformTf == null) return;
+        if (dt <= 0f) return;
 
+        Quaternion current = _mobilePlatformRb.rotation;
+
+        if (!_mobilePlatformRotInit)
+        {
+            _mobilePlatformLastRot = current;
+            _mobilePlatformRotInit = true;
+            return;
+        }
+
+        Quaternion delta = current * Quaternion.Inverse(_mobilePlatformLastRot);
+
+        // 讓玩家的位置繞著平台 pivot 旋轉
+        Vector3 pivot = _mobilePlatformTf.position;
+        Vector3 p = playerRigidbody.position;
+        Vector3 newP = pivot + (delta * (p - pivot));
+        playerRigidbody.MovePosition(newP);
+
+        // 讓角色模型也吃到同一個 yaw 旋轉
+        // 這一步可以避開你 RotateCharacter() 對模型朝向的覆寫感
+        Vector3 axis; float angle;
+        delta.ToAngleAxis(out angle, out axis);
+        if (axis.sqrMagnitude > 0.000001f)
+        {
+            axis.Normalize();
+            float yaw = Vector3.Dot(axis, Vector3.up) * angle;
+            if (Mathf.Abs(yaw) > 0.0001f)
+            {
+                characterModel.Rotate(0f, yaw, 0f, Space.World);
+            }
+        }
+
+        _mobilePlatformLastRot = current;
+    }
 }
