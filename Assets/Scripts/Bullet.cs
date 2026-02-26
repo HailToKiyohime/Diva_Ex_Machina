@@ -17,6 +17,7 @@ public class Bullet : MonoBehaviour
 
     public bool isMelee = false;
 
+    public LayerMask ignoreLayer;
     public LayerMask enemyLayer;
     public bool ignoreObstacles = false;
 
@@ -78,7 +79,7 @@ public class Bullet : MonoBehaviour
         Vector3 prediction = transform.position + rb.linearVelocity * Time.fixedDeltaTime;
 
         RaycastHit hit2;
-        int layerMask = GetPredictMask();
+        int layerMask = GetPredictMask() & ~ignoreLayer.value;
         if (Physics.Linecast(transform.position, prediction, out hit2, layerMask))
         {
             transform.position = hit2.point;
@@ -100,7 +101,12 @@ public class Bullet : MonoBehaviour
 
     protected virtual void OnTriggerEnterFixed(Collider other)
     {
+        Debug.Log("Bullet hit: " + other.name);
         if (_destroyed) return;
+
+        // Ignore specified layers
+        if (IsInIgnoreLayer(other))
+            return;
 
         // ignoreObstacles => only react to enemyLayer
         if (ignoreObstacles && !IsInEnemyLayer(other))
@@ -159,5 +165,10 @@ public class Bullet : MonoBehaviour
         // - if ignoreObstacles was true, we already returned above
         // - otherwise hit obstacle => destroy
         DestroyBullet();
+    }
+
+    private bool IsInIgnoreLayer(Collider col)
+    {
+        return (ignoreLayer.value & (1 << col.gameObject.layer)) != 0;
     }
 }

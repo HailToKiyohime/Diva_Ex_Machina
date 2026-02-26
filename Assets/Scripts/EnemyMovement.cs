@@ -13,17 +13,6 @@ public class EnemyMovement : MonoBehaviour
     [SerializeField] private Transform rotateRoot;          // 想旋轉的物件（通常是敵人根物件 transform，或 WolfMesh）
     [SerializeField] private float turnSpeedDeg = 720f;     // 每秒旋轉角度（度/秒）
 
-    [Header("Turn Deceleration")]
-    [Tooltip("當面向與移動方向夾角大於此角度時，開始減速（用 decelerationSpeed）")]
-    [SerializeField] private float turnSlowStartAngle = 45f;
-
-    [Tooltip("夾角到達此角度時，減速到最慢（速度倍率 = minTurnSpeedFactor）")]
-    [SerializeField] private float turnSlowFullAngle = 180f;
-
-    [Tooltip("大轉向時最低速度倍率（0.2 = 20% speed）")]
-    [Range(0f, 1f)]
-    [SerializeField] private float minTurnSpeedFactor = 0.2f;
-
 
     // ============================
     // Mobile Platform carry (same as PlayerMovement)
@@ -99,19 +88,16 @@ public class EnemyMovement : MonoBehaviour
 
         float angle = Vector3.Angle(forward, desiredDir);
 
-        // angle -> speedFactor（大轉向走慢）
-        float t = Mathf.InverseLerp(turnSlowStartAngle, turnSlowFullAngle, angle);
-        float speedFactor = Mathf.Lerp(1f, minTurnSpeedFactor, Mathf.Clamp01(t));
-
-        Vector3 targetHorizontalRel = desiredDir * (stats.speed * speedFactor);
+        Vector3 targetHorizontalRel = desiredDir * stats.speed;
 
         // ✅ 關鍵：大轉向時用 decelerationSpeed 拉低速度，角度小用 accelerationSpeed
-        float rate = (angle > turnSlowStartAngle) ? stats.decelerationSpeed : stats.accelerationSpeed;
+        float rate = stats.accelerationSpeed;
 
         horizontalRel = Vector3.MoveTowards(horizontalRel, targetHorizontalRel, rate * dt);
 
         Vector3 outRel2 = new Vector3(horizontalRel.x, vRel.y, horizontalRel.z);
         enemyRigidbody.linearVelocity = outRel2 + platformVel;      // ✅ 加回平台速度
+        Debug.Log("platformVel"+platformVel);
     }
 
     public void SetWorldMoveDirection(Vector3 worldDir)

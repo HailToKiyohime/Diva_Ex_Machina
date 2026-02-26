@@ -13,8 +13,9 @@ public class UIManager : MonoBehaviour
     [SerializeField] private GameObject CombatUICanvas;
     [SerializeField] private GameObject CharacterEquipmentCanvas;
     [SerializeField] private GameObject CharacterCraftingCanvas;
+    [SerializeField] private GameObject BuildingUICanvas;
 
-
+    [SerializeField] private BuildSystem buildSystem; // Reference to the BuildSystem script
     public int currentCameraSet = 0; // 0: Combat, 1: Equipment, 2: Crafting
     [Header("Combat UI")]
     public TextMeshProUGUI speedText;
@@ -90,6 +91,8 @@ public class UIManager : MonoBehaviour
                     CombatUICanvas.SetActive(true);
                     CharacterEquipmentCanvas.SetActive(false);
                     CharacterCraftingCanvas.SetActive(false);
+                    BuildingUICanvas.SetActive(false);
+                    buildSystem.enabled = false; // Disable BuildSystem in combat mode
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
                     break;
@@ -101,6 +104,8 @@ public class UIManager : MonoBehaviour
                     CombatUICanvas.SetActive(false);
                     CharacterEquipmentCanvas.SetActive(true);
                     CharacterCraftingCanvas.SetActive(false);
+                    BuildingUICanvas.SetActive(false);
+                    buildSystem.enabled = false; // Disable BuildSystem in equipment mode
                     Cursor.lockState = CursorLockMode.None;
                     Cursor.visible = true;
                     break;
@@ -112,6 +117,8 @@ public class UIManager : MonoBehaviour
                     CombatUICanvas.SetActive(false);
                     CharacterEquipmentCanvas.SetActive(true);
                     CharacterCraftingCanvas.SetActive(true);
+                    BuildingUICanvas.SetActive(false);
+                    buildSystem.enabled = false; // Disable BuildSystem in crafting mode
                     Cursor.lockState = CursorLockMode.None;
                     Cursor.visible = true;
                     break;
@@ -123,6 +130,8 @@ public class UIManager : MonoBehaviour
                     CombatUICanvas.SetActive(false);
                     CharacterEquipmentCanvas.SetActive(false);
                     CharacterCraftingCanvas.SetActive(false);
+                    BuildingUICanvas.SetActive(true);
+                    buildSystem.enabled = true; // Enable BuildSystem in building mode
                     Cursor.lockState = CursorLockMode.None;
                     Cursor.visible = true;
                     break;

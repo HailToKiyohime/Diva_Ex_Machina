@@ -40,6 +40,8 @@ public class CreatePath : MonoBehaviour
     public float CombatRange => combatRange;
     public Transform Target => target;
 
+    [SerializeField] private float cornerReachDist = 1.2f;
+    private int followCornerIndex = 1; // 通常 corners[0] 是起點，所以從 1 開始追
     void Start()
     {
         path = new NavMeshPath();
@@ -101,7 +103,11 @@ public class CreatePath : MonoBehaviour
         if (path != null && path.corners != null)
         {
             for (int i = 0; i < path.corners.Length - 1; i++)
-                Debug.DrawLine(path.corners[i], path.corners[i + 1], Color.red);
+            {
+                Vector3 a = ProjectCornerToReal(path.corners[i]);
+                Vector3 b = ProjectCornerToReal(path.corners[i + 1]);
+                Debug.DrawLine(a, b, Color.red);
+            }
         }
     }
 
@@ -147,6 +153,8 @@ public class CreatePath : MonoBehaviour
             {
                 NavMesh.CalculatePath(navStart, hit.position, NavMesh.AllAreas, path);
             }
+            int len = (path.corners != null) ? path.corners.Length : 0;
+            followCornerIndex = (len > 1) ? 1 : 0;
         }
     }
 
@@ -159,32 +167,24 @@ public class CreatePath : MonoBehaviour
 
         int len = path.corners != null ? path.corners.Length : 0;
         if (len == 0) return objectTransform.position;
+        if (len == 1) return ProjectCornerToReal(path.corners[0]);
 
-        if (len == 1)
-            return ProjectCornerToReal(path.corners[0]);
-
-        // ✅ 用同座標系去找最近 corner
+        // ✅ 用同座標系（ghost/real）計算距離
         Vector3 queryPos = objectTransform.position;
         if (onShipNav && realShipRoot != null && ghostShipRoot != null)
-        {
             queryPos = ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, objectTransform.position);
-        }
 
-        float lowestDistance = Mathf.Infinity;
-        int currentPointIndex = 0;
+        // clamp 防爆
+        followCornerIndex = Mathf.Clamp(followCornerIndex, 0, len - 1);
 
-        for (int i = 0; i < len - 1; i++)
+        // 如果已經接近目前追的 corner，就往下一個推進（可以一次跳過多個很短的角點）
+        while (followCornerIndex < len - 1 &&
+               Vector3.Distance(path.corners[followCornerIndex], queryPos) <= cornerReachDist)
         {
-            float d = Vector3.Distance(path.corners[i], queryPos);
-            if (d < lowestDistance)
-            {
-                lowestDistance = d;
-                currentPointIndex = i;
-            }
+            followCornerIndex++;
         }
 
-        int nextIndex = Mathf.Clamp(currentPointIndex + 1, 0, len - 1);
-        return ProjectCornerToReal(path.corners[nextIndex]);
+        return ProjectCornerToReal(path.corners[followCornerIndex]);
     }
 
     private Vector3 ProjectCornerToReal(Vector3 cornerWorld)

@@ -1,4 +1,7 @@
+Ôªøusing Unity.AI.Navigation;
+using Unity.Cinemachine;
 using UnityEngine;
+using UnityEngine.SocialPlatforms;
 using UnityEngine.UI;
 public class BuildSystem : MonoBehaviour
 {
@@ -12,10 +15,9 @@ public class BuildSystem : MonoBehaviour
 
     [Header("TopDown RawImage Input")]
     public bool useRawImageInput = true;
-    public RawImage gridRawImage;          // ≈„•‹ RenderTexture ™∫ RawImage
-    public Camera topDownCamera;           // •Œ®”¥Ë¨V grid ™∫§Wµ¯®§¨€æ˜
-    public Canvas uiCanvas;                // RawImage ©“¶b™∫ Canvas°]Screen Space Overlay §]•i•HØd™≈°^
-
+    public RawImage gridRawImage;         
+    public Camera topDownCamera;        
+    public Canvas uiCanvas;               
     [Header("Blueprint")]
     public int currentFootprintIndex = 0;
     public BuildBlueprint[] footprints;
@@ -57,7 +59,25 @@ public class BuildSystem : MonoBehaviour
     private bool _previewCanPlace;
 
     public bool buildModeOn = false;
-    private void Awake()
+
+    [Header("Zoom")]
+    public CinemachineCamera buildingCamera;
+    public CinemachinePositionComposer buildingCameraPositionComposer;
+    public float maxZoomDistance = 550;
+    public float minZoomDistance = 50;
+    public float zoomSensitivity = 25f;
+    public float panSensitivity = 0.08f;
+
+    private Vector3 _panStartTargetOffset;
+    private Vector2 _panStartMousePos;
+    private bool _isPanning;
+    [Header("Ghost Duplication")]
+    public bool duplicateToGhost = true;
+    public bool duplicateDisableRenderers = true;
+
+    [SerializeField] NavMeshSurface ghostSurface;
+    AsyncOperation _asyncBuild;
+    private void Awake()    
     {
         if (!cam) cam = Camera.main;
     }
@@ -108,16 +128,18 @@ public class BuildSystem : MonoBehaviour
             if (t.isOn) allOff = false;
         }
 
-        // ßA¶p™GØu™∫¨O°u•Ù¶Û§@≠” off ¥N≤M±º°v
+        // ‰Ω†Â¶ÇÊûúÁúüÁöÑÊòØ„Äå‰ªª‰Ωï‰∏ÄÂÄã off Â∞±Ê∏ÖÊéâ„Äç
         // if (anyOff) ClearBuildingFootprints();
 
-        // ≥q±`ßÛπ≥¨O°u•˛≥°≥£ off §~≤M±º°v
+        // ÈÄöÂ∏∏Êõ¥ÂÉèÊòØ„ÄåÂÖ®ÈÉ®ÈÉΩ off ÊâçÊ∏ÖÊéâ„Äç
         if (allOff) ClearBuildingFootprints();
     }
 
 
     private void Update()
     {
+        HandleZoomInput();
+        HandlePanInput();
         if (buildModeOn) {
             UpdateHitCell();
             HandleRotateInput();
@@ -134,16 +156,14 @@ public class BuildSystem : MonoBehaviour
     {
         if (!enableRotation) return;
 
-        float scroll = Input.mouseScrollDelta.y;
-        if (Mathf.Abs(scroll) < 0.01f) return;
+        if (!Input.GetKeyDown(KeyCode.R)) return;
 
-        int dir = scroll > 0f ? 1 : -1;
-        int steps = Mathf.RoundToInt(Mathf.Abs(scroll) * scrollSensitivity);
-        if (steps < 1) steps = 1;
+        int dir = 1;
+        if (Input.GetKeyDown(KeyCode.R) && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)))
+            dir = -1;
 
-        rotationStep = Mod(rotationStep + dir * steps, 4);
+        rotationStep = Mod(rotationStep + dir, 4);
     }
-
     private int Mod(int a, int m)
     {
         int r = a % m;
@@ -254,9 +274,11 @@ public class BuildSystem : MonoBehaviour
         bool canPlace = EvaluatePlacement(_hitGrid, _hitGridIndex, _hitCellX, _hitCellY, fp, rotationStep, out outOfBounds);
         if (!canPlace) return;
 
+        if (!InventoryManager.Instance.DeductItem(bp.costs)) return;
+
         ApplyFootprintOccupancyRotated(_hitGrid, _hitGridIndex, _hitCellX, _hitCellY, fp, rotationStep);
 
-        Vector3 pos = _hitGrid.GetCellWorldCenter(_hitGridIndex, _hitCellX, _hitCellY);
+        Vector3 pos = GetFootprintCenterWorld(_hitGrid, _hitGridIndex, _hitCellX, _hitCellY, fp, rotationStep);
 
         Quaternion baseRot = placeAlignToGridRotation ? _hitGrid.transform.rotation : Quaternion.identity;
         Quaternion rot = baseRot * Quaternion.Euler(0f, rotationStep * 90f, 0f);
@@ -267,6 +289,23 @@ public class BuildSystem : MonoBehaviour
 
         if (bp.buildingMaterial != null)
             ApplyMaterialToAllRenderers(placed, bp.buildingMaterial);
+
+
+        // ----------  DUPLICATE TO GHOST SHIP  ----------
+        if (duplicateToGhost && TryGetShipRoots(out var realRoot, out var ghostRoot))
+        {
+            Vector3 gp = placed.transform.localPosition;
+            var ghost = Instantiate(bp.buildingPrefab, ghostRoot);
+            ghost.transform.localPosition = placed.transform.localPosition;
+            ghost.transform.localRotation = placed.transform.localRotation;
+            ghost.name = placed.name + "_GHOST";
+            
+            if (duplicateDisableRenderers)
+            {
+                foreach (var r in ghost.GetComponentsInChildren<Renderer>())
+                    r.enabled = false;   // Âè™‰øùÁïô Collider + NavMeshObstacle
+            }
+         }
     }
 
     private void UpdatePreview()
@@ -320,7 +359,7 @@ public class BuildSystem : MonoBehaviour
             _previewGridIndex = _hitGridIndex;
         }
 
-        Vector3 pos = _hitGrid.GetCellWorldCenter(_hitGridIndex, _hitCellX, _hitCellY);
+        Vector3 pos = GetFootprintCenterWorld(_hitGrid, _hitGridIndex, _hitCellX, _hitCellY, fp, rotationStep);
 
         Quaternion baseRot = previewAlignToGridRotation ? _hitGrid.transform.rotation : Quaternion.identity;
         Quaternion rot = baseRot * Quaternion.Euler(0f, rotationStep * 90f, 0f);
@@ -621,6 +660,106 @@ public class BuildSystem : MonoBehaviour
         currentFootprintIndex = 0;
     }
 
+    private void HandleZoomInput()
+    {
+        if (!useRawImageInput) return;
+        if (!gridRawImage) return;
+        if (!buildingCamera) return;
 
+        float scroll = Input.mouseScrollDelta.y;
+        if (Mathf.Approximately(scroll, 0f)) return;
 
+        RectTransform rt = gridRawImage.rectTransform;
+
+        Camera eventCam = null;
+        if (uiCanvas && uiCanvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            eventCam = uiCanvas.worldCamera;
+
+        if (!RectTransformUtility.RectangleContainsScreenPoint(rt, Input.mousePosition, eventCam))
+            return;
+
+        var lens = buildingCamera.Lens;
+        lens.OrthographicSize = Mathf.Clamp(lens.OrthographicSize - scroll * zoomSensitivity, minZoomDistance, maxZoomDistance);
+        buildingCamera.Lens = lens;
+    }
+    private void HandlePanInput()
+    {
+        if (!useRawImageInput) return;
+        if (!gridRawImage) return;
+        if (!buildingCamera) return;
+
+        if (!buildingCameraPositionComposer) return;
+
+        RectTransform rt = gridRawImage.rectTransform;
+
+        Camera eventCam = null;
+        if (uiCanvas && uiCanvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            eventCam = uiCanvas.worldCamera;
+
+        bool over = RectTransformUtility.RectangleContainsScreenPoint(rt, Input.mousePosition, eventCam);
+
+        if (Input.GetMouseButtonDown(1) && over)
+        {
+            _isPanning = true;
+            _panStartMousePos = Input.mousePosition;
+            _panStartTargetOffset = buildingCameraPositionComposer.TargetOffset;
+        }
+
+        if (Input.GetMouseButtonUp(1))
+            _isPanning = false;
+
+        if (!_isPanning) return;
+
+        Vector2 cur = Input.mousePosition;
+        Vector2 delta = cur - _panStartMousePos;
+
+        Vector3 off = _panStartTargetOffset;
+        off.x += delta.x * panSensitivity;
+        off.z += delta.y * panSensitivity;
+
+        buildingCameraPositionComposer.TargetOffset = off;
+    }
+
+    private Vector3 GetFootprintCenterWorld(BuildingGrid grid, int gridIndex, int anchorX, int anchorY, BoolMatrix fp, int rotStep)
+    {
+        int srcW = fp.width;
+        int srcH = fp.height;
+
+        int dstW = (rotStep % 2 == 0) ? srcW : srcH;
+        int dstH = (rotStep % 2 == 0) ? srcH : srcW;
+
+        float centerOffsetX = (dstW - 1) * 0.5f;
+        float centerOffsetY = (dstH - 1) * 0.5f;
+
+        Vector3 anchorWorld = grid.GetCellWorldCenter(gridIndex, anchorX, anchorY);
+        float cellSize = grid.grids[gridIndex].cellSize;
+
+        Transform t = grid.transform;
+        return anchorWorld + (t.right * (centerOffsetX * cellSize)) + (t.forward * (centerOffsetY * cellSize));
+    }
+        // -----  GHOST HELPERS  ---------------------------------------------------
+    private bool TryGetShipRoots(out Transform realRoot, out Transform ghostRoot)
+    {
+        realRoot = null; ghostRoot = null;
+
+        var nav = LandshipNavigation.Instance;
+        if (nav == null) return false;
+
+        realRoot  = nav.core? nav.core : null;
+        ghostRoot = nav.ghostShip? nav.ghostShip : null;
+
+        return realRoot && ghostRoot;
+    }
+
+    private Vector3 ProjectPointToGhost(Transform realRoot, Transform ghostRoot, Vector3 worldPos)
+    {
+        Vector3 local = realRoot.InverseTransformPoint(worldPos);
+        return ghostRoot.TransformPoint(local);
+    }
+
+    private Quaternion ProjectRotToGhost(Transform realRoot, Transform ghostRoot, Quaternion worldRot)
+    {
+        Quaternion localRot = Quaternion.Inverse(realRoot.rotation) * worldRot;
+        return ghostRoot.rotation * localRot;
+    }
 }

@@ -1,4 +1,5 @@
 using UnityEngine;
+
 [CreateAssetMenu(fileName = "New Building", menuName = "BuildBlock/BludeBlueprint")]
 public class BuildBlueprint : ScriptableObject
 {
@@ -8,4 +9,5 @@ public class BuildBlueprint : ScriptableObject
     public Material pendingMaterial;
     public Material unavailableMaterial;
     public Material buildingMaterial;
+    public ItemInstance[] costs;
 }

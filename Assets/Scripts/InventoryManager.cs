@@ -1331,6 +1331,75 @@ public class InventoryManager : MonoBehaviour
 
         return null;
     }
+
+    public bool DeductItem(ItemInstance[] costs)
+    {
+        if (costs == null || costs.Length == 0) return true;
+
+        // 只扣「純 ItemInstance」，不扣任何派生類
+        bool IsPlainStack(ItemInstance inst) =>
+            inst != null && inst.item != null && inst.GetType() == typeof(ItemInstance);
+
+        // 1) 先合併需求（依 ItemObject 計總需求）
+        var required = new Dictionary<ItemObject, int>();
+        foreach (var c in costs)
+        {
+            if (!IsPlainStack(c)) continue;
+
+            int need = Mathf.Max(0, c.amount);
+            if (need == 0) continue;
+
+            if (required.ContainsKey(c.item)) required[c.item] += need;
+            else required.Add(c.item, need);
+        }
+
+        if (required.Count == 0) return true;
+
+        // 2) 計算可用數量（只算純 ItemInstance）
+        var available = new Dictionary<ItemObject, int>();
+        foreach (var inst in inventory)
+        {
+            if (!IsPlainStack(inst)) continue;
+
+            int amt = Mathf.Max(0, inst.amount);
+            if (amt == 0) continue;
+
+            if (available.ContainsKey(inst.item)) available[inst.item] += amt;
+            else available.Add(inst.item, amt);
+        }
+
+        // 3) 不夠就直接返回 false（不扣任何東西）
+        foreach (var kv in required)
+        {
+            int have = available.TryGetValue(kv.Key, out var v) ? v : 0;
+            if (have < kv.Value) return false;
+        }
+
+        // 4) 真正扣除：從尾端往前扣，扣到 0 就移除 stack
+        foreach (var kv in required)
+        {
+            var item = kv.Key;
+            int remaining = kv.Value;
+
+            for (int i = inventory.Count - 1; i >= 0 && remaining > 0; i--)
+            {
+                var inst = inventory[i];
+                if (!IsPlainStack(inst)) continue;
+                if (inst.item != item) continue;
+
+                int take = Mathf.Min(Mathf.Max(0, inst.amount), remaining);
+                inst.amount -= take;
+                remaining -= take;
+
+                if (inst.amount <= 0)
+                    inventory.RemoveAt(i);
+            }
+        }
+
+        return true;
+    }
+
+
     private void ClearColorPickerState()
     {
         if (characterEquipmentColorPicker == null) return;
