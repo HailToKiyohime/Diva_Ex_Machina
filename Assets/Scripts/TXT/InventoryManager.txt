@@ -781,14 +781,6 @@ public class InventoryManager : MonoBehaviour
 
             var button = Instantiate(buttonPrefab, itemsButtonParent);
 
-            ItemInstance capturedItem = inv;
-
-            var trigger = button.GetComponent<InventoryItemTooltipTrigger>();
-            if (trigger == null)
-                trigger = button.AddComponent<InventoryItemTooltipTrigger>();
-
-            trigger.Setup(capturedItem);
-
             // icon
             var icon = button.transform.Find("Item Icon")?.GetComponent<Image>();
             if (icon != null) icon.sprite = inv.item.icon;
@@ -806,6 +798,7 @@ public class InventoryManager : MonoBehaviour
             var tgl = button.GetComponent<Toggle>();
             if (tgl == null) continue;
 
+            ItemInstance capturedItem = inv;
             toggleItemMap[tgl] = capturedItem;
 
             // 先鎖住：已裝備中的物品
@@ -866,11 +859,7 @@ public class InventoryManager : MonoBehaviour
             if (!allowed.Contains(inv.item.type)) continue;
 
             var button = Instantiate(buttonPrefab, itemsButtonParent);
-            var trigger = button.GetComponent<InventoryItemTooltipTrigger>();
-            if (trigger == null)
-                trigger = button.AddComponent<InventoryItemTooltipTrigger>();
 
-            trigger.Setup(inv);
             var icon = button.transform.Find("Item Icon")?.GetComponent<UnityEngine.UI.Image>();
             if (icon != null) icon.sprite = inv.item.icon;
 

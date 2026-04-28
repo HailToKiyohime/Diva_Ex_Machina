@@ -101,7 +101,7 @@ public class Bullet : MonoBehaviour
 
     protected virtual void OnTriggerEnterFixed(Collider other)
     {
-        Debug.Log("Bullet hit: " + other.name);
+        //Debug.Log("Bullet hit: " + other.name);
         if (_destroyed) return;
 
         // Ignore specified layers

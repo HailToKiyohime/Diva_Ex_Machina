@@ -6,6 +6,7 @@ public class LandshipNavigation : MonoBehaviour
     public static LandshipNavigation Instance { get; private set; }
     public Transform ghostShip;          // Ghost ship root (contains baked navmesh)
     public Transform core;               // Core target on real ship
+    public Transform[] dockingPoints;        // Docking points on the real ship
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -15,8 +16,8 @@ public class LandshipNavigation : MonoBehaviour
         else
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject);
         }
     }
+
 
 }

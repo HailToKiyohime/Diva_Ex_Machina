@@ -1,0 +1,35 @@
+using System.Collections.Generic;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.EventSystems;
+public class TooltipManager : MonoBehaviour
+{
+    public TextMeshProUGUI equipmentText;
+    public TextMeshProUGUI statText;
+    void Update()
+    {
+        if (IsMouseOverToggle())
+        {
+            Debug.Log("Mouse is hovering over a Toggle");
+        }
+    }
+    bool IsMouseOverToggle()
+    {
+        PointerEventData pointerData = new PointerEventData(EventSystem.current);
+        pointerData.position = Input.mousePosition;
+
+        List<RaycastResult> results = new List<RaycastResult>();
+        EventSystem.current.RaycastAll(pointerData, results);
+
+        foreach (RaycastResult result in results)
+        {
+            if (result.gameObject.GetComponent<Toggle>() != null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}

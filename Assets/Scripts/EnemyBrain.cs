@@ -1,15 +1,27 @@
 using UnityEngine;
 using UnityEngine.AI;
-
+using System.Collections.Generic;
 public enum EnemyState
 {
     Idle,
     Chasing,
     Attacking,
 }
+[System.Serializable]
+public class TargetPriority
+{
+    public Transform target;
+    public int aggro;
+    public bool isMainTarget;
+}
 
 public class EnemyBrain : MonoBehaviour
 {
+
+    public List<TargetPriority> targetList = new List<TargetPriority>();
+
+    public Vector3 spwanLocation;
+
     public EnemyState currentState = EnemyState.Idle;
 
     [Header("Repath When Path Finished")]
@@ -35,6 +47,7 @@ public class EnemyBrain : MonoBehaviour
     // ============================
     private bool _hasAttackSlot;
 
+    [SerializeField] private bool onShiped = false;
     private void Awake()
     {
         pathFinder = GetComponent<CreatePath>();
@@ -56,7 +69,7 @@ public class EnemyBrain : MonoBehaviour
     {
         if (pathFinder == null || movement == null) return;
 
-        if (pathFinder.Target == null)
+        if (targetList == null || targetList[0].target == null)
         {
             ReleaseAttackSlot();
             SetState(EnemyState.Idle);
@@ -66,7 +79,7 @@ public class EnemyBrain : MonoBehaviour
 
         if (firearmSystem != null)
         {
-            firearmSystem.defaultTarget = pathFinder.Target;
+            firearmSystem.defaultTarget = targetList[0].target;
         }
 
         // A) Decide state by distance (+ hysteresis)
@@ -97,7 +110,7 @@ public class EnemyBrain : MonoBehaviour
 
     private void UpdateStateByDistance()
     {
-        float dist = Vector3.Distance(transform.position, pathFinder.Target.position);
+        float dist = Vector3.Distance(transform.position, targetList[0].target.position);
         float enterAttack = pathFinder.CombatRange;
         float exitAttack = pathFinder.CombatRange + combatRangeHysteresis;
 
@@ -292,5 +305,10 @@ public class EnemyBrain : MonoBehaviour
             pathFinder.FindPath();
             _nextAllowedRepathTime = Time.time + repathCooldown;
         }
+    }
+
+    public void SetOnShiped(bool onShip)
+    {
+        onShiped = onShip;
     }
 }
