@@ -40,7 +40,7 @@ public class CreatePath : MonoBehaviour
     [SerializeField] private Transform ghostShipRoot;
 
     public float CombatRange => combatRange;
-    public Transform Target => enemyBrain.targetList[0].target;
+    public Transform Target => enemyBrain.currentTargetTransform;
 
     [SerializeField] private float cornerReachDist = 1.2f;
     private int followCornerIndex = 1; // 通常 corners[0] 是起點，所以從 1 開始追
@@ -65,7 +65,7 @@ public class CreatePath : MonoBehaviour
         onShipNav = true;
         realShipRoot = realShip;
         ghostShipRoot = ghostShip;
-        enemyBrain.targetList[0].target = newTarget;
+        enemyBrain.ForceSetTarget(newTarget);  // 新增的公開接口
 
         // 船上通常不需要 orbit 初始角度沿用（避免奇怪跳動）
         orbitAngleInitialized = false;
@@ -79,19 +79,17 @@ public class CreatePath : MonoBehaviour
         onShipNav = false;
         realShipRoot = null;
         ghostShipRoot = null;
-        enemyBrain.targetList[0].target = newTarget;
-
+        enemyBrain.ForceSetTarget(newTarget);
+        SelectTarget();
         FindPath();
         elapsed = 0f;
     }
 
     void Update()
     {
-        if (enemyBrain.targetList == null || enemyBrain.targetList[0].target == null) return;
+        if (enemyBrain.targetList == null || enemyBrain.currentTargetTransform == null) return;
 
-        SelectTarget();
-
-        float targetDistance = Vector3.Distance(transform.position, enemyBrain.targetList[0].target.position);
+        float targetDistance = Vector3.Distance(transform.position, enemyBrain.currentTargetTransform.position);
         elapsed += Time.deltaTime;
 
         if (elapsed > currentUpdateTime)
@@ -121,14 +119,14 @@ public class CreatePath : MonoBehaviour
 
     public void FindPath()
     {
-        if (enemyBrain.targetList[0].target == null)
+        if (enemyBrain.currentTargetTransform == null)
         {
 
         }
         else
         {
             Vector3 startWorld = transform.position;
-            Vector3 endWorld = enemyBrain.targetList[0].target.position;
+            Vector3 endWorld = enemyBrain.currentTargetTransform.position;
 
             // 1) 取得計算用 start/end（可能投影到 ghost）
             Vector3 navStart = startWorld;
@@ -173,7 +171,7 @@ public class CreatePath : MonoBehaviour
     }
 
     public NavMeshPath GetPath() => path;
-    public Transform GetTarget() => enemyBrain.targetList[0].target;
+    public Transform GetTarget() => enemyBrain.currentTargetTransform;
 
     public Vector3 FindNextMoveLocation(Transform objectTransform)
     {
@@ -212,7 +210,7 @@ public class CreatePath : MonoBehaviour
 
     public Vector3 GetDestinationPoint(Vector3 targetPosition)
     {
-        float targetDistance = Vector3.Distance(transform.position, enemyBrain.targetList[0].target.position);
+        float targetDistance = Vector3.Distance(transform.position, enemyBrain.currentTargetTransform.position);
 
         if (targetDistance < combatRange)
         {
@@ -220,27 +218,27 @@ public class CreatePath : MonoBehaviour
             {
                 return GetNextOrbitPoint(
                     transform,
-                    enemyBrain.targetList[0].target,
+                    enemyBrain.currentTargetTransform,
                     orbitRadius + Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset),
                     orbitStepDeg,
                     orbitClockwise,
                     orbitUseCurrentAsStart,
-                    enemyBrain.targetList[0].target.position.y
+                    enemyBrain.currentTargetTransform.position.y
                 );
             }
 
             return new Vector3(
-                enemyBrain.targetList[0].target.position.x + Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset),
+                enemyBrain.currentTargetTransform.position.x + Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset),
                 1.5f,
-                enemyBrain.targetList[0].target.position.z + Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset)
+                enemyBrain.currentTargetTransform.position.z + Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset)
             );
         }
         else
         {
             return new Vector3(
-                enemyBrain.targetList[0].target.position.x + Random.Range(-10f, 10f),
+                enemyBrain.currentTargetTransform.position.x + Random.Range(-10f, 10f),
                 1.5f,
-                enemyBrain.targetList[0].target.position.z + Random.Range(-10f, 10f)
+                enemyBrain.currentTargetTransform.position.z + Random.Range(-10f, 10f)
             );
         }
     }
@@ -430,7 +428,7 @@ public class CreatePath : MonoBehaviour
                 }
             }
             if (closestDockingPoint != null)
-                enemyBrain.targetList[0].target = closestDockingPoint;
+                enemyBrain.ForceSetTarget(closestDockingPoint);
         }
     }
 }
