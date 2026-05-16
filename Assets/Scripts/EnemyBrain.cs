@@ -13,6 +13,7 @@ public class TargetPriority
     public Transform target;
     public int aggro;
     public bool isMainTarget;
+    public float damageCauseByTarget;
 }
 
 public class EnemyBrain : MonoBehaviour
@@ -41,11 +42,15 @@ public class EnemyBrain : MonoBehaviour
     private FirearmControlSystem firearmSystem;
     [SerializeField] private float fireConeDeg = 5f;
 
+    public float retargetInterval = 2f;
+    private float retargetTimer = 0f;
     // ============================
     // Attack Limiter
     // Only enemies holding a slot are allowed to shoot.
     // ============================
     private bool _hasAttackSlot;
+
+    public Transform currentTargetTransform = null;
 
     [SerializeField] private bool onShiped = false;
     private void Awake()
@@ -69,7 +74,10 @@ public class EnemyBrain : MonoBehaviour
     {
         if (pathFinder == null || movement == null) return;
 
-        if (targetList == null || targetList[0].target == null)
+        bool hasAnyValidTarget = targetList != null &&
+            targetList.Exists(t => t != null && t.target != null);
+
+        if (!hasAnyValidTarget)
         {
             ReleaseAttackSlot();
             SetState(EnemyState.Idle);
@@ -79,7 +87,16 @@ public class EnemyBrain : MonoBehaviour
 
         if (firearmSystem != null)
         {
-            firearmSystem.defaultTarget = targetList[0].target;
+            if (currentTargetTransform != null)
+                firearmSystem.defaultTarget = currentTargetTransform;
+        }
+
+        //retargeting: periodically reconsider target priorities and possibly switch targets
+        retargetTimer += Time.deltaTime;
+        if (retargetTimer >= retargetInterval)
+        {
+            retargetTimer = 0f;
+            SetCurrentTarget(ChooseNewTarget());
         }
 
         // A) Decide state by distance (+ hysteresis)
@@ -110,7 +127,19 @@ public class EnemyBrain : MonoBehaviour
 
     private void UpdateStateByDistance()
     {
-        float dist = Vector3.Distance(transform.position, targetList[0].target.position);
+        if (currentTargetTransform == null)
+        {
+            SetCurrentTarget(ChooseNewTarget());
+
+            if (currentTargetTransform == null)
+            {
+                SetState(EnemyState.Idle);
+                movement.HorizontalMovement(0f, 0f);
+                return;
+            }
+        }
+
+        float dist = Vector3.Distance(transform.position, currentTargetTransform.position);
         float enterAttack = pathFinder.CombatRange;
         float exitAttack = pathFinder.CombatRange + combatRangeHysteresis;
 
@@ -310,5 +339,69 @@ public class EnemyBrain : MonoBehaviour
     public void SetOnShiped(bool onShip)
     {
         onShiped = onShip;
+    }
+
+    public Transform ChooseNewTarget()
+    {
+        if (targetList == null || targetList.Count == 0)
+            return null;
+
+        int totalAggro = 0;
+
+        foreach (TargetPriority target in targetList)
+        {
+            if (target == null || target.target == null)
+                continue;
+
+            totalAggro += Mathf.Max(0, target.aggro);
+        }
+
+        if (totalAggro <= 0)
+            return null;
+
+        int roll = Random.Range(0, totalAggro);
+        int current = 0;
+
+        foreach (TargetPriority target in targetList)
+        {
+            if (target == null || target.target == null)
+                continue;
+
+            current += Mathf.Max(0, target.aggro);
+
+            if (roll < current)
+                return target.target;
+        }
+
+        return null;
+    }
+
+    private void SetCurrentTarget(Transform newTarget)
+    {
+        if (newTarget == null) return;
+
+        currentTargetTransform = newTarget;
+
+        if (firearmSystem != null)
+            firearmSystem.defaultTarget = currentTargetTransform;
+
+        if (pathFinder != null)
+        {
+            pathFinder.FindPath();
+            _nextAllowedRepathTime = 0f;
+        }
+    }
+
+    public void ForceSetTarget(Transform newTarget)
+    {
+        if (newTarget == null) return;
+        currentTargetTransform = newTarget;
+        if (firearmSystem != null)
+            firearmSystem.defaultTarget = currentTargetTransform;
+        if (pathFinder != null)
+        {
+            pathFinder.FindPath();
+            _nextAllowedRepathTime = 0f;
+        }
     }
 }

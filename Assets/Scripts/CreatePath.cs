@@ -73,6 +73,18 @@ public class CreatePath : MonoBehaviour
         FindPath();
         elapsed = 0f;
     }
+    public void ClearShipNav()
+    {
+        // 清除船上導航模式：關閉投影，重置船根，保持當前目標（或可選擇重置）
+        Debug.Log("Clearing Ship Navigation Mode");
+        onShipNav = false;
+        realShipRoot = null;
+        ghostShipRoot = null;
+        // 可選：重置目標為原本的 target（如果需要）
+        // enemyBrain.targetList[0].target = originalTarget;
+        FindPath();
+        elapsed = 0f;
+    }
 
     public void SetOverworldNav(Transform newTarget)
     {

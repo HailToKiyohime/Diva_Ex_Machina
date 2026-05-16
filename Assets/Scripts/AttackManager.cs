@@ -533,8 +533,10 @@ public class AttackManager : MonoBehaviour
                 }
 
                 var currentBullet = Instantiate(bulletPrefab, muzzle.position, Quaternion.identity);
-
                 var bulletComp = currentBullet.GetComponent<Bullet>();
+
+                bulletComp.attacker = playerRb.gameObject;
+
                 if (bulletComp != null)
                 {
                     // 1) 傷害（已由 ApplyHand / ApplyShoulder 同步到 w.damage）

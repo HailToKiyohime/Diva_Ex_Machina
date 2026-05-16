@@ -4,6 +4,8 @@ using UnityEngine;
 
 public class Bullet : MonoBehaviour
 {
+    public GameObject attacker;
+
     public float physicalDamage = 0;
     public float explosionDamage = 0;
     public float energyDamage = 0;
@@ -133,8 +135,15 @@ public class Bullet : MonoBehaviour
             bool isCrit = (Random.value < Mathf.Clamp01(criticalChance));
             if (isCrit)
                 final *= Mathf.Max(1f, criticalMultiplier);
+            if (attacker != null)
+            {
+                enemy.TakeDamage(final, attacker);
+            }
+            else
+            {
+                enemy.TakeDamage(final);
+            }
 
-            enemy.TakeDamage(final);
 
             // melee impact feedback
             if (isMelee)

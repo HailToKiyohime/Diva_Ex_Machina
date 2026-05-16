@@ -139,6 +139,7 @@ public class EnemyMovement : MonoBehaviour
         {
             _onMobilePlatform = false;
             _mobilePlatformRb = null;
+            gameObject.GetComponent<CreatePath>().ClearShipNav(); // 這裡順便通知 CreatePath 離開船了（如果有的話）
         }
     }
 
