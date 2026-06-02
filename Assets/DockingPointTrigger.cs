@@ -12,14 +12,19 @@
 
         private void OnTriggerEnter(Collider other)
         {
-
-
-            // 你的敵人 collider 可能在子物件，所以用 InParent
             CreatePath path = other.GetComponentInParent<CreatePath>();
             if (path == null) return;
-            Debug.Log($"DockingPointTrigger: {other.name} entered docking trigger");
-            //if (landship.core == null || landship.ghostShip == null) return;
-            // ✅ 切到船上模式：目標改 core，使用 ghost navmesh 計算路徑
-            path.SetOnShipNav(landship.transform, landship.ghostShip, landship.core);
+
+            EnemyBrain brain = other.GetComponentInParent<EnemyBrain>();
+            if (brain == null) return;
+
+            // 用 Brain 的當前目標（可能是 Core、也可能是船上的玩家）
+            // fallback 到 core 只在目標 null 時才用
+            Transform combatTarget = brain.currentTargetTransform;
+            if (combatTarget == null || !combatTarget.IsChildOf(landship.transform))
+                combatTarget = landship.core;
+
+            // 登船：_navTarget 切換成真正的戰鬥目標
+            path.SetOnShipNav(landship.transform, landship.ghostShip, combatTarget);
         }
-    }
+}

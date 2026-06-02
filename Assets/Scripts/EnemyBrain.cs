@@ -1,24 +1,28 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.AI;
 using System.Collections.Generic;
+
 public enum EnemyState
 {
     Idle,
     Chasing,
     Attacking,
 }
+
 [System.Serializable]
 public class TargetPriority
 {
     public Transform target;
-    public int aggro;
+    public int baseAggro;               // Fixed priority — never decays
     public bool isMainTarget;
-    public float damageCauseByTarget;
+    public float damageCauseByTarget;   // Raw damage accumulation — decays when out of range
+    public int damageAggro;             // Stepped aggro derived from damageCauseByTarget — decays in sync
+
+    public int TotalAggro => baseAggro + damageAggro;
 }
 
 public class EnemyBrain : MonoBehaviour
 {
-
     public List<TargetPriority> targetList = new List<TargetPriority>();
 
     public Vector3 spwanLocation;
@@ -44,6 +48,19 @@ public class EnemyBrain : MonoBehaviour
 
     public float retargetInterval = 2f;
     private float retargetTimer = 0f;
+
+    [Tooltip("Only targets within this distance are considered when retargeting (0 = unlimited).")]
+    [SerializeField] private float retargetRange = 50f;
+
+    [Tooltip("Rate at which damageCauseByTarget decays per second when the target is outside retargetRange.")]
+    [SerializeField] private float damageFalloffRate = 5f;
+
+    [Tooltip("Damage required to gain 1 damageAggro step. Shared with EnemyStats.AddAggro via DamagePerAggroStep.")]
+    [SerializeField] private float damagePerAggroStep = 50f;
+
+    /// <summary>Exposed so EnemyStats.AddAggro can use the same threshold.</summary>
+    public float DamagePerAggroStep => damagePerAggroStep;
+
     // ============================
     // Attack Limiter
     // Only enemies holding a slot are allowed to shoot.
@@ -53,6 +70,7 @@ public class EnemyBrain : MonoBehaviour
     public Transform currentTargetTransform = null;
 
     [SerializeField] private bool onShiped = false;
+
     private void Awake()
     {
         pathFinder = GetComponent<CreatePath>();
@@ -74,8 +92,9 @@ public class EnemyBrain : MonoBehaviour
     {
         if (pathFinder == null || movement == null) return;
 
-        bool hasAnyValidTarget = targetList != null &&
-            targetList.Exists(t => t != null && t.target != null);
+        bool hasAnyValidTarget =
+            (pathFinder != null && pathFinder.HasNavTarget) ||
+            (targetList != null && targetList.Exists(t => t != null && t.target != null));
 
         if (!hasAnyValidTarget)
         {
@@ -91,7 +110,8 @@ public class EnemyBrain : MonoBehaviour
                 firearmSystem.defaultTarget = currentTargetTransform;
         }
 
-        //retargeting: periodically reconsider target priorities and possibly switch targets
+        // Retargeting: periodically reconsider target priorities and possibly switch targets
+        DecayOutOfRangeTargets();
         retargetTimer += Time.deltaTime;
         if (retargetTimer >= retargetInterval)
         {
@@ -129,14 +149,8 @@ public class EnemyBrain : MonoBehaviour
     {
         if (currentTargetTransform == null)
         {
-            SetCurrentTarget(ChooseNewTarget());
-
-            if (currentTargetTransform == null)
-            {
-                SetState(EnemyState.Idle);
-                movement.HorizontalMovement(0f, 0f);
-                return;
-            }
+            SetState(EnemyState.Chasing);
+            return;
         }
 
         float dist = Vector3.Distance(transform.position, currentTargetTransform.position);
@@ -147,7 +161,6 @@ public class EnemyBrain : MonoBehaviour
         {
             if (dist <= enterAttack)
             {
-                // IMPORTANT: only enter Attacking if we can claim a slot
                 if (TryClaimAttackSlot())
                     SetState(EnemyState.Attacking);
                 else
@@ -160,7 +173,6 @@ public class EnemyBrain : MonoBehaviour
         }
         else
         {
-            // Already Attacking: only leave when beyond exit threshold
             if (dist >= exitAttack)
                 SetState(EnemyState.Chasing);
         }
@@ -170,18 +182,17 @@ public class EnemyBrain : MonoBehaviour
     {
         if (currentState == newState) return;
 
-        // Exit old
+        // Exit old state
         switch (currentState)
         {
             case EnemyState.Attacking:
-                // Leaving Attacking => release slot
                 ReleaseAttackSlot();
                 break;
         }
 
         currentState = newState;
 
-        // Enter new
+        // Enter new state
         switch (currentState)
         {
             case EnemyState.Idle:
@@ -189,13 +200,11 @@ public class EnemyBrain : MonoBehaviour
                 break;
 
             case EnemyState.Chasing:
-                // Enter chasing: refresh path
                 pathFinder.FindPath();
                 _nextAllowedRepathTime = 0f;
                 break;
 
             case EnemyState.Attacking:
-                // Enter attacking: stop input this frame; actual movement/fire handled in DoAttacking
                 movement.HorizontalMovement(0f, 0f);
                 break;
         }
@@ -205,7 +214,6 @@ public class EnemyBrain : MonoBehaviour
     {
         if (_hasAttackSlot) return true;
 
-        // If there's no GameManager, just allow (fail-open)
         if (GameManager.Instance == null)
         {
             _hasAttackSlot = true;
@@ -284,7 +292,6 @@ public class EnemyBrain : MonoBehaviour
 
         movement.HorizontalMovement(moveX, moveZ);
 
-        // Only shoot if we currently hold an attack slot
         if (!_hasAttackSlot) return;
 
         if (firearmSystem != null && currentState == EnemyState.Attacking)
@@ -341,10 +348,40 @@ public class EnemyBrain : MonoBehaviour
         onShiped = onShip;
     }
 
+    /// <summary>
+    /// Called every frame. For targets outside retargetRange, gradually reduce
+    /// damageCauseByTarget and sync damageAggro. baseAggro is never affected. isMainTarget entries are exempt.
+    /// </summary>
+    private void DecayOutOfRangeTargets()
+    {
+        if (targetList == null || targetList.Count == 0) return;
+
+        float rangeSqr = retargetRange > 0f ? retargetRange * retargetRange : float.PositiveInfinity;
+
+        foreach (TargetPriority target in targetList)
+        {
+            if (target == null || target.target == null) continue;
+
+            // Main targets are immune to decay
+            if (target.isMainTarget) continue;
+
+            float distSqr = (target.target.position - transform.position).sqrMagnitude;
+            if (distSqr <= rangeSqr) continue;
+
+            // Decay raw damage value
+            target.damageCauseByTarget = Mathf.Max(0f, target.damageCauseByTarget - damageFalloffRate * Time.deltaTime);
+
+            // Sync stepped aggro to match decayed damage — baseAggro untouched
+            target.damageAggro = Mathf.FloorToInt(target.damageCauseByTarget / damagePerAggroStep);
+        }
+    }
+
     public Transform ChooseNewTarget()
     {
         if (targetList == null || targetList.Count == 0)
             return null;
+
+        float rangeSqr = retargetRange > 0f ? retargetRange * retargetRange : float.PositiveInfinity;
 
         int totalAggro = 0;
 
@@ -353,7 +390,14 @@ public class EnemyBrain : MonoBehaviour
             if (target == null || target.target == null)
                 continue;
 
-            totalAggro += Mathf.Max(0, target.aggro);
+            if (!target.isMainTarget)
+            {
+                float distSqr = (target.target.position - transform.position).sqrMagnitude;
+                if (distSqr > rangeSqr)
+                    continue;
+            }
+
+            totalAggro += Mathf.Max(0, target.TotalAggro);
         }
 
         if (totalAggro <= 0)
@@ -367,7 +411,14 @@ public class EnemyBrain : MonoBehaviour
             if (target == null || target.target == null)
                 continue;
 
-            current += Mathf.Max(0, target.aggro);
+            if (!target.isMainTarget)
+            {
+                float distSqr = (target.target.position - transform.position).sqrMagnitude;
+                if (distSqr > rangeSqr)
+                    continue;
+            }
+
+            current += Mathf.Max(0, target.TotalAggro);
 
             if (roll < current)
                 return target.target;
@@ -395,9 +446,25 @@ public class EnemyBrain : MonoBehaviour
     public void ForceSetTarget(Transform newTarget)
     {
         if (newTarget == null) return;
+
+        var existing = targetList.Find(t => t != null && t.target == newTarget);
+        if (existing == null)
+        {
+            targetList.Add(new TargetPriority
+            {
+                target = newTarget,
+                baseAggro = 1,
+                isMainTarget = false,
+                damageCauseByTarget = 0f,
+                damageAggro = 0
+            });
+        }
+
         currentTargetTransform = newTarget;
+
         if (firearmSystem != null)
             firearmSystem.defaultTarget = currentTargetTransform;
+
         if (pathFinder != null)
         {
             pathFinder.FindPath();

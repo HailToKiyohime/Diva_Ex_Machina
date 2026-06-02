@@ -18,6 +18,11 @@ public class Firearm
     public Transform muzzleCenterPoint;// central point of muzzles for calculating intersection with targets
 
     public GameObject bulletPrefab; // prefab of the bullet to be fired
+    public float physicalDamage; // physical damage of the bullet
+    public float explosionDamage; // explosion damage of the bullet
+    public float energyDamage; // energy damage of the bullet
+    public float coldDamage; // cold damage of the bullet
+
     public float bulletSpeed; // speed of the bullet
     public float bulletSpread; // spread angle for inaccuracy
     public float bulletPerRound = 1; // number of bullets fired per Round
@@ -134,21 +139,25 @@ public class FirearmControlSystem : MonoBehaviour
     private void Update()
     {
         if (firearms == null) return;
-
         for (int i = 0; i < firearms.Length; i++)
         {
             var fa = firearms[i];
             if (fa == null) continue;
-
             UpdateTargetVelocity(i, fa);
+            TickFiring(i, fa); // 換彈、冷卻倒數留在 Update
+        }
+    }
 
+    private void LateUpdate() // ← 瞄準改到 LateUpdate
+    {
+        if (firearms == null) return;
+        for (int i = 0; i < firearms.Length; i++)
+        {
+            var fa = firearms[i];
+            if (fa == null) continue;
             var t = ResolveTarget(fa);
             if (t != null)
-            {
-                AimOne(i, fa, t, _targetVel[i]);
-            }
-
-            TickFiring(i, fa);
+                AimOne(i, fa, t, _targetVel[i]); // 此時 defaultTarget 已被 EnemyBrain 更新完畢
         }
     }
 
@@ -414,7 +423,7 @@ public class FirearmControlSystem : MonoBehaviour
                 var muzzle = fa.muzzles[m];
                 if (muzzle == null) continue;
 
-                SpawnProjectilesFromMuzzle(muzzle, fa.bulletPrefab, pellets, spread, speed);
+                SpawnProjectilesFromMuzzle(muzzle, fa);
             }
         }
         else
@@ -425,29 +434,36 @@ public class FirearmControlSystem : MonoBehaviour
             var muzzle = fa.muzzles[mi];
             if (muzzle == null) return;
 
-            SpawnProjectilesFromMuzzle(muzzle, fa.bulletPrefab, pellets, spread, speed);
+            SpawnProjectilesFromMuzzle(muzzle, fa);
         }
     }
 
-    private void SpawnProjectilesFromMuzzle(Transform muzzle, GameObject bulletPrefab, int pellets, float spreadDeg, float speed)
+    private void SpawnProjectilesFromMuzzle(Transform muzzle, Firearm fa)
     {
         Vector3 baseDir = muzzle.forward;
-
+        int pellets = Mathf.Max(1, Mathf.RoundToInt(fa.bulletPerRound));
+        float spread = Mathf.Max(0f, fa.bulletSpread);
+        float speed = Mathf.Max(0f, fa.bulletSpeed);
         for (int i = 0; i < pellets; i++)
         {
             Vector3 dir = baseDir;
 
-            if (spreadDeg > 0.0001f)
+            if (spread > 0.0001f)
             {
-                float yaw = Random.Range(-spreadDeg, spreadDeg);
-                float pitch = Random.Range(-spreadDeg, spreadDeg);
+                float yaw = Random.Range(-spread, spread);
+                float pitch = Random.Range(-spread, spread);
                 dir = Quaternion.Euler(pitch, yaw, 0f) * baseDir;
                 dir.Normalize();
             }
 
             Quaternion rot = Quaternion.LookRotation(dir, muzzle.up);
-            GameObject b = Instantiate(bulletPrefab, muzzle.position, rot);
-
+            GameObject b = Instantiate(fa.bulletPrefab, muzzle.position, rot);
+            var bulletComp = b.GetComponent<Bullet>();
+            bulletComp.attacker = gameObject;
+            bulletComp.physicalDamage = fa.physicalDamage;
+            bulletComp.explosionDamage = fa.explosionDamage;
+            bulletComp.energyDamage = fa.energyDamage;
+            bulletComp.coldDamage = fa.coldDamage;
             Rigidbody rb = b.GetComponent<Rigidbody>();
             if (rb != null)
             {

@@ -7,6 +7,9 @@ using UnityEngine.AI;
 
 public class CreatePath : MonoBehaviour
 {
+    private Transform _navTarget;
+    public bool HasNavTarget => _navTarget != null;
+
     private EnemyBrain enemyBrain; // Reference to EnemyBrain for state info
 
     private NavMeshPath path;
@@ -40,7 +43,7 @@ public class CreatePath : MonoBehaviour
     [SerializeField] private Transform ghostShipRoot;
 
     public float CombatRange => combatRange;
-    public Transform Target => enemyBrain.targetList[0].target;
+    public Transform Target => enemyBrain.currentTargetTransform;
 
     [SerializeField] private float cornerReachDist = 1.2f;
     private int followCornerIndex = 1; // 通常 corners[0] 是起點，所以從 1 開始追
@@ -60,28 +63,22 @@ public class CreatePath : MonoBehaviour
     // ============================
     public void SetOnShipNav(Transform realShip, Transform ghostShip, Transform newTarget)
     {
-        // 切換到船上導航模式：啟用投影，設定船根和目標
-        Debug.Log("Switching to Ship Navigation Mode");
         onShipNav = true;
         realShipRoot = realShip;
         ghostShipRoot = ghostShip;
-        enemyBrain.targetList[0].target = newTarget;
-
-        // 船上通常不需要 orbit 初始角度沿用（避免奇怪跳動）
         orbitAngleInitialized = false;
 
-        FindPath();
+        _navTarget = newTarget;                   // 導航目標
+        enemyBrain.ForceSetTarget(newTarget);     // 戰鬥目標（加入 targetList）
         elapsed = 0f;
     }
+
     public void ClearShipNav()
     {
-        // 清除船上導航模式：關閉投影，重置船根，保持當前目標（或可選擇重置）
-        Debug.Log("Clearing Ship Navigation Mode");
         onShipNav = false;
         realShipRoot = null;
         ghostShipRoot = null;
-        // 可選：重置目標為原本的 target（如果需要）
-        // enemyBrain.targetList[0].target = originalTarget;
+        _navTarget = null; // ← 讓 SelectTarget 重選，不留殘值
         FindPath();
         elapsed = 0f;
     }
@@ -91,101 +88,79 @@ public class CreatePath : MonoBehaviour
         onShipNav = false;
         realShipRoot = null;
         ghostShipRoot = null;
-        enemyBrain.targetList[0].target = newTarget;
 
-        FindPath();
+        enemyBrain.ForceSetTarget(newTarget); // ✅ 同步 Brain
         elapsed = 0f;
     }
 
     void Update()
     {
-        if (enemyBrain.targetList == null || enemyBrain.targetList[0].target == null) return;
+        UpdateNavTarget(); // ← 取代 SelectTarget()
 
-        SelectTarget();
+        Transform navDest = _navTarget ?? enemyBrain.currentTargetTransform;
+        if (navDest == null) return;
 
-        float targetDistance = Vector3.Distance(transform.position, enemyBrain.targetList[0].target.position);
         elapsed += Time.deltaTime;
-
         if (elapsed > currentUpdateTime)
         {
             elapsed = 0f;
-
             FindPath();
 
-            // 更新下一次刷新頻率（維持你原本行為）
-            if (targetDistance < combatRange)
-                currentUpdateTime = Random.Range(combatRangeBrainMinUpdateTime, combatRangeBrainMaxUpdateTime);
-            else
-                currentUpdateTime = normalRangeBrainUpdateTime;
+            // 頻率判斷用戰鬥目標距離，不是 navTarget 距離
+            float combatDist = enemyBrain.currentTargetTransform != null
+                ? Vector3.Distance(transform.position, enemyBrain.currentTargetTransform.position)
+                : float.MaxValue;
+
+            currentUpdateTime = combatDist < combatRange
+                ? Random.Range(combatRangeBrainMinUpdateTime, combatRangeBrainMaxUpdateTime)
+                : normalRangeBrainUpdateTime;
         }
 
-        // Debug：corners 是「計算座標系」下的點（船上模式會畫在 ghostShip 那邊）
+        // Debug
         if (path != null && path.corners != null)
         {
             for (int i = 0; i < path.corners.Length - 1; i++)
-            {
-                Vector3 a = ProjectCornerToReal(path.corners[i]);
-                Vector3 b = ProjectCornerToReal(path.corners[i + 1]);
-                Debug.DrawLine(a, b, Color.red);
-            }
+                Debug.DrawLine(ProjectCornerToReal(path.corners[i]),
+                               ProjectCornerToReal(path.corners[i + 1]), Color.red);
         }
     }
 
     public void FindPath()
     {
-        if (enemyBrain.targetList[0].target == null)
-        {
+        Transform destination = _navTarget ?? enemyBrain.currentTargetTransform;
+        if (destination == null) return; // ✅ 統一守衛，不再分兩條路
 
+        Vector3 startWorld = transform.position;
+        Vector3 endWorld = destination.position;
+
+        Vector3 navStart = startWorld;
+        Vector3 navEnd = endWorld;
+
+        if (onShipNav && realShipRoot != null && ghostShipRoot != null)
+        {
+            navStart = ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, startWorld);
+            navEnd = ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, endWorld);
         }
-        else
+
+        Vector3 navmeshPoint = !onShipNav
+            ? GetDestinationPoint(destination)          // ✅ 傳入 destination
+            : GetDestinationPoint_OnShipLocal(startWorld, endWorld);
+
+        NavMeshHit hit, hit2;
+        if (NavMesh.SamplePosition(navmeshPoint, out hit, 100.0f, NavMesh.AllAreas))
         {
-            Vector3 startWorld = transform.position;
-            Vector3 endWorld = enemyBrain.targetList[0].target.position;
-
-            // 1) 取得計算用 start/end（可能投影到 ghost）
-            Vector3 navStart = startWorld;
-            Vector3 navEnd = endWorld;
-
-            if (onShipNav && realShipRoot != null && ghostShipRoot != null)
-            {
-                navStart = ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, startWorld);
-                navEnd = ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, endWorld);
-            }
-
-            // 2) 目的地點：Overworld 用你原本 random offset；OnShip 先用「純目標」
-            Vector3 navmeshPoint = navEnd;
-
-            if (!onShipNav)
-            {
-                navmeshPoint = GetDestinationPoint(endWorld); // 你原本行為：帶 offset / orbit
-            }
+            if (NavMesh.SamplePosition(navStart, out hit2, 100.0f, NavMesh.AllAreas))
+                NavMesh.CalculatePath(hit2.position, hit.position, NavMesh.AllAreas, path);
             else
-            {
-                // 船上模式：在 ghost 空間套用與 GetDestinationPoint 相同的邏輯
-                navmeshPoint = GetDestinationPoint_OnShipLocal(startWorld, endWorld);
-            }
+                NavMesh.CalculatePath(navStart, hit.position, NavMesh.AllAreas, path);
 
-            NavMeshHit hit;
-            NavMeshHit hit2;
-            if (NavMesh.SamplePosition(navmeshPoint, out hit, 100.0f, NavMesh.AllAreas))
-            {
-                //Debug.Log($"Sampled NavMesh position: {hit.position} for target {navmeshPoint}");
-                if (NavMesh.SamplePosition(navStart, out hit2, 100.0f, NavMesh.AllAreas))
-                {
-                    NavMesh.CalculatePath(hit2.position, hit.position, NavMesh.AllAreas, path);
-                }
-                else
-                {
-                    NavMesh.CalculatePath(navStart, hit.position, NavMesh.AllAreas, path);
-                }
-                int len = (path.corners != null) ? path.corners.Length : 0;
-                followCornerIndex = (len > 1) ? 1 : 0;
-            }
+            int len = (path.corners != null) ? path.corners.Length : 0;
+            followCornerIndex = (len > 1) ? 1 : 0;
         }
     }
 
     public NavMeshPath GetPath() => path;
-    public Transform GetTarget() => enemyBrain.targetList[0].target;
+    public Transform GetTarget() => enemyBrain.currentTargetTransform;
 
     public Vector3 FindNextMoveLocation(Transform objectTransform)
     {
@@ -222,9 +197,9 @@ public class CreatePath : MonoBehaviour
         return cornerWorld;
     }
 
-    public Vector3 GetDestinationPoint(Vector3 targetPosition)
+    public Vector3 GetDestinationPoint(Transform destination) // ✅ 改為接收參數
     {
-        float targetDistance = Vector3.Distance(transform.position, enemyBrain.targetList[0].target.position);
+        float targetDistance = Vector3.Distance(transform.position, destination.position);
 
         if (targetDistance < combatRange)
         {
@@ -232,27 +207,27 @@ public class CreatePath : MonoBehaviour
             {
                 return GetNextOrbitPoint(
                     transform,
-                    enemyBrain.targetList[0].target,
+                    destination,
                     orbitRadius + Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset),
                     orbitStepDeg,
                     orbitClockwise,
                     orbitUseCurrentAsStart,
-                    enemyBrain.targetList[0].target.position.y
+                    destination.position.y  // ✅ 不再用 targetList[0]
                 );
             }
 
             return new Vector3(
-                enemyBrain.targetList[0].target.position.x + Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset),
+                destination.position.x + Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset),
                 1.5f,
-                enemyBrain.targetList[0].target.position.z + Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset)
+                destination.position.z + Random.Range(-randomCombatRangeOffset, randomCombatRangeOffset)
             );
         }
         else
         {
             return new Vector3(
-                enemyBrain.targetList[0].target.position.x + Random.Range(-10f, 10f),
+                destination.position.x + Random.Range(-10f, 10f),
                 1.5f,
-                enemyBrain.targetList[0].target.position.z + Random.Range(-10f, 10f)
+                destination.position.z + Random.Range(-10f, 10f)
             );
         }
     }
@@ -421,28 +396,77 @@ public class CreatePath : MonoBehaviour
     public void SelectTarget()
     {
         if (onShipNav) return;
-        //select the closest docking point on the ship as the target
-        if (landshipNavigation == null || landshipNavigation.dockingPoints == null || landshipNavigation.dockingPoints.Length == 0)
+
+        // ✅ 已有戰鬥目標：清除 nav override，讓 currentTargetTransform 同時驅動移動和攻擊
+        if (enemyBrain.currentTargetTransform != null)
         {
-            Debug.LogWarning("LandshipNavigation or docking points not set!");
+            _navTarget = null;
             return;
+        }
+
+        // 沒有戰鬥目標：導航到最近 Docking Point（純移動，不攻擊）
+        if (landshipNavigation == null || landshipNavigation.dockingPoints == null
+            || landshipNavigation.dockingPoints.Length == 0) return;
+
+        Transform closestDockingPoint = null;
+        float closestDistance = float.MaxValue;
+        foreach (Transform dp in landshipNavigation.dockingPoints)
+        {
+            float d = Vector3.Distance(transform.position, dp.position);
+            if (d < closestDistance) { closestDistance = d; closestDockingPoint = dp; }
+        }
+
+        if (closestDockingPoint != null && closestDockingPoint != _navTarget)
+            _navTarget = closestDockingPoint;
+    }
+
+    public void UpdateNavTarget()
+    {
+        if (enemyBrain.currentTargetTransform == null) return;
+
+        if (onShipNav)
+        {
+            // ✅ 已在船上：直接追 currentTargetTransform，不需要 docking point
+            // onShipNav 只由 OnTriggerExit (EnemyMovement) 清除，不在這裡判斷
+            _navTarget = enemyBrain.currentTargetTransform;
+            return;
+        }
+
+        // 不在船上：判斷目標是否在船上決定是否要走 docking point
+        if (IsTargetOnShip(enemyBrain.currentTargetTransform))
+        {
+            Transform dp = GetNearestDockingPoint();
+            if (dp != null) _navTarget = dp;
         }
         else
         {
-            //Search for the closest docking point
-            Transform closestDockingPoint = null;
-            float closestDistance = float.MaxValue;
-            foreach (Transform dockingPoint in landshipNavigation.dockingPoints)
-            {
-                float distance = Vector3.Distance(transform.position, dockingPoint.position);
-                if (distance < closestDistance)
-                {
-                    closestDistance = distance;
-                    closestDockingPoint = dockingPoint;
-                }
-            }
-            if (closestDockingPoint != null)
-                enemyBrain.targetList[0].target = closestDockingPoint;
+            _navTarget = enemyBrain.currentTargetTransform;
         }
+    }
+
+    private bool IsTargetOnShip(Transform target)
+    {
+        if (landshipNavigation == null) return false;
+        if (target.IsChildOf(landshipNavigation.transform)) return true;
+
+        var passenger = target.GetComponent<ShipPassenger>();
+        if (passenger != null && passenger.IsOnShip) return true;
+
+        return false;
+    }
+
+    private Transform GetNearestDockingPoint()
+    {
+        if (landshipNavigation == null || landshipNavigation.dockingPoints == null) return null;
+
+        Transform closest = null;
+        float closestDist = float.MaxValue;
+        foreach (Transform dp in landshipNavigation.dockingPoints)
+        {
+            if (dp == null) continue;
+            float d = Vector3.Distance(transform.position, dp.position);
+            if (d < closestDist) { closestDist = d; closest = dp; }
+        }
+        return closest;
     }
 }

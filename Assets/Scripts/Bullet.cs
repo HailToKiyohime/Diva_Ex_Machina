@@ -29,7 +29,6 @@ public class Bullet : MonoBehaviour
     // 2  = pass 2 enemies, destroy after 3rd enemy impact
     // -1 = infinite
     public int penetration = 0;
-    public int ricochet = 0;
     [SerializeField] private PlayerAnimation meleeImpactOwnerAnim;
 
     private bool _destroyed;
@@ -147,7 +146,10 @@ public class Bullet : MonoBehaviour
 
             // melee impact feedback
             if (isMelee)
+            {
                 meleeImpactOwnerAnim?.AnimEvent_MeleeImpact();
+                enemy.GetComponent<Rigidbody>().linearVelocity = Vector3.zero; // stop enemy movement on hit, for better feedback (optional)
+            }
 
             // Prevent repeated trigger spam while passing through this collider
             if (_selfCol != null && other != null)
@@ -178,6 +180,10 @@ public class Bullet : MonoBehaviour
 
     private bool IsInIgnoreLayer(Collider col)
     {
+        if (col==null)
+        {
+            return false;
+        }
         return (ignoreLayer.value & (1 << col.gameObject.layer)) != 0;
     }
 }

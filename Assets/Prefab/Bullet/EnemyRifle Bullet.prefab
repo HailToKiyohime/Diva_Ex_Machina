@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 3252656202709926224}
   - component: {fileID: 9067150830255424435}
   - component: {fileID: 5212075133997198999}
-  m_Layer: 0
+  m_Layer: 10
   m_Name: EnemyRifle Bullet
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -95,8 +95,26 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27a05ed887e45e146a334e38a0873a25, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Bullet
+  attacker: {fileID: 0}
+  physicalDamage: 0
+  explosionDamage: 0
+  energyDamage: 0
+  coldDamage: 0
+  criticalChance: 0.05
+  criticalMultiplier: 1.5
   lifespan: 5
   rb: {fileID: 0}
+  isMelee: 0
+  ignoreLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  enemyLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  ignoreObstacles: 0
+  penetration: 0
+  ricochet: 0
+  meleeImpactOwnerAnim: {fileID: 0}
 --- !u!1001 &8511368318867935596
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -163,7 +181,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 902158998170697212, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Layer
-      value: 0
+      value: 10
       objectReference: {fileID: 0}
     - target: {fileID: 1536130679692287362, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Enabled
@@ -171,11 +189,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3651987333773354868, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Layer
-      value: 0
+      value: 10
       objectReference: {fileID: 0}
     - target: {fileID: 7603267757058564947, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Layer
-      value: 0
+      value: 10
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.size
@@ -247,7 +265,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8490374799139010626, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Layer
-      value: 0
+      value: 10
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

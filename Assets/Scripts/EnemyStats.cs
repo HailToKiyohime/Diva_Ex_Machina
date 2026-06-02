@@ -20,19 +20,16 @@ public class EnemyStats : MonoBehaviour
 
     public MMF_Player damageFeedback;
 
-    public EnemyBrain enemyBrain; // Reference to the EnemyBrain for potential interactions (e.g., alerting on hit)
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    public EnemyBrain enemyBrain;
+
     void Start()
     {
         health = maxHealth;
         enemyBrain = GetComponent<EnemyBrain>();
     }
 
-    // Update is called once per frame
-    void Update()
-    {
+    void Update() { }
 
-    }
     public void TakeDamage(float amount)
     {
         if (amount <= 0f) return;
@@ -41,15 +38,10 @@ public class EnemyStats : MonoBehaviour
 
         damageFeedback.PlayFeedbacks(this.transform.position, amount);
 
-        // Optional: debug
-        // Debug.Log($"[EnemyStats] Took damage: {amount}, HP now: {health}");
-
         if (health <= 0f)
         {
             health = 0f;
             OnDeath?.Invoke();
-
-
             Destroy(gameObject);
         }
     }
@@ -68,11 +60,10 @@ public class EnemyStats : MonoBehaviour
         {
             health = 0f;
             OnDeath?.Invoke();
-
-
             Destroy(gameObject);
         }
     }
+
     private void AddAggro(GameObject attacker, float amountOfDamage)
     {
         if (attacker == null || enemyBrain == null) return;
@@ -80,26 +71,29 @@ public class EnemyStats : MonoBehaviour
         TargetPriority existing = enemyBrain.targetList
             .Find(t => t != null && t.target == attacker.transform);
 
+        // Use the same threshold as EnemyBrain so decay and accumulation stay in sync
+        float threshold = enemyBrain.DamagePerAggroStep;
+
         if (existing != null)
         {
-            int aggroBefore = Mathf.FloorToInt(existing.damageCauseByTarget / (maxHealth * 0.005f));
+            // Track stepped aggro: every `threshold` damage = +1 damageAggro
+            int aggroBefore = Mathf.FloorToInt(existing.damageCauseByTarget / threshold);
             existing.damageCauseByTarget += amountOfDamage;
-            int aggroAfter = Mathf.FloorToInt(existing.damageCauseByTarget / (maxHealth * 0.005f));
-
-            existing.aggro += (aggroAfter - aggroBefore);
+            int aggroAfter = Mathf.FloorToInt(existing.damageCauseByTarget / threshold);
+            existing.damageAggro += (aggroAfter - aggroBefore);
         }
         else
         {
             enemyBrain.targetList.Add(new TargetPriority
             {
                 target = attacker.transform,
-                aggro = 3,
+                baseAggro = 1,
                 isMainTarget = false,
-                damageCauseByTarget = amountOfDamage
+                damageCauseByTarget = amountOfDamage,
+                damageAggro = Mathf.FloorToInt(amountOfDamage / threshold)
             });
         }
     }
-
 
     public float GetDefenseMultiplier(float defenseValue)
     {

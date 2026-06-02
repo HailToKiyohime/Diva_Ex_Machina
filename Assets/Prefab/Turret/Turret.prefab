@@ -350,6 +350,10 @@ MonoBehaviour:
     - {fileID: 1112750493171489954}
     muzzleCenterPoint: {fileID: 1112750493171489954}
     bulletPrefab: {fileID: 3891428710695554583, guid: f8141f7e21beae648a43caf66175acfa, type: 3}
+    physicalDamage: 10
+    explosionDamage: 0
+    energyDamage: 0
+    coldDamage: 0
     bulletSpeed: 100
     bulletSpread: 0
     bulletPerRound: 1

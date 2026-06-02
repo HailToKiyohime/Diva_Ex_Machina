@@ -56,8 +56,6 @@ public class PlayerMovement : MonoBehaviour
     private bool _prevLockOn;
     private float _aimHoldUntil;
     private Vector3 _lastAimHoldForward = Vector3.forward;
-    [Header("Melee Attack")]
-    public MeleeComboController meleeComboController;
     [Header("Melee Dash")]
     [Tooltip("When lock-on: stop dash early if within this distance to aimingPoint.")]
     [SerializeField] private float meleeDashStopDistance = 1.5f;
@@ -191,156 +189,114 @@ public class PlayerMovement : MonoBehaviour
             var hand = isLeft ? stats.leftHand : stats.rightHand;
         }
 
-        bool attacking = meleeComboController.anim.GetBool("Attacking");
-        if (IsMeleeHandAttack(attackManager, w))
+
+
+        bool isSingle = w.range.firingMode == 0;
+
+
+        // 1) 收集「想射擊」意圖（單發需要緩存，否則轉完身就不是 this frame 了）
+        if (isSingle)
         {
             if (attackInput.WasPressedThisFrame())
             {
-                // if combo is running, only allow the owner hand to input
-                if (meleeComboController != null && meleeComboController.anim != null)
-                {
-                    if (attacking)
-                    {
-                        // owner hand is meleeComboController's internal _isLeftHand (make a public getter)
-                        if (isLeft != meleeComboController.OwnerIsLeftHand)
-                            return;
-                    }
-                }
-                // ✅ Block melee attacks while this hand is reloading/cooling down (reload starts after combo ends)
-                if (w != null && w.meleeRuntime != null && w.meleeRuntime.reloading)
-                    return;
-
-                // 先判斷：按下之前係咪已經在攻擊中（Hit_1/2/3 期間都算）
-                bool wasAttacking = false;
-                if (meleeComboController != null && meleeComboController.anim != null)
-                    wasAttacking = meleeComboController.anim.GetBool("Attacking");
-
-                // 永遠先交俾 combo controller（起手會開 gate + 進 Dash，連段會 queue）
-                if (meleeComboController != null)
-                    meleeComboController.MeleeAttack(isLeft);
-
-                // ✅ 只有「起手」（按下前不是 Attacking）先可以開 melee dash
-                if (!wasAttacking)
-                {
-                    Vector3 platformVel0 = GetMobilePlatformVelocity();
-                    playerRigidbody.linearVelocity = platformVel0;
-                    meleeAttackWall.enabled = true; // enable the melee attack wall collider to prevent enemy from glitching through player during melee attack
-                    StartMeleeDashAttack(w, isLeft);
-                }
-            }
-
-            return;
-        }
-        else if(!attacking)
-        {
-
-            bool isSingle = w.range.firingMode == 0;
-
-
-            // 1) 收集「想射擊」意圖（單發需要緩存，否則轉完身就不是 this frame 了）
-            if (isSingle)
-            {
-                if (attackInput.WasPressedThisFrame())
-                {
-                    pendingSingleUntil[w] = Time.time + singleShotBufferTime;
-                    alignStartTime[w] = Time.time;
-                    if (isLeftShoulderAttack)
-                    {
-                        playerAnimation.ShoulderWeaponAttackLeft();
-                    }
-                    else if (isRightShoulderAttack)
-                    {
-                        playerAnimation.ShoulderWeaponAttackRight();
-                    }
-                }
-
-                if (!pendingSingleUntil.TryGetValue(w, out float until) || Time.time > until)
-                {
-                    pendingSingleUntil.Remove(w);
-                    alignStartTime.Remove(w);
-                    ClearAttackFacingOwnerIfSelf(w);
-                    return;
-                }
-            }
-            else
-            {
-                // 連發/蓄力：只要按住就持續嘗試
-                if (!attackInput.IsPressed())
-                {
-                    alignStartTime.Remove(w);
-                    ClearAttackFacingOwnerIfSelf(w);
-                    if (isLeftShoulderAttack)
-                    {
-                        playerAnimation.ShoulderWeaponAttackLeft();
-                    }
-                    else if (isRightShoulderAttack)
-                    {
-                        playerAnimation.ShoulderWeaponAttackRight();
-                    }
-                    return;
-                }
-
-                if (!alignStartTime.ContainsKey(w))
-                    alignStartTime[w] = Time.time;
-            }
-
-            // 2) 算出這一幀「應該面向哪裡」（lockOn -> aimingPoint；否則 -> 準星 ray）
-            Vector3 targetPoint;
-            if (PlayerAiming.Instance.lockOn && PlayerAiming.Instance.aimingPoint != null)
-                targetPoint = PlayerAiming.Instance.aimingPoint.position;
-            else
-                targetPoint = PlayerAiming.Instance.GetRay().GetPoint(attackAimRayDistance);
-
-            Vector3 lookDir = targetPoint - characterModel.position;
-            lookDir.y = 0f;
-            if (lookDir.sqrMagnitude < 0.0001f) return;
-
-            SetAttackFacingOwner(w, lookDir.normalized);
-
-            // 3) 判斷是否已對準（或超時就放行）
-            Vector3 flatForward = characterModel.forward;
-            flatForward.y = 0f;
-            if (flatForward.sqrMagnitude < 0.0001f) flatForward = attackDesiredForward;
-            flatForward.Normalize();
-
-            float angle = Vector3.Angle(flatForward, attackDesiredForward);
-            bool aligned = angle <= attackAngleThreshold;
-
-            bool timedOut = alignStartTime.TryGetValue(w, out float startT) && (Time.time - startT) >= maxAlignTime;
-
-            if (aligned || timedOut)
-            {
-                // 新增：未 lockOn 時，射擊後保留準星朝向一段時間（允許邊走邊朝準星）
-                if ((PlayerAiming.Instance != null) && !PlayerAiming.Instance.lockOn)
-                {
-                    // 記一份 fallback，避免極端情況 ray/dir 失效時抖動
-                    if (TryGetAimForwardFlat(out var aimFwd))
-                        _lastAimHoldForward = aimFwd;
-
-                    StartAimHold(aimHoldAfterShootNoLock);
-                }
-
+                pendingSingleUntil[w] = Time.time + singleShotBufferTime;
+                alignStartTime[w] = Time.time;
                 if (isLeftShoulderAttack)
                 {
-                    if (playerAnimation != null && !playerAnimation.IsShoulderWeaponReadyToFire(true, 0.1f))
-                        return; // 還未完成 Idle->Attack 轉場，先不要射（保留 pendingSingleUntil，下一幀再試）
+                    playerAnimation.ShoulderWeaponAttackLeft();
                 }
                 else if (isRightShoulderAttack)
                 {
-                    if (playerAnimation != null && !playerAnimation.IsShoulderWeaponReadyToFire(false, 0.1f))
-                        return;
+                    playerAnimation.ShoulderWeaponAttackRight();
                 }
-
-                // 4) 真正觸發射擊（由 AttackManager 管理 cooldown/bullets）
-                bool didShoot = attackManager.TryStartShoot(w);
-                // 單發：一旦成功開火就消耗掉這次請求
-                if (didShoot && isSingle)
-                {
-                    pendingSingleUntil.Remove(w);
-                    alignStartTime.Remove(w);
-                }
-
             }
+
+            if (!pendingSingleUntil.TryGetValue(w, out float until) || Time.time > until)
+            {
+                pendingSingleUntil.Remove(w);
+                alignStartTime.Remove(w);
+                ClearAttackFacingOwnerIfSelf(w);
+                return;
+            }
+        }
+        else
+        {
+            // 連發/蓄力：只要按住就持續嘗試
+            if (!attackInput.IsPressed())
+            {
+                alignStartTime.Remove(w);
+                ClearAttackFacingOwnerIfSelf(w);
+                if (isLeftShoulderAttack)
+                {
+                    playerAnimation.ShoulderWeaponAttackLeft();
+                }
+                else if (isRightShoulderAttack)
+                {
+                    playerAnimation.ShoulderWeaponAttackRight();
+                }
+                return;
+            }
+
+            if (!alignStartTime.ContainsKey(w))
+                alignStartTime[w] = Time.time;
+        }
+
+        // 2) 算出這一幀「應該面向哪裡」（lockOn -> aimingPoint；否則 -> 準星 ray）
+        Vector3 targetPoint;
+        if (PlayerAiming.Instance.lockOn && PlayerAiming.Instance.aimingPoint != null)
+            targetPoint = PlayerAiming.Instance.aimingPoint.position;
+        else
+            targetPoint = PlayerAiming.Instance.GetRay().GetPoint(attackAimRayDistance);
+
+        Vector3 lookDir = targetPoint - characterModel.position;
+        lookDir.y = 0f;
+        if (lookDir.sqrMagnitude < 0.0001f) return;
+
+        SetAttackFacingOwner(w, lookDir.normalized);
+
+        // 3) 判斷是否已對準（或超時就放行）
+        Vector3 flatForward = characterModel.forward;
+        flatForward.y = 0f;
+        if (flatForward.sqrMagnitude < 0.0001f) flatForward = attackDesiredForward;
+        flatForward.Normalize();
+
+        float angle = Vector3.Angle(flatForward, attackDesiredForward);
+        bool aligned = angle <= attackAngleThreshold;
+
+        bool timedOut = alignStartTime.TryGetValue(w, out float startT) && (Time.time - startT) >= maxAlignTime;
+
+        if (aligned || timedOut)
+        {
+            // 新增：未 lockOn 時，射擊後保留準星朝向一段時間（允許邊走邊朝準星）
+            if ((PlayerAiming.Instance != null) && !PlayerAiming.Instance.lockOn)
+            {
+                // 記一份 fallback，避免極端情況 ray/dir 失效時抖動
+                if (TryGetAimForwardFlat(out var aimFwd))
+                    _lastAimHoldForward = aimFwd;
+
+                StartAimHold(aimHoldAfterShootNoLock);
+            }
+
+            if (isLeftShoulderAttack)
+            {
+                if (playerAnimation != null && !playerAnimation.IsShoulderWeaponReadyToFire(true, 0.1f))
+                    return; // 還未完成 Idle->Attack 轉場，先不要射（保留 pendingSingleUntil，下一幀再試）
+            }
+            else if (isRightShoulderAttack)
+            {
+                if (playerAnimation != null && !playerAnimation.IsShoulderWeaponReadyToFire(false, 0.1f))
+                    return;
+            }
+
+            // 4) 真正觸發射擊（由 AttackManager 管理 cooldown/bullets）
+            bool didShoot = attackManager.TryStartShoot(w);
+            // 單發：一旦成功開火就消耗掉這次請求
+            if (didShoot && isSingle)
+            {
+                pendingSingleUntil.Remove(w);
+                alignStartTime.Remove(w);
+            }
+
         }
     }
     private void SetAttackFacingOwner(Weapon w, Vector3 desiredForward)
@@ -596,9 +552,6 @@ public class PlayerMovement : MonoBehaviour
 
         Vector3 hvRel = new Vector3(vRel.x, 0f, vRel.z) * 0.5f;
         playerRigidbody.linearVelocity = new Vector3(hvRel.x, vRel.y, hvRel.z) + platformVel;
-
-        if (meleeComboController != null)
-            meleeComboController.FireHit1FromDash(_meleeDashIsLeft);
     }
     private void ApplyDashFixed(float dt)
     {

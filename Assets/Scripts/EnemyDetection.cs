@@ -20,7 +20,7 @@ public class EnemyDetection : MonoBehaviour
                     TargetPriority newTarget = new TargetPriority
                     {
                         target = other.transform,
-                        aggro = 100,
+                        baseAggro = 100,
                         isMainTarget = false
                     };
                     enemyBrain.targetList.Add(newTarget);

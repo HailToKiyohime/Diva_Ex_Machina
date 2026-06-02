@@ -22,7 +22,7 @@ MonoBehaviour:
   buffs:
   - attribute: 8
     mode: 0
-    value: 1.2
+    value: 0.8
   randomBuffs: []
   attachmentPoints:
   - pointTransform: {fileID: 7689432590055944984, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}

@@ -95,7 +95,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27a05ed887e45e146a334e38a0873a25, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  physicalDamage: 0
+  attacker: {fileID: 0}
+  physicalDamage: 10
   explosionDamage: 0
   energyDamage: 0
   coldDamage: 0
@@ -104,14 +105,14 @@ MonoBehaviour:
   lifespan: 5
   rb: {fileID: 0}
   isMelee: 0
+  ignoreLayer:
+    serializedVersion: 2
+    m_Bits: 0
   enemyLayer:
     serializedVersion: 2
     m_Bits: 512
   ignoreObstacles: 0
   penetration: 0
-  ricochet: 5
-  ricochetSearchRadius: 100
-  bounceNudge: 0.05
   meleeImpactOwnerAnim: {fileID: 0}
 --- !u!1001 &8511368318867935596
 PrefabInstance:
