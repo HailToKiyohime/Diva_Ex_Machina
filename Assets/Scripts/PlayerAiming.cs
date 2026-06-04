@@ -83,11 +83,22 @@ public class PlayerAiming : MonoBehaviour
 
     [Header("Shoulder Offset")]
     [SerializeField] private CinemachineCamera virtualCamera;  // ✅ 改這裡
+    [SerializeField] private PlayerMovement playerMovement;
     [SerializeField] private float shoulderOffsetXLeft = -2f;
     [SerializeField] private float shoulderOffsetXRight = 2f;
     [SerializeField] private float shoulderOffsetLerpSpeed = 5f;
     [SerializeField] private float shoulderOffsetResetSpeed = 3f; // 回中速度（可比移動速度慢）
     [SerializeField] private float resistancePow = 0.5f;
+    [SerializeField] private float shoulderOffsetZForward = 0f;
+    [SerializeField] private float shoulderOffsetZBackward = -1.2f;
+    [SerializeField] private float shoulderOffsetZDefault = -1f;
+    [SerializeField] private float shoulderOffsetZLerpSpeed = 5f;
+    [SerializeField] private float shoulderOffsetYDefault = 1f;
+    [SerializeField] private float shoulderOffsetYJump = 0.65f;
+    [SerializeField] private float shoulderOffsetYFall = 1.5f;
+    [SerializeField] private float shoulderOffsetYJumpLerpSpeed = 10f;  // 跳躍：快
+    [SerializeField] private float shoulderOffsetYFlyLerpSpeed = 2f;    // 飛行/下落：慢
+    [SerializeField] private float shoulderOffsetYGroundLerpSpeed = 5f; // 落地回預設：正常
 
 
     private CinemachineThirdPersonFollow _thirdPersonFollow;
@@ -107,7 +118,7 @@ public class PlayerAiming : MonoBehaviour
         if (meshTransform == null) meshTransform = transform;
         if (mainCam == null) mainCam = Camera.main;
 
-        if(virtualCamera != null)
+        if (virtualCamera != null)
             _thirdPersonFollow = virtualCamera.GetCinemachineComponent(CinemachineCore.Stage.Body)
                          as CinemachineThirdPersonFollow;
     }
@@ -634,10 +645,71 @@ public class PlayerAiming : MonoBehaviour
             newX = Mathf.Lerp(currentX, 0f, Time.deltaTime * shoulderOffsetResetSpeed);
         }
 
+        // Z 軸：根據前後輸入調整
+        float inputY = PlayerController.Instance != null
+            ? PlayerController.Instance.LastMoveInput.y
+            : 0f;
+
+        float currentZ = _thirdPersonFollow.ShoulderOffset.z;
+        float targetZ;
+
+        if (inputY > 0.1f)
+            targetZ = shoulderOffsetZForward;       // 向前：拉近鏡頭
+        else if (inputY < -0.1f)
+            targetZ = shoulderOffsetZBackward;      // 向後：推遠鏡頭
+        else
+            targetZ = shoulderOffsetZDefault;       // 無輸入：回預設值
+
+        float newZ = Mathf.Lerp(currentZ, targetZ, Time.deltaTime * shoulderOffsetZLerpSpeed);
+
+        // Y 軸：根據跳躍 / 飛行 / 下落狀態調整
+        float currentY = _thirdPersonFollow.ShoulderOffset.y;
+        float targetY;
+        float yLerpSpeed;
+
+        if (playerMovement != null)
+        {
+            float vertVel = playerMovement.VerticalVelocity;
+            bool isFlying = playerMovement.IsFlyingActive;
+            bool isGrounded = playerMovement.IsGrounded;
+
+            if (isGrounded)
+            {
+                // 落地：回預設值，正常速度
+                targetY = shoulderOffsetYDefault;
+                yLerpSpeed = shoulderOffsetYGroundLerpSpeed;
+            }
+            else if (isFlying)
+            {
+                // 飛行中：固定用慢速，目標 Y 隨 vertVel 在 Jump~Fall 之間插值
+                // vertVel >= 0 → Jump(0.65)，vertVel 越負 → 越接近 Fall(1.5)
+                float velT = Mathf.Clamp01(-vertVel / 10f); // 10f = 下落速度參考值，可 Inspector 調
+                targetY = Mathf.Lerp(shoulderOffsetYJump, shoulderOffsetYFall, velT);
+                yLerpSpeed = shoulderOffsetYFlyLerpSpeed;
+            }
+            else
+            {
+                // 空中（跳躍）：目標 Y 一樣用 vertVel 插值，但 LerpSpeed 隨 vertVel 平滑過渡
+                // vertVel 大（剛起跳）→ 速度快；vertVel 趨近 0（頂點）→ 速度慢
+                float velT = Mathf.Clamp01(-vertVel / 10f);
+                targetY = Mathf.Lerp(shoulderOffsetYJump, shoulderOffsetYFall, velT);
+                // 速度：上升時用 jumpLerpSpeed，下落時漸漸過渡到 flyLerpSpeed
+                float speedT = Mathf.Clamp01(-vertVel / 5f); // 過渡區間，可調
+                yLerpSpeed = Mathf.Lerp(shoulderOffsetYJumpLerpSpeed, shoulderOffsetYFlyLerpSpeed, speedT);
+            }
+        }
+        else
+        {
+            targetY = shoulderOffsetYDefault;
+            yLerpSpeed = shoulderOffsetYGroundLerpSpeed;
+        }
+
+        float newY = Mathf.Lerp(currentY, targetY, Time.deltaTime * yLerpSpeed);
+
         _thirdPersonFollow.ShoulderOffset = new Vector3(
             newX,
-            _thirdPersonFollow.ShoulderOffset.y,
-            _thirdPersonFollow.ShoulderOffset.z
+            newY,
+            newZ
         );
     }
 }

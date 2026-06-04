@@ -1,11 +1,11 @@
 using UnityEngine;
 
 /// <summary>
-/// ¨¾§b¥Î¡G§âªñ¾Ô§ðÀ»ªº¡u¦¬§À¡v±q Animator Event ¸Ñ½¢¥X¨Ó¡C
-/// ¥Øªº¡G´Nºâ Combo2 ¨S¦¨¥\Âà³õ¡B©Î Animation Event º|¥´¡Aattacking ¤]¤£·|¥d¦º¡C
+/// ï¿½ï¿½ï¿½bï¿½Î¡Gï¿½ï¿½ï¿½Ô§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½uï¿½ï¿½ï¿½ï¿½ï¿½vï¿½q Animator Event ï¿½Ñ½ï¿½ï¿½Xï¿½Ó¡C
+/// ï¿½Øªï¿½ï¿½Gï¿½Nï¿½ï¿½ Combo2 ï¿½Sï¿½ï¿½ï¿½\ï¿½ï¿½ï¿½ï¿½Bï¿½ï¿½ Animation Event ï¿½|ï¿½ï¿½ï¿½Aattacking ï¿½]ï¿½ï¿½ï¿½|ï¿½dï¿½ï¿½ï¿½C
 /// 
-/// ¥Îªk¡G§â³o­Ó±¾¦b Player¡]©Î¦³ Animator/PlayerAnimation ªº¦P¤@­Ó prefab¡^¤W§Y¥i¡C
-/// ¤£»Ý­n§ï§A²{¦³ PlayerMovement / PlayerController ªº©I¥s¬yµ{¡C
+/// ï¿½Îªkï¿½Gï¿½ï¿½oï¿½Ó±ï¿½ï¿½b Playerï¿½]ï¿½Î¦ï¿½ Animator/PlayerAnimation ï¿½ï¿½ï¿½Pï¿½@ï¿½ï¿½ prefabï¿½^ï¿½Wï¿½Yï¿½iï¿½C
+/// ï¿½ï¿½ï¿½Ý­nï¿½ï¿½Aï¿½{ï¿½ï¿½ PlayerMovement / PlayerController ï¿½ï¿½ï¿½Iï¿½sï¿½yï¿½{ï¿½C
 /// </summary>
 public class MeleeAttackLifecycleGuard : MonoBehaviour
 {
@@ -19,16 +19,16 @@ public class MeleeAttackLifecycleGuard : MonoBehaviour
     [SerializeField] private string rightComboIntName = "RightHandCombo";
 
     [Header("Layer / State (optional)")]
-    [Tooltip("¥u¦b³o­Ó layer ºÊ±± normalizedTime¡]¯dªÅ = ¥Î layer 0¡^")]
+    //[Tooltip("ï¿½uï¿½bï¿½oï¿½ï¿½ layer ï¿½Ê±ï¿½ normalizedTimeï¿½]ï¿½dï¿½ï¿½ = ï¿½ï¿½ layer 0ï¿½^")]
     [SerializeField] private string meleeLayerNameContains = "Melee";
-    [Tooltip("§P©w°Êµe¼½§¹ªº normalizedTime ìH­È¡C0.98 ¤ñ¸û«O¦u¡C")]
+    //[Tooltip("ï¿½Pï¿½wï¿½Êµeï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ normalizedTime ï¿½Hï¿½È¡C0.98 ï¿½ï¿½ï¿½ï¿½Oï¿½uï¿½C")]
     [Range(0.5f, 1f)]
     [SerializeField] private float endNormalized = 0.98f;
 
-    [Header("Failsafe")]
-    [Tooltip("§ðÀ»ª¬ºA³Ìªø¤¹³\¦h¤[¡]¬í¡^¡C¶W¹L´N±j¨î Stop¡AÁ×§K¥d¦º¡C")]
+    [Header("Failsafe")]    
+    //[Tooltip("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Aï¿½Ìªï¿½ï¿½ï¿½ï¿½\ï¿½hï¿½[ï¿½]ï¿½ï¿½^ï¿½Cï¿½Wï¿½Lï¿½Nï¿½jï¿½ï¿½ Stopï¿½Aï¿½×§Kï¿½dï¿½ï¿½ï¿½C")]
     [SerializeField] private float maxAttackSeconds = 2.0f;
-    [Tooltip("·í combo2 ³Q±Æ¶¤¦ý¤@ª½¨S¶i¤J¡]Âà³õ¥¢±Ñ¡^®É¡A¤¹³\¦h¤[¦A±j¨î¦¬§À¡C")]
+    //[Tooltip("ï¿½ï¿½ combo2 ï¿½Qï¿½Æ¶ï¿½ï¿½ï¿½ï¿½@ï¿½ï¿½ï¿½Sï¿½iï¿½Jï¿½]ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¡^ï¿½É¡Aï¿½ï¿½ï¿½\ï¿½hï¿½[ï¿½Aï¿½jï¿½î¦¬ï¿½ï¿½ï¿½C")]
     [SerializeField] private float queuedComboFailSafeSeconds = 1.0f;
 
     private int _meleeLayerIndex = 0;
@@ -38,7 +38,7 @@ public class MeleeAttackLifecycleGuard : MonoBehaviour
 
     private bool _wasAttacking = false;
     private float _attackStartTime = 0f;
-    private float _comboQueuedTime = 0f;   // ·í combo2 ³Q±Æ¶¤ªº®É¶¡¡]¥Î¨Ó°»´ú¡u±Æ¶¤¦ý¨S¶i¥h¡v¡^
+    private float _comboQueuedTime = 0f;   
 
     private void Awake()
     {
@@ -71,14 +71,14 @@ public class MeleeAttackLifecycleGuard : MonoBehaviour
 
         bool attacking = anim.GetBool(_hashAttacking);
 
-        // rising edge¡G¶}©l§ðÀ»
+        // rising edgeï¿½Gï¿½}ï¿½lï¿½ï¿½ï¿½ï¿½
         if (attacking && !_wasAttacking)
         {
             _attackStartTime = Time.time;
             _comboQueuedTime = 0f;
         }
 
-        // falling edge¡Gµ²§ô§ðÀ»¡]¥~³¡¤w¦¬§À¡^
+        // falling edgeï¿½Gï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½]ï¿½~ï¿½ï¿½ï¿½wï¿½ï¿½ï¿½ï¿½ï¿½^
         if (!attacking && _wasAttacking)
         {
             _comboQueuedTime = 0f;
@@ -88,34 +88,34 @@ public class MeleeAttackLifecycleGuard : MonoBehaviour
 
         if (!attacking) return;
 
-        // Åª combo ª¬ºA¡]>=2 ªí¥Ü·Q±µ combo2 / ©Î¤w¦b combo2¡^
+        // Åª combo ï¿½ï¿½ï¿½Aï¿½]>=2 ï¿½ï¿½Ü·Qï¿½ï¿½ combo2 / ï¿½Î¤wï¿½b combo2ï¿½^
         int leftCombo = anim.GetInteger(_hashLeftCombo);
         int rightCombo = anim.GetInteger(_hashRightCombo);
         bool wantsCombo2 = (leftCombo >= 2) || (rightCombo >= 2);
 
-        // °O¿ý¡u²Ä¤@¦¸³Q±Æ¶¤¡vªº®É¶¡¡A¥Î©ó°»´úÂà³õ¥¢±Ñ
+        // ï¿½Oï¿½ï¿½ï¿½uï¿½Ä¤@ï¿½ï¿½ï¿½Qï¿½Æ¶ï¿½ï¿½vï¿½ï¿½ï¿½É¶ï¿½ï¿½Aï¿½Î©ó°»´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         if (wantsCombo2 && _comboQueuedTime <= 0f)
             _comboQueuedTime = Time.time;
 
-        // === Failsafe 1¡G¾ã¬q§ðÀ»¶W®É ===
+        // === Failsafe 1ï¿½Gï¿½ï¿½qï¿½ï¿½ï¿½ï¿½ï¿½Wï¿½ï¿½ ===
         if (Time.time - _attackStartTime > maxAttackSeconds)
         {
             ForceStop("maxAttackSeconds");
             return;
         }
 
-        // === Failsafe 2¡G¤w±Æ¶¤ combo2 ¦ý¤Ó¤[³£¥¼¶i¤J¡]±`¨£©ó spin input / transition miss¡^===
-        // ¦pªG combo2 ¤w±Æ¶¤¡A¦Ó¥B¶W¹L¤@©w®É¶¡¡A¦ý¥Ø«eª¬ºA¦ü¥G¤´¥¼¶i¤J²Ä¤G¬q¡A´N±j¨î¦¬§ÀÁ×§K¥d¦º¡C
+        // === Failsafe 2ï¿½Gï¿½wï¿½Æ¶ï¿½ combo2 ï¿½ï¿½ï¿½Ó¤[ï¿½ï¿½ï¿½ï¿½ï¿½iï¿½Jï¿½]ï¿½`ï¿½ï¿½ï¿½ï¿½ spin input / transition missï¿½^===
+        // ï¿½pï¿½G combo2 ï¿½wï¿½Æ¶ï¿½ï¿½Aï¿½Ó¥Bï¿½Wï¿½Lï¿½@ï¿½wï¿½É¶ï¿½ï¿½Aï¿½ï¿½ï¿½Ø«eï¿½ï¿½ï¿½Aï¿½ï¿½ï¿½Gï¿½ï¿½ï¿½ï¿½ï¿½iï¿½Jï¿½Ä¤Gï¿½qï¿½Aï¿½Nï¿½jï¿½î¦¬ï¿½ï¿½ï¿½×§Kï¿½dï¿½ï¿½ï¿½C
         if (wantsCombo2 && _comboQueuedTime > 0f && (Time.time - _comboQueuedTime) > queuedComboFailSafeSeconds)
         {
-            // ºÉ¶q§PÂ_¡u¤´¦b²Ä¤@¬q¡v¡GnormalizedTime ¤w±µªñµ²§À¡A¦ýÁÙ¦b¦P¤@­Ó state¡]©Î¨S¦³¦¨¥\¶i¤J¤U¤@¬q¡^
+            // ï¿½É¶qï¿½Pï¿½_ï¿½uï¿½ï¿½ï¿½bï¿½Ä¤@ï¿½qï¿½vï¿½GnormalizedTime ï¿½wï¿½ï¿½ï¿½ñµ²§ï¿½ï¿½Aï¿½ï¿½ï¿½Ù¦bï¿½Pï¿½@ï¿½ï¿½ stateï¿½]ï¿½Î¨Sï¿½ï¿½ï¿½ï¿½ï¿½\ï¿½iï¿½Jï¿½Uï¿½@ï¿½qï¿½^
             AnimatorStateInfo st = anim.GetCurrentAnimatorStateInfo(_meleeLayerIndex);
             bool nearEnd = st.normalizedTime >= endNormalized;
             bool transitioning = anim.IsInTransition(_meleeLayerIndex);
 
             if (nearEnd && !transitioning)
             {
-                // ²M combo¡AµM«á¦¬§À¡AÁ×§K¤U¤@¦¸³Q¥d¦í
+                // ï¿½M comboï¿½Aï¿½Mï¿½á¦¬ï¿½ï¿½ï¿½Aï¿½×§Kï¿½Uï¿½@ï¿½ï¿½ï¿½Qï¿½dï¿½ï¿½
                 anim.SetInteger(_hashLeftCombo, 0);
                 anim.SetInteger(_hashRightCombo, 0);
                 ForceStop("queuedComboFailSafe");
@@ -123,25 +123,25 @@ public class MeleeAttackLifecycleGuard : MonoBehaviour
             }
         }
 
-        // === ¥¿±`¦¬§À¡G°Êµe¼½§¹¥B¨S¦³¦A±Æ¶¤¤U¤@¬q ===
+        // === ï¿½ï¿½ï¿½`ï¿½ï¿½ï¿½ï¿½ï¿½Gï¿½Êµeï¿½ï¿½ï¿½ï¿½ï¿½Bï¿½Sï¿½ï¿½ï¿½Aï¿½Æ¶ï¿½ï¿½Uï¿½@ï¿½q ===
         AnimatorStateInfo s = anim.GetCurrentAnimatorStateInfo(_meleeLayerIndex);
         if (!anim.IsInTransition(_meleeLayerIndex) && s.normalizedTime >= endNormalized)
         {
-            // ­Y¨S¦³·Q±µ combo2¡A´Nµ²§ô
+            // ï¿½Yï¿½Sï¿½ï¿½ï¿½Qï¿½ï¿½ combo2ï¿½Aï¿½Nï¿½ï¿½ï¿½ï¿½
             if (!wantsCombo2)
             {
                 ForceStop("normalEnd");
                 return;
             }
 
-            // wantsCombo2 ¦ý¤]¤w¨ì§ÀºÝ¡B¥B¨S¦³¶i¤JÂà³õ ¡÷ «Ü¥i¯àÂà³õ miss¡F¥æµ¹ failsafe 2 ©Îª½±µ¦¬§À
-            // ³o¸Ì«O¦u¡G­Y¤w¨ì§ÀºÝ¥B wantsCombo2¡Aµ¥ failsafe 2 ªº®É¶¡¨ì¦A¦¬§À¡]Á×§K»~±þ­è¦n­n¶iÂà³õªº±¡ªp¡^
+            // wantsCombo2 ï¿½ï¿½ï¿½]ï¿½wï¿½ï¿½ï¿½ï¿½Ý¡Bï¿½Bï¿½Sï¿½ï¿½ï¿½iï¿½Jï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Ü¥iï¿½ï¿½ï¿½ï¿½ï¿½ missï¿½Fï¿½æµ¹ failsafe 2 ï¿½Îªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+            // ï¿½oï¿½Ì«Oï¿½uï¿½Gï¿½Yï¿½wï¿½ï¿½ï¿½ï¿½Ý¥B wantsCombo2ï¿½Aï¿½ï¿½ failsafe 2 ï¿½ï¿½ï¿½É¶ï¿½ï¿½ï¿½Aï¿½ï¿½ï¿½ï¿½ï¿½]ï¿½×§Kï¿½~ï¿½ï¿½ï¿½ï¿½nï¿½nï¿½iï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½pï¿½^
         }
     }
 
     private void ForceStop(string reason)
     {
-        // ³o¸Ì¤£­n¨Ì¿à Animation Event¡Fª½±µ¨« PlayerAnimation ªº StopAttacking()¡]·|¶¶«K SetOffAttackLayer & OnStopAttacking¡^
+        // ï¿½oï¿½Ì¤ï¿½ï¿½nï¿½Ì¿ï¿½ Animation Eventï¿½Fï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ PlayerAnimation ï¿½ï¿½ StopAttacking()ï¿½]ï¿½|ï¿½ï¿½ï¿½K SetOffAttackLayer & OnStopAttackingï¿½^
         Debug.LogWarning($"MeleeAttackLifecycleGuard: ForceStop ({reason})");
         playerAnimation.StopAttacking();
     }
