@@ -276,6 +276,7 @@ public class PlayerStats : MonoBehaviour
     public float flyAcceleration;
     [Header("Health")]
     public float maxHealth;
+    public float currentHealth;
     [Header("Aiming")]
     public float lockOnRange;
     public float aimingDistance;
@@ -444,6 +445,7 @@ public class PlayerStats : MonoBehaviour
 
         ResetState();
         currentEnergy = maxEnergy; // 開場補滿能量
+        currentHealth = maxHealth;   // 開場補滿血量  
         // ✅ 開場保證清空左右手和肩膀狀態（避免殘留引用）
         leftHand.Reset();
         rightHand.Reset();

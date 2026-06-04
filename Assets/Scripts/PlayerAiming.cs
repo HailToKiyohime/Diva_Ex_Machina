@@ -1,7 +1,8 @@
 ﻿using System.Collections.Generic;
+using TMPro;
+using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 
 public class PlayerAiming : MonoBehaviour
 {
@@ -80,6 +81,19 @@ public class PlayerAiming : MonoBehaviour
     private Vector3 _autoAimPointVel;
     private Vector3 _autoAimPointSmoothed;
 
+    [Header("Shoulder Offset")]
+    [SerializeField] private CinemachineCamera virtualCamera;  // ✅ 改這裡
+    [SerializeField] private float shoulderOffsetXLeft = -2f;
+    [SerializeField] private float shoulderOffsetXRight = 2f;
+    [SerializeField] private float shoulderOffsetLerpSpeed = 5f;
+    [SerializeField] private float shoulderOffsetResetSpeed = 3f; // 回中速度（可比移動速度慢）
+    [SerializeField] private float resistancePow = 0.5f;
+
+
+    private CinemachineThirdPersonFollow _thirdPersonFollow;
+
+
+
     // Debug hook (optional)
     private int _autoAimLastWriteFrame = -1;
     public bool IsAutoAimActiveDebug() => _autoAimActive;
@@ -92,22 +106,24 @@ public class PlayerAiming : MonoBehaviour
 
         if (meshTransform == null) meshTransform = transform;
         if (mainCam == null) mainCam = Camera.main;
+
+        if(virtualCamera != null)
+            _thirdPersonFollow = virtualCamera.GetCinemachineComponent(CinemachineCore.Stage.Body)
+                         as CinemachineThirdPersonFollow;
     }
 
     private void Update()
     {
-        // UI gate (keep your original rule)
         if (UIManager.Instance != null && UIManager.Instance.currentCameraSet != 0)
             return;
 
-        // AutoAim active: block mouse input, but keep lock system updated
         if (_autoAimActive)
         {
             CrosshairDetect_ConstrainedLock();
+            UpdateShoulderOffset(); // ✅ 加在這裡
             return;
         }
 
-        // Manual look
         float mouseX = Input.GetAxis("Mouse X");
         float mouseY = Input.GetAxis("Mouse Y");
         if (Mathf.Abs(mouseX) > 0.001f || Mathf.Abs(mouseY) > 0.001f)
@@ -123,6 +139,7 @@ public class PlayerAiming : MonoBehaviour
         }
 
         CrosshairDetect_ConstrainedLock();
+        UpdateShoulderOffset();
     }
 
     private void LateUpdate()
@@ -587,5 +604,40 @@ public class PlayerAiming : MonoBehaviour
             UIManager.Instance.speedInfo.anchoredPosition = new Vector2((newSize / 2) + 55, 0);
             UIManager.Instance.distanceInfo.anchoredPosition = new Vector2(-((newSize / 2) + 55), 0);
         }
+    }
+    private void UpdateShoulderOffset()
+    {
+        if (_thirdPersonFollow == null) return;
+
+        float inputX = PlayerController.Instance != null
+            ? PlayerController.Instance.LastMoveInput.x
+            : 0f;
+
+        float currentX = _thirdPersonFollow.ShoulderOffset.x;
+        float newX;
+
+        if (inputX < -0.1f || inputX > 0.1f)
+        {
+            // 有左右輸入：移向目標側，帶阻力
+            float targetX = inputX < -0.1f ? shoulderOffsetXLeft : shoulderOffsetXRight;
+
+            float range = Mathf.Abs(targetX);
+            float distRatio = range > 0f ? Mathf.Clamp01(Mathf.Abs(targetX - currentX) / (range * 2f)) : 0f;
+            float resistanceCurve = Mathf.Pow(distRatio, resistancePow);
+            float dynamicSpeed = shoulderOffsetLerpSpeed * resistanceCurve;
+
+            newX = Mathf.Lerp(currentX, targetX, Time.deltaTime * dynamicSpeed);
+        }
+        else
+        {
+            // 無輸入：平滑回中
+            newX = Mathf.Lerp(currentX, 0f, Time.deltaTime * shoulderOffsetResetSpeed);
+        }
+
+        _thirdPersonFollow.ShoulderOffset = new Vector3(
+            newX,
+            _thirdPersonFollow.ShoulderOffset.y,
+            _thirdPersonFollow.ShoulderOffset.z
+        );
     }
 }

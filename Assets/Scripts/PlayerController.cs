@@ -3,6 +3,7 @@ using UnityEngine.InputSystem;
 
 public class PlayerController : MonoBehaviour
 {
+    public Vector2 LastMoveInput { get; private set; }
     public static PlayerController Instance { get; private set; }
     private PlayerControllers playerControls;
 
@@ -49,6 +50,7 @@ public class PlayerController : MonoBehaviour
         // Block all gameplay input (UI lock / melee dash lock)
         if (IsGameplayInputBlocked())
         {
+            LastMoveInput = Vector2.zero; 
             // Clear movement intent so RotateCharacter / animations don't keep the last input direction.
             if (playerMovement != null)
                 playerMovement.HorizontalMovement(0f, 0f);
@@ -57,6 +59,8 @@ public class PlayerController : MonoBehaviour
         }
 
         Vector2 movementInput = playerControls.Player.Move.ReadValue<Vector2>();
+        LastMoveInput = movementInput;
+
         playerMovement.HorizontalMovement(movementInput.x, movementInput.y);
 
         if (playerControls.Player.Jump.IsPressed())

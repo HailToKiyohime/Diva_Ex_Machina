@@ -110,10 +110,9 @@ MonoBehaviour:
     m_Bits: 0
   enemyLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 8448
   ignoreObstacles: 0
   penetration: 0
-  ricochet: 0
   meleeImpactOwnerAnim: {fileID: 0}
 --- !u!1001 &8511368318867935596
 PrefabInstance:
