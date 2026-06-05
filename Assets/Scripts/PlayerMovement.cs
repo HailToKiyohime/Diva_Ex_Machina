@@ -70,6 +70,11 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float meleeDashHomingStrength = 14f;  // 越大越黏
     [SerializeField] private float meleeDashHomingMaxTurnDegPerSec = 720f; // 限制轉向，避免瞬拐
     [SerializeField] private float meleeDashLeadFallbackTime = 0.05f; // solver fail 時用的簡易 lead
+
+    [Header("Dust Effect")]
+    [SerializeField] private float dustInterval = 0.3f; // 每幾秒播一次，可在 Inspector 調整
+    private float _nextDustTime = 0f;
+
     // runtime
     private bool _meleeDashActive = false;
     private bool _meleeDashIsLeft = true;
@@ -93,6 +98,7 @@ public class PlayerMovement : MonoBehaviour
     {
         EnergyRegenerationCheck();
         RotateCharacter();
+        HandleDustEffect(); 
         UIManager.Instance.speedText.text = playerRigidbody.linearVelocity.magnitude < 0.0001f ? 0.ToString("F2") : playerRigidbody.linearVelocity.magnitude.ToString("F2");
     }
     public void FixedUpdate()
@@ -892,6 +898,7 @@ public class PlayerMovement : MonoBehaviour
         }
 
         _onMobilePlatform = true;
+        playerAnimation.SetSimulationSpaceLandship();
     }
     public void OnTriggerExit(Collider other)
     {
@@ -901,6 +908,7 @@ public class PlayerMovement : MonoBehaviour
         _mobilePlatformRb = null;
         _mobilePlatformTf = null;
         _mobilePlatformRotInit = false;
+        playerAnimation.SetSimulationSpaceWorld(); 
     }
 
     private Vector3 GetMobilePlatformVelocity()
@@ -945,5 +953,16 @@ public class PlayerMovement : MonoBehaviour
         }
 
         _mobilePlatformLastRot = current;
+    }
+    private void HandleDustEffect()
+    {
+        // 條件：在地面 + 有移動輸入 + 計時到了
+        bool isMoving = moveDirection.sqrMagnitude > 0.01f;
+
+        if (grounded && isMoving && Time.time >= _nextDustTime)
+        {
+            _nextDustTime = Time.time + dustInterval;
+            playerAnimation.DustEffect();
+        }
     }
 }

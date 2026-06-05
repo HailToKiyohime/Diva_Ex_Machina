@@ -52,7 +52,15 @@ public class PlayerAnimation : MonoBehaviour
 
     public MMF_Player leftAttackFeedback;//Range
     public MMF_Player rightAttackFeedback;//Range
-    public MMF_Player MeleeAttackFeedback;
+    public MMF_Player meleeAttackFeedback;
+
+    public MMF_Player dustFeedback;
+    [Header("Gun")]
+    [SerializeField] private ParticleSystem[] leftMuzzle;
+    [SerializeField] private ParticleSystem[] rightMuzzle;
+    [Header("Dust Particle")]
+    [SerializeField] private ParticleSystem dustParticle;
+    [SerializeField] private Transform landshipTransform;
     void Awake()
     {
         anim = anim != null ? anim : GetComponent<Animator>();
@@ -630,9 +638,17 @@ public class PlayerAnimation : MonoBehaviour
     {
         rightAttackFeedback?.PlayFeedbacks(this.transform.position);
     }
+    public void DustEffect()
+    {
+        dustFeedback?.PlayFeedbacks(this.transform.position);
+    }
+    public void StopDustEffect()
+    {
+        dustFeedback?.StopFeedbacks();
+    }
     public void AnimEvent_MeleeImpact()
     {
-        MeleeAttackFeedback?.PlayFeedbacks(this.transform.position);
+        meleeAttackFeedback?.PlayFeedbacks(this.transform.position);
     }
 
     // ===== Animation Events =====
@@ -654,7 +670,46 @@ public class PlayerAnimation : MonoBehaviour
         Debug.Log("Hit:" + collision.gameObject);
         if (collision.gameObject.tag == "Enemy" && attackManager.playerRb.linearVelocity.magnitude > 8f)
         {
-            MeleeAttackFeedback.PlayFeedbacks(this.transform.position);
+            meleeAttackFeedback.PlayFeedbacks(this.transform.position);
+        }
+    }
+
+    public void SetSimulationSpaceLandship()
+    {
+        if (dustParticle == null) return;
+        var main = dustParticle.main;
+        main.simulationSpace = ParticleSystemSimulationSpace.Custom;
+        main.customSimulationSpace = landshipTransform;
+
+        for (int i = 0; i < leftMuzzle.Length; i++)
+        {
+            var leftMuzzleMain = leftMuzzle[i].main;
+            leftMuzzleMain.simulationSpace = ParticleSystemSimulationSpace.Custom;
+            leftMuzzleMain.customSimulationSpace = landshipTransform;
+        }
+        for (int i = 0; i < rightMuzzle.Length; i++)
+        {
+            var rightMuzzleMain = rightMuzzle[i].main;
+            rightMuzzleMain.simulationSpace = ParticleSystemSimulationSpace.Custom;
+            rightMuzzleMain.customSimulationSpace = landshipTransform;
+        }
+    }
+
+    public void SetSimulationSpaceWorld()
+    {
+        if (dustParticle == null) return;
+        var main = dustParticle.main;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+
+        for (int i = 0; i < leftMuzzle.Length; i++)
+        {
+            var leftMuzzleMain = leftMuzzle[i].main;
+            leftMuzzleMain.simulationSpace = ParticleSystemSimulationSpace.World;
+        }
+        for (int i = 0; i < rightMuzzle.Length; i++)
+        {
+            var rightMuzzleMain = rightMuzzle[i].main;
+            rightMuzzleMain.simulationSpace = ParticleSystemSimulationSpace.World;
         }
     }
 }
