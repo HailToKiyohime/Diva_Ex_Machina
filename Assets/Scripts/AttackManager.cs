@@ -81,6 +81,9 @@ public class Weapon
 
 public class AttackManager : MonoBehaviour
 {
+    public Rigidbody shipRB;
+    public bool onShip;
+
     public PlayerAnimation playerAnimation;
 
     public Weapon leftHandWeapon;
@@ -105,6 +108,7 @@ public class AttackManager : MonoBehaviour
 
     [Header("Optional: used to add player velocity to sword slash")]
     [SerializeField] public Rigidbody playerRb;
+
 
     private void Awake()
     {
@@ -556,6 +560,8 @@ public class AttackManager : MonoBehaviour
 
                 Vector3 targetPoint;
 
+                Vector3 movingPlatformOffset = Vector3.zero;
+
                 bool constrained = PlayerAiming.Instance.lockOn;
                 if (constrained)
                 {
@@ -570,11 +576,19 @@ public class AttackManager : MonoBehaviour
                     else
                     {
                         targetPoint = ray.GetPoint(100f);
+                        if (shipRB != null && onShip == true)
+                        {
+                            movingPlatformOffset = shipRB.linearVelocity;
+                        }
                     }
                 }
                 else
                 {
                     targetPoint = ray.GetPoint(100f);
+                    if (shipRB != null && onShip == true)
+                    {
+                        movingPlatformOffset = shipRB.linearVelocity;
+                    }
                 }
 
                 Vector3 dirNoSpread = (targetPoint - muzzle.position).normalized;
@@ -596,9 +610,9 @@ public class AttackManager : MonoBehaviour
                 Vector3 dirWithSpread = dirNoSpread * cosAlpha + lateral * sinAlpha;
 
                 var rb = currentBullet.GetComponent<Rigidbody>();
-                if (rb) rb.linearVelocity = dirWithSpread * w.range.bulletSpeed;
+                if (rb) rb.linearVelocity = (dirWithSpread * w.range.bulletSpeed) + movingPlatformOffset;
                 //make bullet face the direction it's moving
-                currentBullet.transform.forward = dirWithSpread;
+                currentBullet.transform.forward = (dirWithSpread * w.range.bulletSpeed) + movingPlatformOffset;
             }
 
             w.runtime.bulletsLeft--;
@@ -824,5 +838,17 @@ public class AttackManager : MonoBehaviour
         rb.linearVelocity = PlayerAiming.Instance.meshTransform.forward * baseSlashSpeed;
         slash.transform.rotation = rot;
 
+    }
+
+    public void SetOnShip(Rigidbody rb)
+    {
+        shipRB = rb;
+        onShip = true;
+    }
+
+    public void SetOffShip()
+    {
+        shipRB = null;
+        onShip = false;
     }
 }

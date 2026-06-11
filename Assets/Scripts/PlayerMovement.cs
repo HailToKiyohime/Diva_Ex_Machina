@@ -91,7 +91,7 @@ public class PlayerMovement : MonoBehaviour
 
     [SerializeField] private BoxCollider meleeAttackWall; // A box collider that enables/disables, it is larger than the player collider to prevent enemy from glitching through player during melee attack due to the capsule collider being smaller than the player model and it round shape
 
-
+    public AttackManager attackManager;
 
 
     public void Update()
@@ -899,6 +899,7 @@ public class PlayerMovement : MonoBehaviour
 
         _onMobilePlatform = true;
         playerAnimation.SetSimulationSpaceLandship();
+        attackManager.SetOnShip(rb);
     }
     public void OnTriggerExit(Collider other)
     {
@@ -908,7 +909,8 @@ public class PlayerMovement : MonoBehaviour
         _mobilePlatformRb = null;
         _mobilePlatformTf = null;
         _mobilePlatformRotInit = false;
-        playerAnimation.SetSimulationSpaceWorld(); 
+        playerAnimation.SetSimulationSpaceWorld();
+        attackManager.SetOffShip();
     }
 
     private Vector3 GetMobilePlatformVelocity()
