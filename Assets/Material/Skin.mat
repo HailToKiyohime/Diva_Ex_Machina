@@ -558,7 +558,7 @@ Material:
     - _UVMappingMaskEmissive: {r: 1, g: 0, b: 0, a: 0}
     - _ViewShift: {r: 0, g: 0, b: 0, a: 1}
     - _blushColor: {r: 1, g: 0.48624685, b: 0.4669811, a: 1}
-    - _skinColor: {r: 1, g: 0.8915094, b: 0.8998549, a: 1}
+    - _skinColor: {r: 0.9811321, g: 0.8746885, b: 0.8822917, a: 1}
     - emissive: {r: 0, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

@@ -536,7 +536,7 @@ public class AttackManager : MonoBehaviour
                     playerAnimation.RightWeaponMuzzleFlash();
                 }
 
-                var currentBullet = Instantiate(bulletPrefab, muzzle.position, Quaternion.identity);
+                var currentBullet = Instantiate(bulletPrefab, muzzle.position , Quaternion.identity);
                 var bulletComp = currentBullet.GetComponent<Bullet>();
 
                 bulletComp.attacker = playerRb.gameObject;
@@ -612,7 +612,7 @@ public class AttackManager : MonoBehaviour
                 var rb = currentBullet.GetComponent<Rigidbody>();
                 if (rb) rb.linearVelocity = (dirWithSpread * w.range.bulletSpeed) + movingPlatformOffset;
                 //make bullet face the direction it's moving
-                currentBullet.transform.forward = (dirWithSpread * w.range.bulletSpeed) + movingPlatformOffset;
+                currentBullet.transform.forward = (dirWithSpread * w.range.bulletSpeed);
             }
 
             w.runtime.bulletsLeft--;

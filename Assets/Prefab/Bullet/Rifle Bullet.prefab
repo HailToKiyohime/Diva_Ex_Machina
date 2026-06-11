@@ -182,17 +182,45 @@ PrefabInstance:
       propertyPath: m_Layer
       value: 10
       objectReference: {fileID: 0}
+    - target: {fileID: 902158998170697212, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 1536130679692287362, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Enabled
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2094876460748012575, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: TrailModule.enabled
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3651987333773354868, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Layer
       value: 10
       objectReference: {fileID: 0}
+    - target: {fileID: 3651987333773354868, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 7603267757058564947, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Layer
       value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: m_Autodestruct
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: m_MotionVectors
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: m_Parameters.alignment
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: m_Parameters.numCornerVertices
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.size
@@ -204,7 +232,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.data[1].time
-      value: 0.33282748
+      value: 0.70991486
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.data[2].time
@@ -216,27 +244,27 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.data[1].value
-      value: 0.1699377
+      value: 0.3711937
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.data[2].value
-      value: 0.51903117
+      value: 0.8712324
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.data[0].inSlope
-      value: 0.47929838
+      value: 0.46730745
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.data[1].inSlope
-      value: 0.9152884
+      value: 0.5769741
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.data[2].inSlope
-      value: 0.10692044
+      value: 0.41732135
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.data[0].outSlope
-      value: 0.47929838
+      value: 0.46730745
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.data[1].inWeight
@@ -244,27 +272,31 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.data[1].outSlope
-      value: 0.9152884
+      value: 0.5769741
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.data[2].inWeight
-      value: 0.14552066
+      value: 0.4429446
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.data[2].outSlope
-      value: 0.10692044
+      value: 0.41732135
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.data[0].outWeight
-      value: 0.28198132
+      value: 0.21978067
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.data[1].outWeight
-      value: 0.16473071
+      value: 0.1793936
       objectReference: {fileID: 0}
     - target: {fileID: 8490374799139010626, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Layer
       value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 8490374799139010626, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
