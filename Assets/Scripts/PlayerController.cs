@@ -9,7 +9,6 @@ public class PlayerController : MonoBehaviour
 
     [SerializeField] private PlayerMovement playerMovement;
     [SerializeField] private AttackManager attackManager;
-
     void Awake()
     {
         if (Instance != null && Instance != this)
@@ -112,4 +111,5 @@ public class PlayerController : MonoBehaviour
         playerMovement.ProcessAttackFacingAndAttack(attackManager, attackManager.leftShoulderWeapon, playerControls.Player.LeftShoulderAttack);
         playerMovement.ProcessAttackFacingAndAttack(attackManager, attackManager.rightShoulderWeapon, playerControls.Player.RightShoulderAttack);
     }
+
 }
