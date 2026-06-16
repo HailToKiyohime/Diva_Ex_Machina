@@ -194,6 +194,95 @@ public class PlayerAiming : MonoBehaviour
     }
 
     // =========================
+    // AutoAim：目標丟失/被擊殺時重新尋找目標
+    // =========================
+
+    // AutoAim 進行中，當前目標丟失/被擊殺時呼叫。
+    // 成功取得新目標回傳 true（AutoAim 繼續）；找不到回傳 false（已退出 AutoAim）。
+    private bool HandleAutoAimTargetLost()
+    {
+        if (TryAcquireNextAutoAimTarget())
+            return true;
+
+        // 找不到任何目標 -> 退出 AutoAim
+        EndAutoAim();
+        return false;
+    }
+
+    // 搜尋下一個目標：必須在相機前方、在 lockOnDistance（3D 距離）內、
+    // 且落在螢幕鎖定圈（lockOnRange）內；在符合者中選離螢幕中心最近的。
+    // 找到則設為新目標並回傳 true，否則回傳 false。
+    private bool TryAcquireNextAutoAimTarget()
+    {
+        if (mainCam == null || playerOrientation == null || GameManager.Instance == null)
+            return false;
+
+        List<GameObject> enemies = GameManager.Instance.GetEnemies();
+        if (enemies == null || enemies.Count == 0)
+            return false;
+
+        Vector2 sc = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+        float radius = GetLockAreaPixelRadius(); // 螢幕鎖定圈半徑（由 lockOnRange 決定）
+
+        GameObject best = null;
+        float bestProximity = Mathf.Infinity;
+
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            var enemy = enemies[i];
+            if (!enemy) continue;
+            if (!enemy.activeInHierarchy) continue;
+
+            // 跳過舊的（已丟失/被擊殺的）目標，避免重新選到同一個
+            if (_autoAimTarget != null && enemy.transform == _autoAimTarget) continue;
+
+            // 條件 1：在 lockOnDistance 內（3D 世界距離）
+            float dist = Vector3.Distance(playerOrientation.transform.position, enemy.transform.position);
+            if (dist > lockOnDistance) continue;
+
+            // 必須在相機前方
+            Vector3 sp = mainCam.WorldToScreenPoint(enemy.transform.position);
+            if (sp.z <= 0f) continue;
+
+            Vector2 pt = new Vector2(sp.x, sp.y);
+            float prox = Vector2.Distance(pt, sc);
+
+            // 條件 2：必須在螢幕鎖定圈（lockOnRange）內
+            if (prox > radius + 0.01f) continue;
+
+            // 條件 3：在符合上述條件的目標中，選離螢幕中心最近的
+            if (prox < bestProximity)
+            {
+                bestProximity = prox;
+                best = enemy;
+            }
+        }
+
+        if (best == null)
+            return false;
+
+        // 設定為新目標
+        _autoAimTarget = best.transform;
+        _autoAimTargetRenderer = best.GetComponentInChildren<Renderer>();
+
+        _lockedTarget = _autoAimTarget;
+        _lockedTargetRb = best.GetComponentInParent<Rigidbody>();
+        _lockedTargetRenderer = _autoAimTargetRenderer;
+
+        lockOn = true;
+        currentTargetRb = _lockedTargetRb;
+        _lockedInsideCircle = true;
+
+        // 重置平滑與自動退出計時器，避免換目標瞬間誤觸退出
+        _autoAimPointSmoothed = GetAutoAimPointRaw();
+        _autoAimPointVel = Vector3.zero;
+        _autoAimOutDistanceTimer = 0f;
+        _autoAimOutAreaTimer = 0f;
+
+        return true;
+    }
+
+    // =========================
     // Constrained Lock (核心)
     // =========================
     private void CrosshairDetect_ConstrainedLock()
@@ -208,9 +297,14 @@ public class PlayerAiming : MonoBehaviour
         {
             if (_autoAimTarget == null || !_autoAimTarget.gameObject.activeInHierarchy)
             {
-                // Target gone: AutoAim should end elsewhere too, but keep safe here
-                ClearLock();
-                return;
+                // 目標丟失 / 被擊殺：搜尋下一個「最接近螢幕中心且在 lockOnDistance 內」的敵人
+                // 找不到才退出 AutoAim
+                if (!HandleAutoAimTargetLost())
+                {
+                    ClearLock();
+                    return;
+                }
+                // 已取得新目標，繼續往下用新目標維持鎖定
             }
 
             if (_lockedTarget != _autoAimTarget)
@@ -440,15 +534,23 @@ public class PlayerAiming : MonoBehaviour
     {
         if (_autoAimTarget == null || playerOrientation == null || mainCam == null)
         {
-            EndAutoAim();
-            return;
+            // playerOrientation / mainCam 缺失屬於異常情況，直接退出
+            if (playerOrientation == null || mainCam == null)
+            {
+                EndAutoAim();
+                return;
+            }
+
+            // 目標丟失 / 被擊殺：嘗試搜尋下一個目標，找不到才退出
+            if (!HandleAutoAimTargetLost())
+                return;
         }
 
-        // 如果目標被 destroy / inactive：自動關閉
+        // 如果目標被 destroy / inactive：嘗試搜尋下一個目標，找不到才退出
         if (!_autoAimTarget.gameObject.activeInHierarchy)
         {
-            EndAutoAim();
-            return;
+            if (!HandleAutoAimTargetLost())
+                return;
         }
 
         float dt = Time.deltaTime;

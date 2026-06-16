@@ -712,4 +712,8 @@ public class PlayerAnimation : MonoBehaviour
             rightMuzzleMain.simulationSpace = ParticleSystemSimulationSpace.World;
         }
     }
+    public void PlayFootsteps()
+    {
+        AudioManager.Instance.Play("Footsteps", 1, 0.8f, 1.2f, false);
+    }
 }

@@ -96,7 +96,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   attacker: {fileID: 0}
-  physicalDamage: 10
+  physicalDamage: 0
   explosionDamage: 0
   energyDamage: 0
   coldDamage: 0
@@ -190,9 +190,25 @@ PrefabInstance:
       propertyPath: m_Enabled
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 1536130679692287362, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 0}
     - target: {fileID: 2094876460748012575, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: TrailModule.enabled
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2094876460748012575, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: InitialModule.startColor.maxColor.b
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2094876460748012575, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: InitialModule.startColor.maxColor.g
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2094876460748012575, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: InitialModule.startColor.maxColor.r
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3651987333773354868, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Layer
@@ -202,9 +218,17 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 5686564334342486774, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: moveWithTransform
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7603267757058564947, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Layer
       value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 7603267757058564947, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Autodestruct

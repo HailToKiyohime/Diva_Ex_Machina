@@ -5,7 +5,7 @@ using MoreMountains.Feedbacks;
 public class EnemyStats : MonoBehaviour
 {
     public float maxHealth;
-    private float health;
+    public float health;
     public float physicalDefense; // in percentage (0-100)
     public float explosionDefense; // in percentage (0-100)
     public float energyDefense; // in percentage (0-100)
