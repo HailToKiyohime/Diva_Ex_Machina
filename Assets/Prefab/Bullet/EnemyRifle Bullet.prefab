@@ -96,7 +96,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Bullet
   attacker: {fileID: 0}
-  physicalDamage: 0
+  physicalDamage: 20
   explosionDamage: 0
   energyDamage: 0
   coldDamage: 0

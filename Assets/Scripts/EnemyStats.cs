@@ -2,7 +2,7 @@
 using System;
 using MoreMountains.Feedbacks;
 
-public class EnemyStats : MonoBehaviour
+public class EnemyStats : MonoBehaviour, IDamageable
 {
     public float maxHealth;
     public float health;
@@ -55,6 +55,32 @@ public class EnemyStats : MonoBehaviour
         damageFeedback.PlayFeedbacks(this.transform.position, amount);
 
         AddAggro(attacker, amount);
+
+        if (health <= 0f)
+        {
+            health = 0f;
+            OnDeath?.Invoke();
+            Destroy(gameObject);
+        }
+    }
+
+    // ===== 實作 IDamageable：由敵人自己套用防禦後再扣血 =====
+    public void TakeDamage(DamageInfo dmg, GameObject attacker)
+    {
+        float amount =
+            dmg.physical * GetDefenseMultiplier(physicalDefense) +
+            dmg.explosion * GetDefenseMultiplier(explosionDefense) +
+            dmg.energy * GetDefenseMultiplier(energyDefense) +
+            dmg.cold * GetDefenseMultiplier(coldDefense);
+
+        if (amount <= 0f) return;
+
+        health -= amount;
+
+        damageFeedback.PlayFeedbacks(this.transform.position, amount);
+
+        if (attacker != null)
+            AddAggro(attacker, amount);
 
         if (health <= 0f)
         {

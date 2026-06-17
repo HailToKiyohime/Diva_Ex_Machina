@@ -113,61 +113,61 @@ public class Bullet : MonoBehaviour
         if (ignoreObstacles && !IsInEnemyLayer(other))
             return;
 
-        // Enemy?
-        var enemy = other.GetComponentInParent<EnemyStats>();
-        bool isEnemy = (enemy != null) && IsInEnemyLayer(other);
+        // 可被傷害的目標？（不再綁死 EnemyStats，改認 IDamageable 介面）
+        var target = other.GetComponentInParent<IDamageable>();
+        // enemyLayer 現在代表「這顆子彈允許打到的層」：
+        // 玩家開的子彈設成敵人層，敵人開的子彈設成玩家層，以此分敵我、避免友軍誤傷。
+        bool isTarget = (target != null) && IsInEnemyLayer(other);
 
-        if (isEnemy)
+        if (isTarget)
         {
-            // Avoid double hits on same enemy (multiple colliders)
-            int id = enemy.GetInstanceID();
+            // 用被打物件的 instance id 去重（避免同一目標多 collider 重複觸發）
+            var targetObj = target as Component;
+            int id = (targetObj != null) ? targetObj.GetInstanceID() : other.GetInstanceID();
             if (_hitEnemyIds.Contains(id)) return;
             _hitEnemyIds.Add(id);
 
-            // Apply damage FIRST
-            float final =
-                physicalDamage * enemy.GetDefenseMultiplier(enemy.physicalDefense) +
-                explosionDamage * enemy.GetDefenseMultiplier(enemy.explosionDefense) +
-                energyDamage * enemy.GetDefenseMultiplier(enemy.energyDefense) +
-                coldDamage * enemy.GetDefenseMultiplier(enemy.coldDefense);
+            // 暴擊在「攻擊方」這邊結算（暴擊是攻擊者的屬性）
+            float critMul = 1f;
+            if (Random.value < Mathf.Clamp01(criticalChance))
+                critMul = Mathf.Max(1f, criticalMultiplier);
 
-            bool isCrit = (Random.value < Mathf.Clamp01(criticalChance));
-            if (isCrit)
-                final *= Mathf.Max(1f, criticalMultiplier);
-            if (attacker != null)
-            {
-                enemy.TakeDamage(final, attacker);
-            }
-            else
-            {
-                enemy.TakeDamage(final);
-            }
+            // 只交出「原始四種傷害」，防禦由被打的目標自己套用
+            DamageInfo dmg = new DamageInfo(
+                physicalDamage * critMul,
+                explosionDamage * critMul,
+                energyDamage * critMul,
+                coldDamage * critMul
+            );
 
+            target.TakeDamage(dmg, attacker);
 
-            // melee impact feedback
+            // 近戰命中回饋
             if (isMelee)
             {
                 meleeImpactOwnerAnim?.AnimEvent_MeleeImpact();
-                enemy.GetComponent<Rigidbody>().linearVelocity = Vector3.zero; // stop enemy movement on hit, for better feedback (optional)
+                var targetRb = (targetObj != null) ? targetObj.GetComponent<Rigidbody>() : null;
+                if (targetRb != null)
+                    targetRb.linearVelocity = Vector3.zero; // 命中時停住目標，回饋更明確（可選）
             }
 
-            // Prevent repeated trigger spam while passing through this collider
+            // 避免穿過同一 collider 時重複觸發
             if (_selfCol != null && other != null)
                 Physics.IgnoreCollision(_selfCol, other, true);
 
-            // THEN handle penetration (your semantics)
+            // 接著處理穿透（語意與原本相同）
             if (penetration == -1)
             {
-                return; // infinite
+                return; // 無限穿透
             }
             else if (penetration > 0)
             {
-                penetration--; // consume one pass
-                return;        // keep flying
+                penetration--; // 消耗一次穿透
+                return;        // 繼續飛
             }
             else // penetration == 0
             {
-                DestroyBullet(); // destroy AFTER this impact
+                DestroyBullet(); // 命中後銷毀
                 return;
             }
         }
@@ -180,7 +180,7 @@ public class Bullet : MonoBehaviour
 
     private bool IsInIgnoreLayer(Collider col)
     {
-        if (col==null)
+        if (col == null)
         {
             return false;
         }

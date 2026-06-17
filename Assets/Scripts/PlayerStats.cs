@@ -219,7 +219,7 @@ public class BaseStats
 }
 
 
-public class PlayerStats : MonoBehaviour
+public class PlayerStats : MonoBehaviour, IDamageable
 {
     public event Action<VisualChange> OnLegVisualChanged;
     public event Action<Vector3> OnThrusterFlameOffsetChanged;
@@ -432,6 +432,34 @@ public class PlayerStats : MonoBehaviour
         float cm = (baseCm + add) * mul;
         if (cm < 1f) cm = 1f;
         return cm;
+    }
+
+    // ===== 實作 IDamageable：玩家受傷（原本沒有，這裡補上）=====
+    public void TakeDamage(DamageInfo dmg, GameObject attacker)
+    {
+        float amount =
+            dmg.physical * GetDefenseMultiplier(physicalDefense) +
+            dmg.explosion * GetDefenseMultiplier(explosionDefense) +
+            dmg.energy * GetDefenseMultiplier(energyDefense) +
+            dmg.cold * GetDefenseMultiplier(coldDefense);
+
+        if (amount <= 0f) return;
+
+        currentHealth -= amount;
+        // TODO: 玩家受傷回饋（震動 / 音效 / UI 閃紅 / 鏡頭抖動等）
+
+        if (currentHealth <= 0f)
+        {
+            currentHealth = 0f;
+            // TODO: 玩家死亡處理（OnPlayerDeath?.Invoke(); 重生 / GameOver 等）
+        }
+    }
+
+    // 與 EnemyStats 相同的防禦公式：defense 為 0~1000，最高減免 100%
+    public float GetDefenseMultiplier(float defenseValue)
+    {
+        float reduction = Mathf.Clamp01(defenseValue / 1000f);
+        return 1f - reduction;
     }
 
     void Awake()
