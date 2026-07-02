@@ -522,7 +522,6 @@ public class AttackManager : MonoBehaviour
 
         for (int i = 0; i < shotsToFire; i++)
         {
-            AudioManager.Instance.PlayCapped("GunShot", 0.1f, 0.8f, 1.2f, false);
             for (int x = 0; x < w.range.bulletPerShot; x++)
             {
                 bool isLeft = (w == leftHandWeapon);
@@ -634,11 +633,11 @@ public class AttackManager : MonoBehaviour
     {
         if (w == null) return;
         if (w.runtime.reloading) return;
-
-        AudioManager.Instance.Play("GunReload");    
+  
         w.runtime.reloading = true;
         w.reloadNormalized = 0f;
         PushAmmoUI();
+        playerAnimation.AnimEvent_Reload();
 
         if (w.range.reloadTime <= 0f)
         {

@@ -142,6 +142,7 @@ public class InventoryManager : MonoBehaviour
         // ON：照舊，走「開背包」或「切上色目標」
         if (isOn)
         {
+            SFXManager.Instance.PlayFeedback("ClickFeedback");
             if (IsColorMode)
             {
                 OpenColorPage();
@@ -814,6 +815,7 @@ public class InventoryManager : MonoBehaviour
             tgl.onValueChanged.AddListener(isOn =>
             {
                 if (!isOn) return;
+                SFXManager.Instance.PlayFeedback("ClickFeedback");
                 OnClickInventoryItem(capturedItem, tgl);
             });
         }
@@ -894,6 +896,7 @@ public class InventoryManager : MonoBehaviour
             tgl.onValueChanged.AddListener(isOn =>
             {
                 if (!isOn) return;
+                SFXManager.Instance.PlayFeedback("ClickFeedback");
                 OnClickInventoryItem(capturedItem, tgl);
             });
         }
@@ -1095,6 +1098,8 @@ public class InventoryManager : MonoBehaviour
         int index = GetSelectedSlotIndex();
         if (index < 0) return;
 
+        SFXManager.Instance.PlayFeedback("ClickFeedback");
+
         var equippedType = EquipmentManager.Instance.equipmentSlots[index].item?.item != null
             ? EquipmentManager.Instance.equipmentSlots[index].item.item.type
             : (ItemType?)null;
@@ -1222,6 +1227,7 @@ public class InventoryManager : MonoBehaviour
 
         tgl.onValueChanged.AddListener(isOn =>
         {
+            SFXManager.Instance.PlayFeedback("ClickFeedback");
             ApplyToggleColors(tgl, isOn);
             if (!isOn) return;
 

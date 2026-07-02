@@ -434,7 +434,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
         return cm;
     }
 
-    // ===== 實作 IDamageable：玩家受傷（原本沒有，這裡補上）=====
     public void TakeDamage(DamageInfo dmg, GameObject attacker)
     {
         float amount =
@@ -442,6 +441,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
             dmg.explosion * GetDefenseMultiplier(explosionDefense) +
             dmg.energy * GetDefenseMultiplier(energyDefense) +
             dmg.cold * GetDefenseMultiplier(coldDefense);
+
+        //Debug.Log($"[PlayerStats] 收到傷害 {amount}，來自 {attacker?.name}");  // ← 加這行
 
         if (amount <= 0f) return;
 

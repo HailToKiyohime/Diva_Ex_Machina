@@ -53,6 +53,8 @@ public class PlayerAnimation : MonoBehaviour
     public MMF_Player leftAttackFeedback;//Range
     public MMF_Player rightAttackFeedback;//Range
     public MMF_Player meleeAttackFeedback;
+    public MMF_Player reloadFeedback;
+    public MMF_Player walkFeedback;
 
     public MMF_Player dustFeedback;
     [Header("Gun")]
@@ -61,6 +63,9 @@ public class PlayerAnimation : MonoBehaviour
     [Header("Dust Particle")]
     [SerializeField] private ParticleSystem dustParticle;
     [SerializeField] private Transform landshipTransform;
+
+    public bool IsDashAnimationActive { get; private set; }
+
     void Awake()
     {
         anim = anim != null ? anim : GetComponent<Animator>();
@@ -247,6 +252,15 @@ public class PlayerAnimation : MonoBehaviour
         anim.SetFloat("y", vertical);
     }
 
+    public void setDashTrigger()
+    {
+        IsDashAnimationActive = true;
+        anim.SetTrigger("dash");
+    }
+    public void SetDashAnimationLock(bool locked)
+    {
+        IsDashAnimationActive = locked;
+    }
     public void SetIsOnGround(bool onGround)
     {
         anim.SetBool("onGround", onGround);
@@ -650,6 +664,11 @@ public class PlayerAnimation : MonoBehaviour
     {
         meleeAttackFeedback?.PlayFeedbacks(this.transform.position);
     }
+    public void AnimEvent_Reload()
+    {
+        reloadFeedback?.PlayFeedbacks(this.transform.position);
+    }
+
 
     // ===== Animation Events =====
     // 左手攻擊動畫 clip 的 Animation Event 直接叫呢個
@@ -712,8 +731,8 @@ public class PlayerAnimation : MonoBehaviour
             rightMuzzleMain.simulationSpace = ParticleSystemSimulationSpace.World;
         }
     }
-    public void PlayFootsteps()
+    public void PlayWalkFeedback()
     {
-        AudioManager.Instance.Play("Footsteps", 1, 0.8f, 1.2f, false);
+        walkFeedback?.PlayFeedbacks(this.transform.position);
     }
 }

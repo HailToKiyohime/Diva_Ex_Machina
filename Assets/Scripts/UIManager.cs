@@ -25,6 +25,7 @@ public class UIManager : MonoBehaviour
     public Color lockonColor;
     public Color normalColor;
     public Slider energyBar;
+    public Slider healthBar; // 玩家血量條（把 AP Bar 拖進來）
 
     [Header("Ammo Bar")]
     public Image leftHandAmmoBar;
@@ -35,8 +36,8 @@ public class UIManager : MonoBehaviour
     public Image rightHandAmmoFrame;
     public Image leftShoulderAmmoFrame;
     public Image rightShoulderAmmoFrame;
-    public Color ammoNormalColor ;
-    public Color ammoReloadColor ;
+    public Color ammoNormalColor;
+    public Color ammoReloadColor;
     public float ammoReloadFlashSpeed = 6f;
     // hand reload state
     private bool _leftReloading;
@@ -74,67 +75,69 @@ public class UIManager : MonoBehaviour
         else if (Input.GetKeyDown(KeyCode.Keypad2))
         {
             currentCameraSet = 1;
-        }else if (Input.GetKeyDown(KeyCode.Keypad3))
+        }
+        else if (Input.GetKeyDown(KeyCode.Keypad3))
         {
             currentCameraSet = 2;
-        }else if (Input.GetKeyDown(KeyCode.Keypad4))
+        }
+        else if (Input.GetKeyDown(KeyCode.Keypad4))
         {
             currentCameraSet = 3;
         }
         switch (currentCameraSet)
-            {
-                case 0:
-                    CombatCameraSet.SetActive(true);
-                    BuildingCameraSet.SetActive(false);
-                    CharacterEquipmentCameraSet.SetActive(false);
-                    CharacterCraftingCameraSet.SetActive(false);
-                    CombatUICanvas.SetActive(true);
-                    CharacterEquipmentCanvas.SetActive(false);
-                    CharacterCraftingCanvas.SetActive(false);
-                    BuildingUICanvas.SetActive(false);
-                    buildSystem.enabled = false; // Disable BuildSystem in combat mode
-                    Cursor.lockState = CursorLockMode.Locked;
-                    Cursor.visible = false;
-                    break;
-                case 1:
-                    CombatCameraSet.SetActive(false);
-                    BuildingCameraSet.SetActive(false);
-                    CharacterEquipmentCameraSet.SetActive(true);
-                    CharacterCraftingCameraSet.SetActive(false);
-                    CombatUICanvas.SetActive(false);
-                    CharacterEquipmentCanvas.SetActive(true);
-                    CharacterCraftingCanvas.SetActive(false);
-                    BuildingUICanvas.SetActive(false);
-                    buildSystem.enabled = false; // Disable BuildSystem in equipment mode
-                    Cursor.lockState = CursorLockMode.None;
-                    Cursor.visible = true;
-                    break;
-                case 2:
-                    CombatCameraSet.SetActive(false);
-                    BuildingCameraSet.SetActive(false);
-                    CharacterEquipmentCameraSet.SetActive(false);
-                    CharacterCraftingCameraSet.SetActive(true);
-                    CombatUICanvas.SetActive(false);
-                    CharacterEquipmentCanvas.SetActive(true);
-                    CharacterCraftingCanvas.SetActive(true);
-                    BuildingUICanvas.SetActive(false);
-                    buildSystem.enabled = false; // Disable BuildSystem in crafting mode
-                    Cursor.lockState = CursorLockMode.None;
-                    Cursor.visible = true;
-                    break;
-                case 3:
-                    CombatCameraSet.SetActive(false);
-                    BuildingCameraSet.SetActive(true);
-                    CharacterEquipmentCameraSet.SetActive(false);
-                    CharacterCraftingCameraSet.SetActive(false);
-                    CombatUICanvas.SetActive(false);
-                    CharacterEquipmentCanvas.SetActive(false);
-                    CharacterCraftingCanvas.SetActive(false);
-                    BuildingUICanvas.SetActive(true);
-                    buildSystem.enabled = true; // Enable BuildSystem in building mode
-                    Cursor.lockState = CursorLockMode.None;
-                    Cursor.visible = true;
-                    break;
+        {
+            case 0:
+                CombatCameraSet.SetActive(true);
+                BuildingCameraSet.SetActive(false);
+                CharacterEquipmentCameraSet.SetActive(false);
+                CharacterCraftingCameraSet.SetActive(false);
+                CombatUICanvas.SetActive(true);
+                CharacterEquipmentCanvas.SetActive(false);
+                CharacterCraftingCanvas.SetActive(false);
+                BuildingUICanvas.SetActive(false);
+                buildSystem.enabled = false; // Disable BuildSystem in combat mode
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+                break;
+            case 1:
+                CombatCameraSet.SetActive(false);
+                BuildingCameraSet.SetActive(false);
+                CharacterEquipmentCameraSet.SetActive(true);
+                CharacterCraftingCameraSet.SetActive(false);
+                CombatUICanvas.SetActive(false);
+                CharacterEquipmentCanvas.SetActive(true);
+                CharacterCraftingCanvas.SetActive(false);
+                BuildingUICanvas.SetActive(false);
+                buildSystem.enabled = false; // Disable BuildSystem in equipment mode
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+                break;
+            case 2:
+                CombatCameraSet.SetActive(false);
+                BuildingCameraSet.SetActive(false);
+                CharacterEquipmentCameraSet.SetActive(false);
+                CharacterCraftingCameraSet.SetActive(true);
+                CombatUICanvas.SetActive(false);
+                CharacterEquipmentCanvas.SetActive(true);
+                CharacterCraftingCanvas.SetActive(true);
+                BuildingUICanvas.SetActive(false);
+                buildSystem.enabled = false; // Disable BuildSystem in crafting mode
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+                break;
+            case 3:
+                CombatCameraSet.SetActive(false);
+                BuildingCameraSet.SetActive(true);
+                CharacterEquipmentCameraSet.SetActive(false);
+                CharacterCraftingCameraSet.SetActive(false);
+                CombatUICanvas.SetActive(false);
+                CharacterEquipmentCanvas.SetActive(false);
+                CharacterCraftingCanvas.SetActive(false);
+                BuildingUICanvas.SetActive(true);
+                buildSystem.enabled = true; // Enable BuildSystem in building mode
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+                break;
         }
     }
     private void LateUpdate()
@@ -142,6 +145,7 @@ public class UIManager : MonoBehaviour
         if (currentCameraSet != 0) return;
 
         RefreshEnergyBar();
+        RefreshHealthBar();
         UpdateAmmoBarColors();
     }
     public void RefreshEnergyBar()
@@ -154,6 +158,17 @@ public class UIManager : MonoBehaviour
         float max = Mathf.Max(1f, stats.maxEnergy); // �קK maxEnergy = 0 �y�����X�z���A
         energyBar.maxValue = max;
         energyBar.value = Mathf.Clamp(stats.currentEnergy, 0f, max);
+    }
+    public void RefreshHealthBar()
+    {
+        if (healthBar == null) return;
+
+        var stats = PlayerStats.Instance;
+        if (stats == null) return;
+
+        float max = Mathf.Max(1f, stats.maxHealth); // 避免 maxHealth = 0 造成除零/異常
+        healthBar.maxValue = max;
+        healthBar.value = Mathf.Clamp(stats.currentHealth, 0f, max);
     }
     public void SwitchToCombatUI()
     {
@@ -237,8 +252,8 @@ public class UIManager : MonoBehaviour
     }
     public void SetAmmoBarSize(float lockOnRange)
     {
-        
-        float newSize = lockOnRange*0.533f;
+
+        float newSize = lockOnRange * 0.533f;
         float newSize2 = lockOnRange * 0.566f;
         leftHandAmmoFrame.rectTransform.sizeDelta = new Vector2(newSize, newSize);
         leftHandAmmoFrame.rectTransform.anchoredPosition = new Vector2(-(newSize / 2), -(newSize / 2));

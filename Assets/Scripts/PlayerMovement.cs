@@ -30,6 +30,9 @@ public class PlayerMovement : MonoBehaviour
     private Vector3 dashDir = Vector3.forward;
     private float dashAccel = 0f;        // 固定加速度（m/s^2）
     private float dashTargetSpeed = 0f;  // 目標 dash 速度
+    [Tooltip("Dash 期間禁止攻擊/射擊的鎖定秒數。填你 dash 動畫的實際長度；想跟位移視窗一致就填和 dashDuration 一樣。")]
+    [SerializeField] private float dashAttackLockDuration = 0.35f;
+    private float dashAttackLockUntil = 0f;
 
     [Header("Attack Facing")]
     [SerializeField] private float attackRotateSpeed = 25;         // 轉身速度
@@ -72,7 +75,10 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float meleeDashLeadFallbackTime = 0.05f; // solver fail 時用的簡易 lead
 
     [Header("Dust Effect")]
-    [SerializeField] private float dustInterval = 0.3f; // 每幾秒播一次，可在 Inspector 調整
+    [SerializeField] private float dustIntervalSlow = 0.4f;   // 慢速：間隔長 = 稀
+    [SerializeField] private float dustIntervalFast = 0.08f;  // 全速：間隔短 = 密
+    [SerializeField] private float dustMinSpeed = 1f;         // 低於此速度不噴
+    [SerializeField] private float dustMaxSpeed = 16f;        // 達此速度 = 最密(60km/h≈16.7)
     private float _nextDustTime = 0f;
 
     // runtime
@@ -179,6 +185,8 @@ public class PlayerMovement : MonoBehaviour
     {
         if (attackManager == null || w == null || attackInput == null) return;
         if (PlayerAiming.Instance == null || characterModel == null) return;
+        // Dash 動畫播放期間：禁止任何攻擊/射擊（涵蓋左右手、肩武器、近戰）
+        if (IsDashAttackBlocked) return;
 
         // 判斷這次攻擊是遠程還是近戰（不改 PlayerController 的呼叫方式）
         var stats = PlayerStats.Instance;
@@ -616,13 +624,18 @@ public class PlayerMovement : MonoBehaviour
         dashAccel = deltaVStart / dur;
 
         stats.currentEnergy -= stats.dashEnergyCost;
-
+        // Dash 期間鎖住攻擊/射擊
+        float dashAtkLock = (dashAttackLockDuration > 0f) ? dashAttackLockDuration : dashDuration;
+        dashAttackLockUntil = Time.time + dashAtkLock;
         dashRequestUntil = Time.time + dashInputBuffer;
         dashActiveUntil = Time.time + dashDuration;
         nextDashTime = Time.time + dashCooldown;
 
+        playerAnimation.setDashTrigger();
+
         CancelInvoke("ResetEnergyRegenerate");
         canRegenerateEnergy = false;
+
 
         return true;
     }
@@ -817,7 +830,23 @@ public class PlayerMovement : MonoBehaviour
     public bool IsFlyingActive => !grounded && Time.time <= flyRequestUntil;
 
     public bool IsDashActive => Time.time <= dashActiveUntil;
+    public bool IsDashAttackBlocked => Time.time <= dashAttackLockUntil;
+
     public bool IsMeleeDashActive => _meleeDashActive;
+
+    // 玩家相對「腳下平台」的水平速度。沒站平台 => 等於世界速度；站在移動的船上不動 => ≈0
+    
+    public float HorizontalSpeedRelativeToPlatform
+    {
+        get
+        {
+            if (playerRigidbody == null) return 0f;
+            Vector3 vRel = playerRigidbody.linearVelocity - GetMobilePlatformVelocity();
+            vRel.y = 0f;
+            return vRel.magnitude;
+        }
+    }
+    
     public float VerticalVelocity
     {
         get
@@ -879,6 +908,8 @@ public class PlayerMovement : MonoBehaviour
     private Transform _mobilePlatformTf;
     private Quaternion _mobilePlatformLastRot;
     private bool _mobilePlatformRotInit;
+    // 對外公開：玩家目前站著的移動平台（沒站平台 = null）。給殘影 parent 用。
+    public Transform CurrentPlatform => _onMobilePlatform ? _mobilePlatformTf : null;
     public void OnTriggerStay(Collider other)
     {
         if (!other.CompareTag("Mobile Platform")) return;
@@ -956,12 +987,16 @@ public class PlayerMovement : MonoBehaviour
     }
     private void HandleDustEffect()
     {
-        // 條件：在地面 + 有移動輸入 + 計時到了
-        bool isMoving = moveDirection.sqrMagnitude > 0.01f;
+        // 用相對平台速度：站在移動的船上不動 => ≈0 => 不噴
+        float speed = HorizontalSpeedRelativeToPlatform;
 
-        if (grounded && isMoving && Time.time >= _nextDustTime)
+        if (!grounded || speed < dustMinSpeed) return;
+
+        if (Time.time >= _nextDustTime)
         {
-            _nextDustTime = Time.time + dustInterval;
+            float t = Mathf.InverseLerp(dustMinSpeed, dustMaxSpeed, speed); // 0~1，自動 clamp
+            float interval = Mathf.Lerp(dustIntervalSlow, dustIntervalFast, t);
+            _nextDustTime = Time.time + interval;
             playerAnimation.DustEffect();
         }
     }

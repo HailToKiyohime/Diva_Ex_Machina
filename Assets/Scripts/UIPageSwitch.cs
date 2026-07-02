@@ -20,6 +20,7 @@ public class UIPageSwitch : MonoBehaviour
 
     public void SwitchPage(int pageIndex)
     {
+        SFXManager.Instance.PlayFeedback("ClickFeedback");
         foreach (var page in pages) page.SetActive(false);
         pages[pageIndex].SetActive(true);
     }

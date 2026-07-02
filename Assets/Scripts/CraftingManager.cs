@@ -445,7 +445,7 @@ public class CraftingManager : MonoBehaviour
         int slotIndex = GetSelectedSlotIndex();
         HideAllRemoveButtonsOnCraftingSlots();
         bool slotHasEquipment = SlotHasEquipment(slotIndex);
-
+        SFXManager.Instance.PlayFeedback("ClickFeedback");
         foreach (var inv in InventoryManager.Instance.inventory)
         {
             if (inv == null || inv.item == null || inv.item.type != itemType)
@@ -579,6 +579,7 @@ public class CraftingManager : MonoBehaviour
     // 右側「背包物品按鈕」被勾選時的處理
     private void OnClickInventoryItem(ItemInstance item, Toggle btn)
     {
+        SFXManager.Instance.PlayFeedback("ClickFeedback");
         // 整把武器
         if (item.item is RangeWeapon rw)
         {
@@ -1262,6 +1263,7 @@ public class CraftingManager : MonoBehaviour
         }
         Debug.Log($"Forge baseSlot.item runtime type = {baseSlot.item.GetType().Name}");
         Debug.Log($"Forge baseSlot.item.item SO type = {baseSlot.item.item?.GetType().Name}");
+        SFXManager.Instance.PlayFeedback("ClickFeedback");
         // =========================
         // Range Weapon
         // =========================
@@ -1604,6 +1606,7 @@ public class CraftingManager : MonoBehaviour
 
     public void SwitchWeaponCraftingTab(int weaponType)
     {
+        SFXManager.Instance.PlayFeedback("ClickFeedback");
         craftingType = weaponType;
         if (craftingType == 0)
         {
