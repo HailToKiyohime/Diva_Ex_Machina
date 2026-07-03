@@ -8,14 +8,13 @@ public class SpeedMotionBlur : MonoBehaviour
     [SerializeField] private PlayerMovement playerMovement;
     [SerializeField] private Volume volume;   // 拖你那顆 Global Volume 進來
 
-    [Header("Speed → Intensity")]
-    [Tooltip("相對速度低於這個(m/s)就完全不模糊。站船上不動 => ≈0 => 0 模糊")]
-    [SerializeField] private float minSpeed = 1.5f;
-    [Tooltip("達到這個相對速度 = maxIntensity。60km/h ≈ 16.7 m/s")]
-    [SerializeField] private float maxSpeed = 16f;
-    [Range(0f, 1f)][SerializeField] private float maxIntensity = 0.8f;
-    [Tooltip("Intensity 變化平滑度")]
-    [SerializeField] private float lerpSpeed = 8f;
+    [Header("Dash Motion Blur")]
+    [Tooltip("dash 時的模糊強度")]
+    [Range(0f, 1f)][SerializeField] private float dashIntensity = 0.8f;
+    [Tooltip("進入模糊的速度（越大衝進去越快）")]
+    [SerializeField] private float blurInLerp = 20f;
+    [Tooltip("退出模糊的速度（越小尾巴拖越長）")]
+    [SerializeField] private float blurOutLerp = 8f;
 
     private MotionBlur _mb;
 
@@ -29,11 +28,12 @@ public class SpeedMotionBlur : MonoBehaviour
     {
         if (_mb == null || playerMovement == null) return;
 
-        float speed = playerMovement.HorizontalSpeedRelativeToPlatform;
+        // dash 期間 = 目標強度，其餘 = 0
+        bool dashing = playerMovement.IsDashActive;
+        float target = dashing ? dashIntensity : 0f;
 
-        float t = Mathf.InverseLerp(minSpeed, maxSpeed, speed); // <minSpeed=0, >maxSpeed=1
-        float target = t * maxIntensity;
-
-        _mb.intensity.value = Mathf.Lerp(_mb.intensity.value, target, lerpSpeed * Time.deltaTime);
+        // 進場快、退場慢，尾巴比較好看
+        float lerp = dashing ? blurInLerp : blurOutLerp;
+        _mb.intensity.value = Mathf.Lerp(_mb.intensity.value, target, lerp * Time.deltaTime);
     }
 }
