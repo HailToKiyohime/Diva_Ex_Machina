@@ -5,41 +5,41 @@ using UnityEngine.Rendering;
 public class DashAfterimage : MonoBehaviour
 {
     [Header("Refs")]
-    [Tooltip("Åª dash ª¬ºA¥Î¡C©ì§Aªº PlayerMovement ¶i¨Ó¡C")]
+    //[Tooltip("Åª dash ï¿½ï¿½ï¿½Aï¿½Î¡Cï¿½ï¿½Aï¿½ï¿½ PlayerMovement ï¿½iï¿½Ó¡C")]
     [SerializeField] private PlayerMovement playerMovement;
 
     [Header("Auto-Collect Roots")]
-    [Tooltip("Body ª«¥ó¡]¹Ï¤¤ªº Body¡^¡C·|¦Û°Ê§ì©³¤U©Ò¦³ SkinnedMeshRenderer¡C¯dªÅ = ¥Î¥»ª«¥ó¡]Player¡^·í®Ú¡C")]
+    //[Tooltip("Body ï¿½ï¿½ï¿½ï¿½]ï¿½Ï¤ï¿½ï¿½ï¿½ Bodyï¿½^ï¿½Cï¿½|ï¿½Û°Ê§ì©³ï¿½Uï¿½Ò¦ï¿½ SkinnedMeshRendererï¿½Cï¿½dï¿½ï¿½ = ï¿½Î¥ï¿½ï¿½ï¿½ï¿½ï¿½]Playerï¿½^ï¿½ï¿½Ú¡C")]
     [SerializeField] private Transform bodyRoot;
 
-    [Tooltip("¡]¥i¿ï¡^¸Ë³Æ mesh ªº®e¾¹¡C¯dªÅ = ¦Û°Ê¥Î BoneCombiner.Instance ªº transform¡C")]
+    //[Tooltip("ï¿½]ï¿½iï¿½ï¿½^ï¿½Ë³ï¿½ mesh ï¿½ï¿½ï¿½eï¿½ï¿½ï¿½Cï¿½dï¿½ï¿½ = ï¿½Û°Ê¥ï¿½ BoneCombiner.Instance ï¿½ï¿½ transformï¿½C")]
     [SerializeField] private Transform equipmentRoot;
 
-    [Tooltip("¡]¥i¿ï¡^¤£¦b¤W­z¨â­Ó®Ú©³¤U¡B·QÃB¥~¥[¤Jªº SkinnedMeshRenderer¡C")]
+    //[Tooltip("ï¿½]ï¿½iï¿½ï¿½^ï¿½ï¿½ï¿½bï¿½Wï¿½zï¿½ï¿½Ó®Ú©ï¿½ï¿½Uï¿½Bï¿½Qï¿½Bï¿½~ï¿½[ï¿½Jï¿½ï¿½ SkinnedMeshRendererï¿½C")]
     [SerializeField] private SkinnedMeshRenderer[] extraRenderers;
 
-    [Tooltip("¨C¦¸ dash ³£­«·s±½´y¡AÅý´«¸Ë«á·s¸Ë¤Wªº¸Ë³Æ¤]¯à¦Y¨ì´Ý¼v¡C")]
+    //[Tooltip("ï¿½Cï¿½ï¿½ dash ï¿½ï¿½ï¿½ï¿½ï¿½sï¿½ï¿½ï¿½yï¿½Aï¿½ï¿½ï¿½ï¿½ï¿½Ë«ï¿½sï¿½Ë¤Wï¿½ï¿½ï¿½Ë³Æ¤]ï¿½ï¿½Yï¿½ï¿½Ý¼vï¿½C")]
     [SerializeField] private bool rescanOnEachDash = true;
 
     [Header("Ghost Look")]
-    [Tooltip("´Ý¼v§÷½è¡G«ØÄ³ URP/Unlit + Transparent¡]¬X©M¡^©Î Additive¡]µo¥ú¡^¡C")]
+    //[Tooltip("ï¿½Ý¼vï¿½ï¿½ï¿½ï¿½Gï¿½ï¿½Ä³ URP/Unlit + Transparentï¿½]ï¿½Xï¿½Mï¿½^ï¿½ï¿½ Additiveï¿½]ï¿½oï¿½ï¿½ï¿½^ï¿½C")]
     [SerializeField] private Material ghostMaterial;
-    [Tooltip("´Ý¼vÃC¦â¡]§t°_©l alpha¡^¡A·|ÂÐ»\§÷½èªº _BaseColor¡C")]
+    //[Tooltip("ï¿½Ý¼vï¿½Cï¿½ï¿½]ï¿½tï¿½_ï¿½l alphaï¿½^ï¿½Aï¿½|ï¿½Ð»\ï¿½ï¿½ï¿½èªº _BaseColorï¿½C")]
     [SerializeField] private Color ghostColor = new Color(0.4f, 0.75f, 1f, 0.5f);
 
     [Header("Timing")]
-    [Tooltip("¤@¦¸ dash ²£¥Í´Ý¼vªºÁ`®Éªø¡]¬í¡^¡C")]
+    //[Tooltip("ï¿½@ï¿½ï¿½ dash ï¿½ï¿½ï¿½Í´Ý¼vï¿½ï¿½ï¿½`ï¿½Éªï¿½ï¿½]ï¿½ï¿½^ï¿½C")]
     [SerializeField] private float burstDuration = 0.3f;
-    [Tooltip("¨C¹j¦h¤[¥Í¤@±i´Ý¼v¡A¶V¤p¶V±K¡C")]
+    //[Tooltip("ï¿½Cï¿½jï¿½hï¿½[ï¿½Í¤@ï¿½iï¿½Ý¼vï¿½Aï¿½Vï¿½pï¿½Vï¿½Kï¿½C")]
     [SerializeField] private float spawnInterval = 0.04f;
-    [Tooltip("³æ±i´Ý¼v±q¥X²{¨ì®ø¥¢ªº®É¶¡¡C")]
+    //[Tooltip("ï¿½ï¿½iï¿½Ý¼vï¿½qï¿½Xï¿½{ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É¶ï¿½ï¿½C")]
     [SerializeField] private float ghostLifetime = 0.3f;
 
     private bool _wasDashing = false;
     private float _burstUntil = 0f;
     private float _nextSpawn = 0f;
 
-    // ¦¬¶°¨ìªº´è¬V¾¹¡]¦Û°Ê + ¤â°Ê¡A¤w¥h­«¡^
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ìªºï¿½ï¿½Vï¿½ï¿½ï¿½]ï¿½Û°ï¿½ + ï¿½ï¿½Ê¡Aï¿½wï¿½hï¿½ï¿½ï¿½^
     private readonly List<SkinnedMeshRenderer> _renderers = new List<SkinnedMeshRenderer>();
     private readonly HashSet<SkinnedMeshRenderer> _seen = new HashSet<SkinnedMeshRenderer>();
     private readonly List<SkinnedMeshRenderer> _scanBuffer = new List<SkinnedMeshRenderer>();
@@ -55,7 +55,7 @@ public class DashAfterimage : MonoBehaviour
     {
         if (playerMovement == null) return;
 
-        // °»´ú dash °_©lÃäªu
+        // ï¿½ï¿½ï¿½ï¿½ dash ï¿½_ï¿½lï¿½ï¿½u
         bool dashing = playerMovement.IsDashActive;
         if (dashing && !_wasDashing)
         {
@@ -63,7 +63,7 @@ public class DashAfterimage : MonoBehaviour
                 CollectRenderers();
 
             _burstUntil = Time.time + burstDuration;
-            _nextSpawn = 0f; // ¥ß¨è¥Í²Ä¤@±i
+            _nextSpawn = 0f; // ï¿½ß¨ï¿½Í²Ä¤@ï¿½i
         }
         _wasDashing = dashing;
 
@@ -74,7 +74,7 @@ public class DashAfterimage : MonoBehaviour
         }
     }
 
-    // ´«¸Ë«á­Y§â rescanOnEachDash Ãö±¼¡A¥i±q EquipmentManager ¤â°Ê©I¥s³o­Ó¨ê·s
+    // ï¿½ï¿½ï¿½Ë«ï¿½Yï¿½ï¿½ rescanOnEachDash ï¿½ï¿½ï¿½ï¿½ï¿½Aï¿½iï¿½q EquipmentManager ï¿½ï¿½Ê©Iï¿½sï¿½oï¿½Ó¨ï¿½s
     public void RefreshRenderers() => CollectRenderers();
 
     private void CollectRenderers()
@@ -82,17 +82,17 @@ public class DashAfterimage : MonoBehaviour
         _renderers.Clear();
         _seen.Clear();
 
-        // 1) Body ©³¤U©Ò¦³ SMR¡]¯dªÅ´N¥Î¥»ª«¥ó·í®Ú = Player¡^
+        // 1) Body ï¿½ï¿½ï¿½Uï¿½Ò¦ï¿½ SMRï¿½]ï¿½dï¿½Å´Nï¿½Î¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ = Playerï¿½^
         Transform bodySearch = (bodyRoot != null) ? bodyRoot : transform;
         AddFromRoot(bodySearch);
 
-        // 2) ¸Ë³Æ®e¾¹¡]¯dªÅ´N¦Û°Ê¥Î BoneCombiner ³æ¨Ò¡^
+        // 2) ï¿½Ë³Æ®eï¿½ï¿½ï¿½]ï¿½dï¿½Å´Nï¿½Û°Ê¥ï¿½ BoneCombiner ï¿½ï¿½Ò¡^
         Transform eqSearch = equipmentRoot;
         if (eqSearch == null && BoneCombiner.Instance != null)
             eqSearch = BoneCombiner.Instance.transform;
         AddFromRoot(eqSearch);
 
-        // 3) ÃB¥~¤â°Ê«ü©wªº
+        // 3) ï¿½Bï¿½~ï¿½ï¿½Ê«ï¿½ï¿½wï¿½ï¿½
         if (extraRenderers != null)
         {
             for (int i = 0; i < extraRenderers.Length; i++)
@@ -106,7 +106,7 @@ public class DashAfterimage : MonoBehaviour
     {
         if (root == null) return;
         _scanBuffer.Clear();
-        root.GetComponentsInChildren<SkinnedMeshRenderer>(true, _scanBuffer); // §t inactive
+        root.GetComponentsInChildren<SkinnedMeshRenderer>(true, _scanBuffer); // ï¿½t inactive
         for (int i = 0; i < _scanBuffer.Count; i++)
             AddOne(_scanBuffer[i]);
     }
@@ -114,7 +114,7 @@ public class DashAfterimage : MonoBehaviour
     private void AddOne(SkinnedMeshRenderer smr)
     {
         if (smr == null) return;
-        if (_seen.Add(smr)) // ¥h­«¡]Body ®Ú»P¸Ë³Æ®Ú­Y¦³­«Å|¤]¤£·|­«½Æ¡^
+        if (_seen.Add(smr)) // ï¿½hï¿½ï¿½ï¿½]Body ï¿½Ú»Pï¿½Ë³Æ®Ú­Yï¿½ï¿½ï¿½ï¿½ï¿½|ï¿½]ï¿½ï¿½ï¿½|ï¿½ï¿½ï¿½Æ¡^
             _renderers.Add(smr);
     }
 
@@ -122,7 +122,7 @@ public class DashAfterimage : MonoBehaviour
     {
         if (ghostMaterial == null || _renderers.Count == 0) return;
 
-        // ª±®a¥Ø«e¯¸µÛªº²¾°Ê¥­¥x¡]null = ¯¸¦bÀR¤î¦a­±¡^
+        // ï¿½ï¿½ï¿½aï¿½Ø«eï¿½ï¿½ï¿½Ûªï¿½ï¿½ï¿½ï¿½Ê¥ï¿½ï¿½xï¿½]null = ï¿½ï¿½ï¿½bï¿½Rï¿½ï¿½aï¿½ï¿½ï¿½^
         Transform platform = (playerMovement != null) ? playerMovement.CurrentPlatform : null;
 
         for (int i = 0; i < _renderers.Count; i++)
@@ -131,18 +131,18 @@ public class DashAfterimage : MonoBehaviour
             if (smr == null || !smr.gameObject.activeInHierarchy) continue;
             if (smr.sharedMesh == null) continue;
 
-            // 1) ¯MµH·í«e pose¡]useScale=false¡Gscale ¦Û¤v¥Î lossyScale ®M¡^
+            // 1) ï¿½Mï¿½Hï¿½ï¿½e poseï¿½]useScale=falseï¿½Gscale ï¿½Û¤vï¿½ï¿½ lossyScale ï¿½Mï¿½^
             Mesh baked = new Mesh();
             smr.BakeMesh(baked, false);
 
-            // 2) Á{®É°­¼v GO¡A¹ï»ô¥@¬É TRS
+            // 2) ï¿½{ï¿½É°ï¿½ï¿½v GOï¿½Aï¿½ï¿½ï¿½@ï¿½ï¿½ TRS
             var go = new GameObject("DashGhost");
             go.transform.SetPositionAndRotation(smr.transform.position, smr.transform.rotation);
             go.transform.localScale = smr.transform.lossyScale;
 
-            // ¡¹ ­Y¯¸¦b·|°Êªº¥­¥x¤W¡Aparent ¨ì¥­¥x¡AÅý´Ý¼v¸òµÛ²î¤@°_¥­²¾/±ÛÂà
+            // ï¿½ï¿½ ï¿½Yï¿½ï¿½ï¿½bï¿½|ï¿½Êªï¿½ï¿½ï¿½ï¿½xï¿½Wï¿½Aparent ï¿½ì¥­ï¿½xï¿½Aï¿½ï¿½ï¿½Ý¼vï¿½ï¿½Û²ï¿½@ï¿½_ï¿½ï¿½ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½
             if (platform != null)
-                go.transform.SetParent(platform, true); // worldPositionStays¡G«O¯d·í«e¥@¬É«ººA«á¦A¸òÀH
+                go.transform.SetParent(platform, true); // worldPositionStaysï¿½Gï¿½Oï¿½dï¿½ï¿½eï¿½@ï¿½É«ï¿½ï¿½Aï¿½ï¿½Aï¿½ï¿½ï¿½H
 
             var mf = go.AddComponent<MeshFilter>();
             mf.sharedMesh = baked;
@@ -153,14 +153,14 @@ public class DashAfterimage : MonoBehaviour
             mr.lightProbeUsage = LightProbeUsage.Off;
             mr.reflectionProbeUsage = ReflectionProbeUsage.Off;
 
-            // ¨C±i°­¼v¤@¥÷§÷½è instance¡AÂÐ»\©Ò¦³ submesh
+            // ï¿½Cï¿½iï¿½ï¿½ï¿½vï¿½@ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ instanceï¿½Aï¿½Ð»\ï¿½Ò¦ï¿½ submesh
             var matInstance = new Material(ghostMaterial);
             int subs = Mathf.Max(1, baked.subMeshCount);
             var mats = new Material[subs];
             for (int s = 0; s < subs; s++) mats[s] = matInstance;
             mr.sharedMaterials = mats;
 
-            // 3) ²H¥X + ¦Û·´
+            // 3) ï¿½Hï¿½X + ï¿½Û·ï¿½
             var fader = go.AddComponent<DashGhostFader>();
             fader.Init(matInstance, baked, ghostColor, ghostLifetime);
         }

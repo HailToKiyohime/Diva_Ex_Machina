@@ -1,21 +1,20 @@
 using UnityEngine;
 
 /// <summary>
-/// ¶Ë®`Âàµo¾¹¡C
+/// ï¿½Ë®`ï¿½ï¿½oï¿½ï¿½ï¿½C
 ///
-/// ¥Î³~¡G·í¡u¾Ö¦³ Collider ªºª«¥ó¡v(¨Ò¦p Player ¥»Åé) ©M¡u³B²zª¬ºA/¦å¶qªº¸}¥»¡v
-/// (¨Ò¦p±¾¦b Player Manager ¤Wªº PlayerStats) ¤£¦b¦P¤@±ø¤÷¤lÃì¤W®É¡A
-/// ¤l¼uªº GetComponentInParent&lt;IDamageable&gt;() ·|§ä¤£¨ì PlayerStats¡C
+/// ï¿½Î³~ï¿½Gï¿½ï¿½uï¿½Ö¦ï¿½ Collider ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½v(ï¿½Ò¦p Player ï¿½ï¿½ï¿½ï¿½) ï¿½Mï¿½uï¿½Bï¿½zï¿½ï¿½ï¿½A/ï¿½ï¿½qï¿½ï¿½ï¿½}ï¿½ï¿½ï¿½v
+/// (ï¿½Ò¦pï¿½ï¿½ï¿½b Player Manager ï¿½Wï¿½ï¿½ PlayerStats) ï¿½ï¿½ï¿½bï¿½Pï¿½@ï¿½ï¿½ï¿½ï¿½ï¿½lï¿½ï¿½Wï¿½É¡A
+/// ï¿½lï¿½uï¿½ï¿½ GetComponentInParent&lt;IDamageable&gt;() ï¿½|ï¿½ä¤£ï¿½ï¿½ PlayerStatsï¿½C
 ///
-/// §â³o­Ó¸}¥»±¾¦b¡u¦³ Collider ªºª«¥ó¡v¤W¡A¥¦¦Û¤v¹ê§@ IDamageable¡A
-/// ¦¬¨ì¶Ë®`«á¦AÂà¥æµ¹¯u¥¿ªº±µ¦¬ªÌ¡C¤l¼u§¹¥þ¤£¥Î§ï¡C
+/// ï¿½ï¿½oï¿½Ó¸}ï¿½ï¿½ï¿½ï¿½ï¿½bï¿½uï¿½ï¿½ Collider ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½vï¿½Wï¿½Aï¿½ï¿½ï¿½Û¤vï¿½ï¿½@ IDamageableï¿½A
+/// ï¿½ï¿½ï¿½ï¿½Ë®`ï¿½ï¿½Aï¿½ï¿½æµ¹ï¿½uï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì¡Cï¿½lï¿½uï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î§ï¿½C
 ///
-/// ©ñ¸m¦ì¸m¡G±¾¦b©Ò¦³¬ÛÃö Collider ªº¡u¦@¦P®Úª«¥ó¡v(³q±`¬O Player ®Úª«¥ó)¡A
-/// ³o¼Ë¤£ºÞ¥´¨ì­þ­Ó¤l Collider¡A©¹¤W§ä³£·|§ä¨ì³o­ÓÂàµo¾¹¡C
+/// ï¿½ï¿½mï¿½ï¿½mï¿½Gï¿½ï¿½ï¿½bï¿½Ò¦ï¿½ï¿½ï¿½ï¿½ï¿½ Collider ï¿½ï¿½ï¿½uï¿½@ï¿½Pï¿½Úªï¿½ï¿½ï¿½v(ï¿½qï¿½`ï¿½O Player ï¿½Úªï¿½ï¿½ï¿½)ï¿½A
+/// ï¿½oï¿½Ë¤ï¿½ï¿½Þ¥ï¿½ï¿½ï¿½ï¿½ï¿½Ó¤l Colliderï¿½Aï¿½ï¿½ï¿½Wï¿½ä³£ï¿½|ï¿½ï¿½ï¿½oï¿½ï¿½ï¿½ï¿½oï¿½ï¿½ï¿½C
 /// </summary>
 public class DamageRelay : MonoBehaviour, IDamageable
 {
-    [Tooltip("¯u¥¿³B²z¶Ë®`ªº¸}¥»¡A¥²¶·¹ê§@ IDamageable¡C§â Player Manager ¤Wªº PlayerStats ©ì¶i¨Ó¡C")]
     [SerializeField] private MonoBehaviour damageReceiver;
 
     private IDamageable _target;
@@ -23,9 +22,6 @@ public class DamageRelay : MonoBehaviour, IDamageable
     void Awake()
     {
         _target = damageReceiver as IDamageable;
-
-        if (_target == null)
-            Debug.LogError($"[DamageRelay] '{name}' ªº damageReceiver ¥¼³]©w©Î¥¼¹ê§@ IDamageable¡C", this);
     }
 
     public void TakeDamage(DamageInfo damage, GameObject attacker)
@@ -34,14 +30,10 @@ public class DamageRelay : MonoBehaviour, IDamageable
     }
 
 #if UNITY_EDITOR
-    // ¦b Inspector ©ì¨ì¤£¹ïªº¸}¥»®É§Y®É´£¿ô¨Ã²MªÅ
     void OnValidate()
     {
         if (damageReceiver != null && !(damageReceiver is IDamageable))
         {
-            Debug.LogWarning(
-                $"[DamageRelay] {damageReceiver.GetType().Name} ¨S¦³¹ê§@ IDamageable¡A½Ð§ï©ì¦³¹ê§@ªº¸}¥»¡C",
-                this);
             damageReceiver = null;
         }
     }
