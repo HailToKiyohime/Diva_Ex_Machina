@@ -7,6 +7,7 @@ using UnityEngine.AI;
 
 public class CreatePath : MonoBehaviour
 {
+    /*
     private Transform _navTarget;
     public bool HasNavTarget => _navTarget != null;
 
@@ -69,7 +70,7 @@ public class CreatePath : MonoBehaviour
         orbitAngleInitialized = false;
 
         _navTarget = newTarget;                   // 導航目標
-        enemyBrain.ForceSetTarget(newTarget);     // 戰鬥目標（加入 targetList）
+        //enemyBrain.ForceSetTarget(newTarget);     // 戰鬥目標（加入 targetList）
         elapsed = 0f;
     }
 
@@ -134,12 +135,12 @@ public class CreatePath : MonoBehaviour
         Vector3 endWorld = destination.position;
 
         Vector3 navStart = startWorld;
-        Vector3 navEnd = endWorld;
+        //Vector3 navEnd = endWorld;
 
         if (onShipNav && realShipRoot != null && ghostShipRoot != null)
         {
             navStart = ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, startWorld);
-            navEnd = ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, endWorld);
+            //navEnd = ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, endWorld);
         }
 
         Vector3 navmeshPoint = !onShipNav
@@ -468,5 +469,5 @@ public class CreatePath : MonoBehaviour
             if (d < closestDist) { closestDist = d; closest = dp; }
         }
         return closest;
-    }
+    }*/
 }

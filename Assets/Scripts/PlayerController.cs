@@ -37,10 +37,6 @@ public class PlayerController : MonoBehaviour
         if (UIManager.Instance != null && UIManager.Instance.currentCameraSet != 0)
             return true;
 
-        // 2) Lock all gameplay input while melee dash movement is active
-        if (playerMovement != null && playerMovement.IsMeleeDashActive)
-            return true;
-
         return false;
     }
 

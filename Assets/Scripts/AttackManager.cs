@@ -25,14 +25,6 @@ public class RangeWeaponSettings
     public float bulletSpeed;
     public int firingMode; // 0:Single, 1:Auto, 2:Charge
 }
-[System.Serializable]
-public class MeleeWeaponSettings
-{
-    public float reloadTime;
-    public MeleeWeapon item;
-    public Transform weaponObject;
-    public GameObject swordSlashPrefab;
-}
 
 [System.Serializable]
 public class RangeWeaponRuntimeState
@@ -63,20 +55,11 @@ public class Weapon
     // Range Weapon Specific (Foldout)
     public RangeWeaponSettings range = new RangeWeaponSettings();
 
-    // Melee Weapon Specific (Foldout)
-    public MeleeWeaponSettings melee = new MeleeWeaponSettings();
-
     // Runtime State (Foldout)
     public RangeWeaponRuntimeState runtime = new RangeWeaponRuntimeState();
 
-    // Melee Runtime State (Foldout)
-    public MeleeWeaponRuntimeState meleeRuntime = new MeleeWeaponRuntimeState();
-
     // Reload UI runtime (0~1). When reloading, ammo bar shows this value.
     [HideInInspector] public float reloadNormalized;
-
-    // Melee reload UI runtime (0~1). When melee reloading, ammo bar shows this value.
-    [HideInInspector] public float meleeReloadNormalized;
 }
 
 public class AttackManager : MonoBehaviour
@@ -98,16 +81,16 @@ public class AttackManager : MonoBehaviour
     private RangeWeaponInstance _leftRangeWeaponSource;
     private RangeWeaponInstance _rightRangeWeaponSource;
 
-    // Melee source cache
-    private MeleeWeaponInstance _leftMeleeWeaponSource;
-    private MeleeWeaponInstance _rightMeleeWeaponSource;
-
     // Shoulder Weapon Scource cache
     private ShoulderWeaponInstance _leftShoulderWeaponSource;
     private ShoulderWeaponInstance _rightShoulderWeaponSource;
 
     [Header("Optional: used to add player velocity to sword slash")]
     [SerializeField] public Rigidbody playerRb;
+
+    [Header("Debug")]
+    [Tooltip("開火時在 Scene 視圖畫出：黃 = 準星 ray（相機出發）、紅 = 子彈實際方向（槍口出發），持續 1 秒。")]
+    [SerializeField] private bool debugDrawFireRay = false;
 
 
     private void Awake()
@@ -135,37 +118,19 @@ public class AttackManager : MonoBehaviour
         var stats = PlayerStats.Instance;
         if (stats == null) return;
 
-        ApplyHand(stats.leftHand, leftHandWeapon, ref _leftRangeWeaponSource, ref _leftMeleeWeaponSource);
-        ApplyHand(stats.rightHand, rightHandWeapon, ref _rightRangeWeaponSource, ref _rightMeleeWeaponSource);
+        ApplyHand(stats.leftHand, leftHandWeapon, ref _leftRangeWeaponSource);
+        ApplyHand(stats.rightHand, rightHandWeapon, ref _rightRangeWeaponSource);
 
-        // ★補齊 melee weaponObject（由裝備系統拎實體武器 Transform）
-        ResolveMeleeWeaponObject(leftHandWeapon, stats.leftWeaponSlotIndex);
-        ResolveMeleeWeaponObject(rightHandWeapon, stats.rightWeaponSlotIndex);
 
         ApplyShoulder(stats.leftShoulder, leftShoulderWeapon, ref _leftShoulderWeaponSource);
         ApplyShoulder(stats.rightShoulder, rightShoulderWeapon, ref _rightShoulderWeaponSource);
 
         PushAmmoUI();
     }
-    private void ResolveMeleeWeaponObject(Weapon w, int slotIndex)
-    {
-        if (w == null) return;
 
-        // 只處理近戰
-        if (w.melee == null || w.melee.item == null) { w.melee.weaponObject = null; return; }
-
-        var em = EquipmentManager.Instance;
-        if (em == null || em.equipmentSlots == null) { w.melee.weaponObject = null; return; }
-        if (slotIndex < 0 || slotIndex >= em.equipmentSlots.Count) { w.melee.weaponObject = null; return; }
-
-        var go = em.equipmentSlots[slotIndex].equipedItem;
-        w.melee.weaponObject = (go != null) ? go.transform : null;
-    }
-
-    private static void ClearWeaponOutput(Weapon outWeapon, ref RangeWeaponInstance cachedSource, ref MeleeWeaponInstance cachedMeleeSource)
+    private static void ClearWeaponOutput(Weapon outWeapon, ref RangeWeaponInstance cachedSource)
     {
         cachedSource = null;
-        cachedMeleeSource = null;
 
         outWeapon.bullet = null;
         outWeapon.muzzle = null;
@@ -184,17 +149,6 @@ public class AttackManager : MonoBehaviour
         outWeapon.range.magazineSize = 0;
         outWeapon.range.bulletSpeed = 0f;
         outWeapon.range.firingMode = 0;
-
-        // melee settings
-        outWeapon.melee.swordSlashPrefab = null;
-        outWeapon.melee.reloadTime = 0f;
-        outWeapon.melee.item = null;
-        outWeapon.melee.weaponObject = null;
-
-        outWeapon.reloadNormalized = 0f;
-        outWeapon.meleeReloadNormalized = 0f;
-
-        outWeapon.meleeRuntime.reloading = false;
 
         // runtime 不一定要清，但清咗 Inspector 會更直觀
         outWeapon.runtime.bulletsLeft = 0;
@@ -225,16 +179,6 @@ public class AttackManager : MonoBehaviour
         outWeapon.range.bulletSpeed = 0f;
         outWeapon.range.firingMode = 0;
 
-        // melee settings
-        outWeapon.melee.reloadTime = 0f;
-        outWeapon.melee.item = null;
-        outWeapon.melee.weaponObject = null;
-
-        outWeapon.reloadNormalized = 0f;
-        outWeapon.meleeReloadNormalized = 0f;
-
-        outWeapon.meleeRuntime.reloading = false;
-
         // runtime 不一定要清，但清咗 Inspector 會更直觀
         outWeapon.runtime.bulletsLeft = 0;
         outWeapon.runtime.shooting = false;
@@ -242,14 +186,14 @@ public class AttackManager : MonoBehaviour
         outWeapon.runtime.readyToShoot = false;
         outWeapon.runtime.allowInvoke = false;
     }
-    private static void ApplyHand(WeaponStats hand, Weapon outWeapon, ref RangeWeaponInstance cachedSource, ref MeleeWeaponInstance cachedMeleeSource)
+    private static void ApplyHand(WeaponStats hand, Weapon outWeapon, ref RangeWeaponInstance cachedSource)
     {
         if (outWeapon == null) return;
 
         // 沒武器：清空輸出（也可以改成 disable 該手射擊）
         if (hand == null || hand.weaponKind == HandWeaponKind.None || (!hand.HasWeapon))
         {
-            ClearWeaponOutput(outWeapon, ref cachedSource, ref cachedMeleeSource);
+            ClearWeaponOutput(outWeapon, ref cachedSource);
             return;
         }
 
@@ -258,14 +202,13 @@ public class AttackManager : MonoBehaviour
         {
             if (hand.rangeweapon == null)
             {
-                ClearWeaponOutput(outWeapon, ref cachedSource, ref cachedMeleeSource);
+                ClearWeaponOutput(outWeapon, ref cachedSource);
                 return;
             }
 
             // 如果換武器：重置 runtime state（子彈/裝填狀態等）
             bool changedWeapon = cachedSource != hand.rangeweapon;
             cachedSource = hand.rangeweapon;
-            cachedMeleeSource = null;
 
             // 1) 子彈 prefab / muzzle
             var rw = hand.rangeweapon.item as RangeWeapon;
@@ -288,13 +231,6 @@ public class AttackManager : MonoBehaviour
             outWeapon.range.bulletSpeed = hand.GetAttribute(Attributes.BulletSpeed);
             outWeapon.range.firingMode = Mathf.RoundToInt(hand.GetAttribute(Attributes.FiringMode));
 
-            // melee 清空
-            outWeapon.melee.reloadTime = 0f;
-            outWeapon.melee.item = null;
-            outWeapon.melee.weaponObject = null;
-            outWeapon.meleeRuntime.reloading = false;
-            outWeapon.meleeReloadNormalized = 0f;
-
             if (changedWeapon)
             {
                 outWeapon.runtime.bulletsLeft = outWeapon.range.magazineSize;
@@ -306,64 +242,6 @@ public class AttackManager : MonoBehaviour
             }
             return;
         }
-        else if (hand.weaponKind == HandWeaponKind.Melee)
-        {
-            if (hand.meleeWeapon == null)
-            {
-                ClearWeaponOutput(outWeapon, ref cachedSource, ref cachedMeleeSource);
-                return;
-            }
-
-            bool changedMelee = cachedMeleeSource != hand.meleeWeapon;
-            cachedMeleeSource = hand.meleeWeapon;
-            cachedSource = null;
-
-            // range 清空（避免錯用）
-            outWeapon.bullet = null;
-            outWeapon.muzzle = null;
-            outWeapon.range.reloadTime = 0f;
-            outWeapon.range.bulletPerShot = 0;
-            outWeapon.range.roundPerTap = 0;
-            outWeapon.range.timeBetweenShooting = 0f;
-            outWeapon.range.timeBetweenShots = 0f;
-            outWeapon.range.spread = 0f;
-            outWeapon.range.magazineSize = 0;
-            outWeapon.range.bulletSpeed = 0f;
-            outWeapon.range.firingMode = 0;
-            outWeapon.runtime.bulletsLeft = 0;
-            outWeapon.runtime.shooting = false;
-            outWeapon.runtime.reloading = false;
-            outWeapon.runtime.readyToShoot = false;
-            outWeapon.runtime.allowInvoke = false;
-            outWeapon.reloadNormalized = 0f;
-
-            // melee 設定：暫時用 hand 的 ReloadTime 當作近戰 cooldown（可以被裝備/零件 buff）
-            outWeapon.muzzle = hand.meleeWeapon.muzzlePoint;
-            outWeapon.melee.reloadTime = hand.GetAttribute(Attributes.ReloadTime);
-            outWeapon.melee.item = hand.meleeWeapon.item as MeleeWeapon;
-
-            // ✅ 同步近戰傷害（避免 w.damage 是 0 或殘留舊值）
-            float meleeOutput = hand.GetAttribute(Attributes.MeleeOutput);
-            if (meleeOutput <= 0f) meleeOutput = 1f; // 保底：如果你沒給 MeleeOutput 的 base buff
-
-            outWeapon.damage.physicalDamage = hand.GetAttribute(Attributes.PhysicalDamage) * meleeOutput;
-            outWeapon.damage.explosionDamage = hand.GetAttribute(Attributes.ExplosionDamage) * meleeOutput;
-            outWeapon.damage.energyDamage = hand.GetAttribute(Attributes.EnergyDamage) * meleeOutput;
-            outWeapon.damage.coldDamage = hand.GetAttribute(Attributes.ColdDamage) * meleeOutput;
-
-            // weaponObject：MeleeWeaponInstance 目前沒有提供 Transform，這裡保持 null（需要的話之後再接）
-            outWeapon.melee.swordSlashPrefab = (outWeapon.melee.item != null) ? outWeapon.melee.item.swordSlash : null;
-            outWeapon.melee.weaponObject = null;
-
-            if (changedMelee)
-            {
-                outWeapon.meleeRuntime.reloading = false;
-                outWeapon.meleeReloadNormalized = 0f;
-            }
-            return;
-        }
-
-
     }
     private static void ApplyShoulder(ShoulderWeaponStats shoulder, Weapon outWeapon, ref ShoulderWeaponInstance cachedSource)
     {
@@ -408,13 +286,6 @@ public class AttackManager : MonoBehaviour
             outWeapon.range.bulletSpeed = shoulder.GetAttribute(Attributes.BulletSpeed);
             outWeapon.range.firingMode = Mathf.RoundToInt(shoulder.GetAttribute(Attributes.FiringMode));
 
-            // melee 清空
-            outWeapon.melee.reloadTime = 0f;
-            outWeapon.melee.item = null;
-            outWeapon.melee.weaponObject = null;
-            outWeapon.meleeRuntime.reloading = false;
-            outWeapon.meleeReloadNormalized = 0f;
-
             if (changedWeapon)
             {
                 outWeapon.runtime.bulletsLeft = outWeapon.range.magazineSize;
@@ -435,29 +306,17 @@ public class AttackManager : MonoBehaviour
 
         var stats = PlayerStats.Instance;
 
-        bool leftIsMelee = stats != null && stats.leftHand != null
-            && stats.leftHand.weaponKind == HandWeaponKind.Melee
-            && stats.leftHand.meleeWeapon != null;
-
-        bool rightIsMelee = stats != null && stats.rightHand != null
-            && stats.rightHand.weaponKind == HandWeaponKind.Melee
-            && stats.rightHand.meleeWeapon != null;
-
         // Hand fill
-        float leftFill = CalcAmmoBarFill(leftHandWeapon, leftIsMelee);
-        float rightFill = CalcAmmoBarFill(rightHandWeapon, rightIsMelee);
+        float leftFill = CalcAmmoBarFill(leftHandWeapon);
+        float rightFill = CalcAmmoBarFill(rightHandWeapon);
 
-        bool leftReloading = leftIsMelee
-            ? (leftHandWeapon != null && leftHandWeapon.meleeRuntime.reloading)
-            : (leftHandWeapon != null && leftHandWeapon.runtime.reloading);
+        bool leftReloading =  leftHandWeapon != null && leftHandWeapon.runtime.reloading;
 
-        bool rightReloading = rightIsMelee
-            ? (rightHandWeapon != null && rightHandWeapon.meleeRuntime.reloading)
-            : (rightHandWeapon != null && rightHandWeapon.runtime.reloading);
+        bool rightReloading = rightHandWeapon != null && rightHandWeapon.runtime.reloading;
 
         // ✅ Shoulder fill (shoulder is range-only in current design)
-        float leftShoulderFill = CalcAmmoBarFill(leftShoulderWeapon, isMelee: false);
-        float rightShoulderFill = CalcAmmoBarFill(rightShoulderWeapon, isMelee: false);
+        float leftShoulderFill = CalcAmmoBarFill(leftShoulderWeapon);
+        float rightShoulderFill = CalcAmmoBarFill(rightShoulderWeapon);
 
         bool leftShoulderReloading = (leftShoulderWeapon != null && leftShoulderWeapon.runtime.reloading);
         bool rightShoulderReloading = (rightShoulderWeapon != null && rightShoulderWeapon.runtime.reloading);
@@ -469,17 +328,9 @@ public class AttackManager : MonoBehaviour
             rightShoulderFill, rightShoulderReloading);
     }
 
-    private static float CalcAmmoBarFill(Weapon w, bool isMelee)
+    private static float CalcAmmoBarFill(Weapon w)
     {
         if (w == null) return 0f;
-
-        if (isMelee)
-        {
-            // Melee: bar shows cooldown progress (0~1). When not reloading, show full.
-            if (w.meleeRuntime.reloading)
-                return Mathf.Clamp01(w.meleeReloadNormalized);
-            return 1f;
-        }
 
         // Reload mode: fillAmount means reload progress
         if (w.runtime.reloading)
@@ -536,7 +387,7 @@ public class AttackManager : MonoBehaviour
                     playerAnimation.RightWeaponMuzzleFlash();
                 }
 
-                var currentBullet = Instantiate(bulletPrefab, muzzle.position , Quaternion.identity);
+                var currentBullet = Instantiate(bulletPrefab, muzzle.position, Quaternion.identity);
                 var bulletComp = currentBullet.GetComponent<Bullet>();
 
                 bulletComp.attacker = playerRb.gameObject;
@@ -562,6 +413,10 @@ public class AttackManager : MonoBehaviour
 
                 Vector3 movingPlatformOffset = Vector3.zero;
 
+                // Burst（roundPerTap > 1）每一發都改用「當幀最新」的準星 ray；
+                // 原本整個 burst 沿用扣扳機那一刻的舊 ray，相機一轉就會歪。
+                Ray fireRay = (PlayerAiming.Instance != null) ? PlayerAiming.Instance.GetRay() : ray;
+
                 bool constrained = PlayerAiming.Instance.lockOn;
                 if (constrained)
                 {
@@ -575,7 +430,7 @@ public class AttackManager : MonoBehaviour
                     }
                     else
                     {
-                        targetPoint = ray.GetPoint(100f);
+                        targetPoint = fireRay.GetPoint(100f);
                         if (shipRB != null && onShip == true)
                         {
                             movingPlatformOffset = shipRB.linearVelocity;
@@ -584,7 +439,7 @@ public class AttackManager : MonoBehaviour
                 }
                 else
                 {
-                    targetPoint = ray.GetPoint(100f);
+                    targetPoint = fireRay.GetPoint(100f);
                     if (shipRB != null && onShip == true)
                     {
                         movingPlatformOffset = shipRB.linearVelocity;
@@ -608,6 +463,12 @@ public class AttackManager : MonoBehaviour
 
                 Vector3 lateral = right * Mathf.Cos(phi) + up * Mathf.Sin(phi);
                 Vector3 dirWithSpread = dirNoSpread * cosAlpha + lateral * sinAlpha;
+
+                if (debugDrawFireRay)
+                {
+                    Debug.DrawRay(fireRay.origin, fireRay.direction * 100f, Color.yellow, 1f);
+                    Debug.DrawRay(muzzle.position, dirNoSpread * 100f, Color.red, 1f);
+                }
 
                 var rb = currentBullet.GetComponent<Rigidbody>();
                 if (rb) rb.linearVelocity = (dirWithSpread * w.range.bulletSpeed) + movingPlatformOffset;
@@ -633,7 +494,7 @@ public class AttackManager : MonoBehaviour
     {
         if (w == null) return;
         if (w.runtime.reloading) return;
-  
+
         w.runtime.reloading = true;
         w.reloadNormalized = 0f;
         PushAmmoUI();
@@ -677,95 +538,6 @@ public class AttackManager : MonoBehaviour
         w.reloadNormalized = 0f;
     }
 
-    // -------------------------
-    // Melee Reload (Combo End)
-    // -------------------------
-
-    /// <summary>
-    /// Called when a melee combo chain finishes (NOT when it starts).
-    /// This starts the melee reload/cooldown timer for that hand.
-    /// </summary>
-    public void NotifyMeleeComboFinished(bool isLeftHand)
-    {
-        Weapon w = isLeftHand ? leftHandWeapon : rightHandWeapon;
-        if (w == null) return;
-
-        // Only start melee reload if this hand is currently a melee weapon
-        var stats = PlayerStats.Instance;
-        if (stats != null)
-        {
-            var hand = isLeftHand ? stats.leftHand : stats.rightHand;
-            if (hand == null || hand.weaponKind != HandWeaponKind.Melee) return;
-        }
-
-        StartMeleeReload(w, isLeftHand);
-    }
-
-    public void StartMeleeReload(Weapon w, bool isLeftHand)
-    {
-        if (w == null) return;
-        if (w.meleeRuntime == null) w.meleeRuntime = new MeleeWeaponRuntimeState();
-        if (w.meleeRuntime.reloading) return;
-
-        w.meleeRuntime.reloading = true;
-        w.meleeReloadNormalized = 0f;
-        PushAmmoUI();
-
-        if (w.melee.reloadTime <= 0f)
-        {
-            w.meleeReloadNormalized = 1f;
-            PushAmmoUI();
-            FinishMeleeReload(w);
-            PushAmmoUI();
-            return;
-        }
-
-        StartCoroutine(MeleeReloadCoroutine(w, isLeftHand));
-    }
-
-    private IEnumerator MeleeReloadCoroutine(Weapon w, bool isLeftHand)
-    {
-        float elapsed = 0f;
-
-        var stats = PlayerStats.Instance;
-        float baseReload = (w != null) ? w.melee.reloadTime : 0f;
-
-        // ✅ per-hand melee reload time（buff 計算留喺 PlayerStats）
-        float duration = (stats != null)
-            ? Mathf.Max(0.0001f, stats.GetMeleeReloadTimeForHand(isLeftHand, baseReload))
-            : Mathf.Max(0.0001f, baseReload);
-
-
-        // Keep ticking even if timescale changes; melee reload is gameplay, so use scaled time.
-        while (elapsed < duration)
-        {
-            // If weapon got cleared/swapped, bail out safely
-            if (w == null || w.meleeRuntime == null || !w.meleeRuntime.reloading)
-                yield break;
-
-            elapsed += Time.deltaTime;
-            w.meleeReloadNormalized = Mathf.Clamp01(elapsed / duration);
-            PushAmmoUI();
-            yield return null;
-        }
-
-        w.meleeReloadNormalized = 1f;
-        PushAmmoUI();
-
-        FinishMeleeReload(w);
-        PushAmmoUI();
-    }
-
-    private void FinishMeleeReload(Weapon w)
-    {
-        if (w == null) return;
-        if (w.meleeRuntime == null) w.meleeRuntime = new MeleeWeaponRuntimeState();
-
-        w.meleeRuntime.reloading = false;
-        w.meleeReloadNormalized = 0f;
-    }
-
-
     private IEnumerator ResetShotCooldown(Weapon w)
     {
         yield return new WaitForSeconds(w.range.timeBetweenShooting);
@@ -792,54 +564,6 @@ public class AttackManager : MonoBehaviour
         }
     }
 
-    public void AnimEvent_SpawnSwordSlash_Left()
-    {
-        SpawnSwordSlash(leftHandWeapon);
-    }
-
-    public void AnimEvent_SpawnSwordSlash_Right()
-    {
-        SpawnSwordSlash(rightHandWeapon);
-    }
-    private void SpawnSwordSlash(Weapon w)
-    {
-        float baseSlashSpeed = playerRb.linearVelocity.magnitude + 50;
-
-        if (w == null) return;
-
-        var prefab = w.melee.swordSlashPrefab;
-        var origin = w.muzzle;
-        if (prefab == null || origin == null) return;
-
-
-        Quaternion rot = Quaternion.LookRotation(PlayerAiming.Instance.meshTransform.forward, Vector3.up);
-        GameObject slash = Instantiate(prefab, origin.position, rot);
-
-        // ✅ 把近戰武器傷害/暴擊塞進 slash prefab 的 Bullet.cs
-        var bulletComp = slash.GetComponent<Bullet>();
-        if (bulletComp != null)
-        {
-            bulletComp.physicalDamage = w.damage.physicalDamage;
-            bulletComp.explosionDamage = w.damage.explosionDamage;
-            bulletComp.energyDamage = w.damage.energyDamage;
-            bulletComp.coldDamage = w.damage.coldDamage;
-
-            var ps = PlayerStats.Instance;
-            if (ps != null)
-            {
-                bulletComp.criticalChance = ps.criticalChance;
-                bulletComp.criticalMultiplier = ps.criticalMultiplier;
-                bulletComp.SetMeleeImpactOwner(playerAnimation);
-            }
-        }
-
-
-        // ===== 3) 計算 velocity：base + player speed projected =====
-        Rigidbody rb = slash.GetComponent<Rigidbody>();
-        rb.linearVelocity = PlayerAiming.Instance.meshTransform.forward * baseSlashSpeed;
-        slash.transform.rotation = rot;
-
-    }
 
     public void SetOnShip(Rigidbody rb)
     {

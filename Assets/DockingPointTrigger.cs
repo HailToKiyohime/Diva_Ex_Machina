@@ -2,6 +2,7 @@
 
     public class DockingPointTrigger : MonoBehaviour
     {   
+    /*
         [SerializeField] private LandshipNavigation landship;
 
         private void Reset()
@@ -26,5 +27,5 @@
 
             // 登船：_navTarget 切換成真正的戰鬥目標
             path.SetOnShipNav(landship.transform, landship.ghostShip, combatTarget);
-        }
+        }*/
 }

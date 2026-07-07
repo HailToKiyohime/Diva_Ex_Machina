@@ -20,12 +20,14 @@ public class UIManager : MonoBehaviour
     [Header("Combat UI")]
     public TextMeshProUGUI speedText;
     public TextMeshProUGUI distanceText;
+    public TextMeshProUGUI healthText;
     public RectTransform speedInfo;
     public RectTransform distanceInfo;
     public Color lockonColor;
     public Color normalColor;
     public Slider energyBar;
     public Slider healthBar; // 玩家血量條（把 AP Bar 拖進來）
+
 
     [Header("Ammo Bar")]
     public Image leftHandAmmoBar;
@@ -169,6 +171,10 @@ public class UIManager : MonoBehaviour
         float max = Mathf.Max(1f, stats.maxHealth); // 避免 maxHealth = 0 造成除零/異常
         healthBar.maxValue = max;
         healthBar.value = Mathf.Clamp(stats.currentHealth, 0f, max);
+        if (healthText != null)
+        {
+            healthText.text = stats.currentHealth.ToString();
+        }
     }
     public void SwitchToCombatUI()
     {

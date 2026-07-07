@@ -108,8 +108,14 @@ public class PlayerAiming : MonoBehaviour
     // Debug hook (optional)
     private int _autoAimLastWriteFrame = -1;
     public bool IsAutoAimActiveDebug() => _autoAimActive;
+    /// AutoAim 是否進行中（即使目標暫時跑出鎖圈、lockOn 被設為 false 也算）。
+    /// PlayerMovement.RotateCharacter 用它讓角色在圈外仍持續面向準星。
+    public bool IsAutoAimActive => _autoAimActive;
     public bool DidAutoAimWriteThisFrameDebug(int frame) => _autoAimLastWriteFrame == frame;
 
+    // --- Platform (Landship) yaw follow ---
+    private Transform _platform;         // 目前站的移動平台（null = 沒站）
+    private float _platformManualYaw;    // 相對平台的手動 yaw（度）
     private void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
@@ -137,15 +143,35 @@ public class PlayerAiming : MonoBehaviour
 
         float mouseX = Input.GetAxis("Mouse X");
         float mouseY = Input.GetAxis("Mouse Y");
-        if (Mathf.Abs(mouseX) > 0.001f || Mathf.Abs(mouseY) > 0.001f)
+        // pitch（上下）照舊
+        if (Mathf.Abs(mouseY) > 0.001f)
         {
-            turn.x += mouseX;
             turn.y -= mouseY;
-
-            turn.x = ClampAngle(turn.x, float.MinValue, float.MaxValue);
             turn.y = ClampAngle(turn.y, BottomClamp, TopClamp);
+        }
+
+        if (_platform != null)
+        {
+            // 站在平台上：手動 yaw 存「相對平台」的量，
+            // 世界 yaw = 手動 yaw + 平台當前朝向。每幀重建 => 不會累積漂移。
+            if (Mathf.Abs(mouseX) > 0.001f)
+                _platformManualYaw += mouseX;
+
+            turn.x = _platformManualYaw + HeadingOf(_platform.rotation);
 
             if (playerOrientation != null)
+                playerOrientation.transform.rotation = Quaternion.Euler(turn.y, turn.x, 0f);
+        }
+        else
+        {
+            // 沒站平台：維持原本的世界 yaw 累加
+            if (Mathf.Abs(mouseX) > 0.001f)
+            {
+                turn.x += mouseX;
+                turn.x = ClampAngle(turn.x, float.MinValue, float.MaxValue);
+            }
+
+            if ((Mathf.Abs(mouseX) > 0.001f || Mathf.Abs(mouseY) > 0.001f) && playerOrientation != null)
                 playerOrientation.transform.rotation = Quaternion.Euler(turn.y, turn.x, 0f);
         }
 
@@ -191,6 +217,9 @@ public class PlayerAiming : MonoBehaviour
 
         _autoAimOutDistanceTimer = 0f;
         _autoAimOutAreaTimer = 0f;
+        // 若站在平台上，退出 AutoAim 後重新校準，避免鏡頭瞬跳
+        if (_platform != null)
+            _platformManualYaw = Mathf.DeltaAngle(HeadingOf(_platform.rotation), turn.x);
     }
 
     // =========================
@@ -330,28 +359,35 @@ public class PlayerAiming : MonoBehaviour
 
             targetDistance = Vector3.Distance(playerOrientation.transform.position, _lockedTarget.position);
 
-            // LockOnDistance hard drop (but during AutoAim we do NOT scan for a new one)
-            if (!isVisible || targetDistance > lockOnDistance)
+            // LockOnDistance hard drop：只在「非 AutoAim」時立即斷鎖。
+            // AutoAim 期間交給 LateUpdate 的 _autoAimOutDistanceTimer（超距 N 秒才退出），
+            // 這段緩衝期間 ray / 準星 / aimingPoint 仍持續更新，不會凍結在舊方向。
+            if (!_autoAimActive && (!isVisible || targetDistance > lockOnDistance))
             {
                 ClearLock();
-                if (_autoAimActive) return; // don't scan new target during AutoAim
             }
             else
             {
                 Vector3 sp = mainCam.WorldToScreenPoint(_lockedTarget.position);
 
-                // Behind camera: drop lock (but during AutoAim we do NOT scan for a new one)
-                if (sp.z <= 0f)
+                // Behind camera（sp.z <= 0）：WorldToScreenPoint 的座標會左右/上下鏡像。
+                // 非 AutoAim：維持原本行為，直接斷鎖、往下走掃描/free-aim。
+                // AutoAim：不斷鎖也不 return（否則 ray 會凍結）；把 delta 鏡像翻回來、
+                //          視為圈外，讓夾點仍落在目標那一側的圈邊，等相機追上來。
+                bool behindCamera = (sp.z <= 0f);
+                if (behindCamera && !_autoAimActive)
                 {
                     ClearLock();
-                    if (_autoAimActive) return;
+                    // IMPORTANT: do NOT return; allow scanning/free-aim below
                 }
                 else
                 {
                     Vector2 targetScreen = new Vector2(sp.x, sp.y);
                     Vector2 delta = targetScreen - screenCenter;
+                    if (behindCamera)
+                        delta = -delta; // 背後鏡像修正
 
-                    _lockedInsideCircle = (delta.magnitude <= radius + 0.01f);
+                    _lockedInsideCircle = !behindCamera && (delta.magnitude <= radius + 0.01f);
 
                     // AutoAim OFF: no clamp; if outside circle -> drop lock and continue to scan/free-aim
                     if (!_autoAimActive && !_lockedInsideCircle)
@@ -364,7 +400,10 @@ public class PlayerAiming : MonoBehaviour
                         // AutoAim ON: clamp when outside; inside follow target normally
                         Vector2 uiPoint = targetScreen;
                         if (_autoAimActive && !_lockedInsideCircle)
-                            uiPoint = screenCenter + delta.normalized * radius;
+                        {
+                            Vector2 dirOnScreen = (delta.sqrMagnitude > 0.0001f) ? delta.normalized : Vector2.up;
+                            uiPoint = screenCenter + dirOnScreen * radius;
+                        }
 
                         // Circle-outside should look like normal crosshair (gray + no tilt)
                         DriveCrosshairTo(uiPoint, _lockedInsideCircle);
@@ -813,5 +852,34 @@ public class PlayerAiming : MonoBehaviour
             newY,
             newZ
         );
+    }
+
+    // 由 PlayerMovement 的 OnTriggerStay / OnTriggerExit 呼叫
+    public void SetPlatform(Transform platform)
+    {
+        if (platform == _platform) return;
+
+        if (platform != null)
+        {
+            // 進平台：記住當前手動偏移，避免鏡頭瞬間跳
+            // turn.x = manual + heading  =>  manual = turn.x - heading
+            _platformManualYaw = Mathf.DeltaAngle(HeadingOf(platform.rotation), turn.x);
+        }
+
+        _platform = platform;
+    }
+
+    // 把 rotation 的水平朝向（forward 投影到 XZ）換成角度（度）。對 pitch / roll 免疫。
+    private static float HeadingOf(Quaternion rot)
+    {
+        Vector3 f = rot * Vector3.forward;
+        f.y = 0f;
+        if (f.sqrMagnitude < 1e-6f)   // forward 幾乎垂直，改用 right 當參考
+        {
+            f = rot * Vector3.right;
+            f.y = 0f;
+            if (f.sqrMagnitude < 1e-6f) return 0f;
+        }
+        return Mathf.Atan2(f.x, f.z) * Mathf.Rad2Deg;
     }
 }

@@ -59,20 +59,6 @@ public class PlayerMovement : MonoBehaviour
     private bool _prevLockOn;
     private float _aimHoldUntil;
     private Vector3 _lastAimHoldForward = Vector3.forward;
-    [Header("Melee Dash")]
-    [Tooltip("When lock-on: stop dash early if within this distance to aimingPoint.")]
-    [SerializeField] private float meleeDashStopDistance = 1.5f;
-    [Tooltip("Extra time added on top of (distance / dashSpeed) to tolerate tiny stalls.")]
-    [SerializeField] private float meleeDashTimeExtra = 0.08f;
-    [Tooltip("Hard clamp for melee dash timeout.")]
-    [SerializeField] private float meleeDashMaxTimeClamp = 0.6f;
-    [Tooltip("If horizontal speed stays below this for a short time, treat as stuck and end dash.")]
-    [SerializeField] private float meleeDashStuckSpeed = 0.2f;
-    [SerializeField] private float meleeDashStuckTime = 0.10f;
-    [Header("Melee Dash Magnetism (Homing)")]
-    [SerializeField] private float meleeDashHomingStrength = 14f;  // 越大越黏
-    [SerializeField] private float meleeDashHomingMaxTurnDegPerSec = 720f; // 限制轉向，避免瞬拐
-    [SerializeField] private float meleeDashLeadFallbackTime = 0.05f; // solver fail 時用的簡易 lead
 
     [Header("Dust Effect")]
     [SerializeField] private float dustIntervalSlow = 0.4f;   // 慢速：間隔長 = 稀
@@ -81,28 +67,16 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float dustMaxSpeed = 16f;        // 達此速度 = 最密(60km/h≈16.7)
     private float _nextDustTime = 0f;
 
-    // runtime
-    private bool _meleeDashActive = false;
-    private bool _meleeDashIsLeft = true;
-    private float _meleeDashElapsed = 0f;
-    private float _meleeDashTimeout = 0f;
-    private float _meleeDashMaxDistance = 0f;
-    private float _meleeDashStuckElapsed = 0f;
-    private Vector3 _meleeDashStartPos;
-    private Vector3 _meleeDashDir;
-
-    // --- Gravity Lock (for melee attack etc.) ---
-    private int _gravityLockCount = 0;
-    private bool _cachedUseGravity = true;
-
-    [SerializeField] private BoxCollider meleeAttackWall; // A box collider that enables/disables, it is larger than the player collider to prevent enemy from glitching through player during melee attack due to the capsule collider being smaller than the player model and it round shape
-
     public AttackManager attackManager;
     public void Update()
     {
         EnergyRegenerationCheck();
         RotateCharacter();
-        HandleDustEffect(); 
+        HandleDustEffect();
+        if (!grounded)
+        {
+            playerAnimation.StopWalkFeedback();
+        }
         UIManager.Instance.speedText.text = playerRigidbody.linearVelocity.magnitude < 0.0001f ? 0.ToString("F2") : playerRigidbody.linearVelocity.magnitude.ToString("F2");
     }
     public void FixedUpdate()
@@ -111,13 +85,11 @@ public class PlayerMovement : MonoBehaviour
         GroundCheck();
         ApplyHorizontalMovementFixed(Time.fixedDeltaTime);
         ApplyFlyFixed(Time.fixedDeltaTime); // 新增
-        ApplyMeleeDashFixed(Time.fixedDeltaTime); // NEW: melee dash
         ApplyDashFixed(Time.fixedDeltaTime); // 新增
 
     }
     private void ApplyHorizontalMovementFixed(float dt)
     {
-        if (_meleeDashActive || Time.time <= dashActiveUntil) return;
 
         Vector3 platformVel = GetMobilePlatformVelocity();
 
@@ -188,7 +160,6 @@ public class PlayerMovement : MonoBehaviour
         // Dash 動畫播放期間：禁止任何攻擊/射擊（涵蓋左右手、肩武器、近戰）
         if (IsDashAttackBlocked) return;
 
-        // 判斷這次攻擊是遠程還是近戰（不改 PlayerController 的呼叫方式）
         var stats = PlayerStats.Instance;
         bool isLeft = (attackManager != null && w == attackManager.leftHandWeapon);
         bool isRight = (attackManager != null && w == attackManager.rightHandWeapon);
@@ -198,15 +169,13 @@ public class PlayerMovement : MonoBehaviour
 
         if (stats != null && (isLeft || isRight))
         {
-            var hand = isLeft ? stats.leftHand : stats.rightHand;
+            var hand = isLeft ? stats.leftHand : stats.rightHand; 
         }
 
 
 
         bool isSingle = w.range.firingMode == 0;
 
-
-        // 1) 收集「想射擊」意圖（單發需要緩存，否則轉完身就不是 this frame 了）
         if (isSingle)
         {
             if (attackInput.WasPressedThisFrame())
@@ -275,7 +244,9 @@ public class PlayerMovement : MonoBehaviour
         float angle = Vector3.Angle(flatForward, attackDesiredForward);
         bool aligned = angle <= attackAngleThreshold;
 
-        bool timedOut = alignStartTime.TryGetValue(w, out float startT) && (Time.time - startT) >= maxAlignTime;
+        float singleAlignDeadline = Mathf.Min(maxAlignTime, singleShotBufferTime * 0.5f);
+        bool timedOut = alignStartTime.TryGetValue(w, out float startT)
+                        && (Time.time - startT) >= (isSingle ? singleAlignDeadline : maxAlignTime);
 
         if (aligned || timedOut)
         {
@@ -362,209 +333,6 @@ public class PlayerMovement : MonoBehaviour
         return false;
     }
 
-
-
-    // =========================
-    // Melee Dash (DROP-IN FIX)
-    // =========================
-    private void StartMeleeDashAttack(Weapon w, bool isLeftHand)
-    {
-        var stats = PlayerStats.Instance;
-        if (stats == null || playerRigidbody == null) return;
-        if (PlayerAiming.Instance == null) return;
-
-        float maxDist = stats.GetMeleeDashDistanceForHand(isLeftHand);
-        if (maxDist <= 0f) return;
-
-        bool allowVertical = (PlayerAiming.Instance.lockOn && PlayerAiming.Instance.aimingPoint != null);
-
-        Vector3 dir = Vector3.zero;
-
-        // 1) Direction source
-        if (allowVertical)
-        {
-            // --- lock-on: 3D lead/intercept direction ---
-            Vector3 tgtPos = PlayerAiming.Instance.aimingPoint.position;
-            Vector3 tgtVel = Vector3.zero;
-
-            var targetRb = PlayerAiming.Instance.GetTargetRigidbody();
-            if (targetRb != null)
-                tgtVel = targetRb.linearVelocity; // Unity 6
-
-            float chaserSpeed = stats.dashSpeed;
-
-            if (!ProjectileCalculation.InterceptionDirection(tgtPos, transform.position, tgtVel, chaserSpeed, out dir))
-                dir = (tgtPos - transform.position);
-
-            if (dir.sqrMagnitude < 0.0001f)
-                dir = (characterModel != null ? characterModel.forward : transform.forward);
-
-            // Clamp pitch so it doesn't become "vertical rocket"
-            float maxUpAngle = 65f; // tweakable
-            Vector3 flat = new Vector3(dir.x, 0f, dir.z);
-
-            Vector3 baseForward = (flat.sqrMagnitude > 0.0001f)
-                ? flat.normalized
-                : (characterModel != null ? characterModel.forward : transform.forward);
-
-            dir = Vector3.RotateTowards(baseForward, dir.normalized, maxUpAngle * Mathf.Deg2Rad, 0f);
-            dir.Normalize();
-        }
-        else
-        {
-            // --- free aim: keep your original horizontal feel ---
-            Ray ray = PlayerAiming.Instance.GetRay();
-
-            if (Physics.Raycast(ray, out RaycastHit hit, maxDist))
-                maxDist = Mathf.Min(hit.distance, maxDist);
-
-            dir = ray.direction;
-            dir.y = 0f;
-
-            if (dir.sqrMagnitude < 0.0001f)
-                dir = (characterModel != null ? characterModel.forward : transform.forward);
-            else
-                dir.Normalize();
-        }
-
-        // Only flatten when not lock-on
-        if (!allowVertical)
-            dir.y = 0f;
-
-        if (dir.sqrMagnitude < 0.0001f) return;
-        dir.Normalize();
-
-        // Visual facing: still rotate only on XZ (prevents weird model tilt)
-        if (characterModel != null)
-        {
-            Vector3 f = dir; f.y = 0f;
-            if (f.sqrMagnitude > 0.0001f)
-                characterModel.forward = f.normalized;
-        }
-
-        // 2) Setup runtime
-        _meleeDashActive = true;
-        _meleeDashIsLeft = isLeftHand;
-        _meleeDashElapsed = 0f;
-        _meleeDashStuckElapsed = 0f;
-        _meleeDashStartPos = transform.position;
-        _meleeDashDir = dir;
-        _meleeDashMaxDistance = maxDist;
-
-        // 3) Reuse dash feel (accel)
-        Vector3 platformVel = GetMobilePlatformVelocity();
-        Vector3 vWorld = playerRigidbody.linearVelocity;
-        Vector3 vRel = vWorld - platformVel;
-
-        dashDir = dir;
-        dashTargetSpeed = stats.dashSpeed;
-
-        // Use full velocity projection (works for both 2D and 3D dash)
-        float vParallelRel = Vector3.Dot(vRel, dashDir);
-        float deltaVStart = Mathf.Max(0f, dashTargetSpeed - vParallelRel);
-
-        float dur = Mathf.Max(0.02f, dashDuration);
-        dashAccel = deltaVStart / dur;
-
-        // 4) Timeout
-        float est = (dashTargetSpeed > 0.01f) ? (maxDist / dashTargetSpeed) : 0.2f;
-        _meleeDashTimeout = Mathf.Clamp(est + meleeDashTimeExtra, 0.15f, meleeDashMaxTimeClamp);
-    }
-
-    private void ApplyMeleeDashFixed(float dt)
-    {
-        if (!_meleeDashActive) return;
-        if (playerRigidbody == null) return;
-
-        _meleeDashElapsed += dt;
-
-        float traveled = Vector3.Distance(_meleeDashStartPos, transform.position);
-        bool stop = traveled >= _meleeDashMaxDistance;
-
-        if (!stop && PlayerAiming.Instance != null && PlayerAiming.Instance.lockOn && PlayerAiming.Instance.aimingPoint != null)
-        {
-            float d = Vector3.Distance(transform.position, PlayerAiming.Instance.aimingPoint.position);
-            if (d <= meleeDashStopDistance) stop = true;
-        }
-
-        if (!stop && _meleeDashElapsed >= _meleeDashTimeout) stop = true;
-
-        Vector3 platformVel = GetMobilePlatformVelocity();
-        Vector3 vWorld = playerRigidbody.linearVelocity;
-        Vector3 vRel = vWorld - platformVel;
-
-        float alongSpeedRel = Mathf.Abs(Vector3.Dot(vRel, dashDir));
-        if (alongSpeedRel <= meleeDashStuckSpeed) _meleeDashStuckElapsed += dt;
-        else _meleeDashStuckElapsed = 0f;
-
-        if (!stop && _meleeDashStuckElapsed >= meleeDashStuckTime) stop = true;
-
-        if (stop)
-        {
-            EndMeleeDashAndFireHit1();
-            return;
-        }
-
-        float vParallelRel = Vector3.Dot(vRel, dashDir);
-        if (vParallelRel >= dashTargetSpeed) return;
-
-        if (PlayerAiming.Instance != null &&
-            PlayerAiming.Instance.lockOn &&
-            PlayerAiming.Instance.aimingPoint != null)
-        {
-            Vector3 tgtPos = PlayerAiming.Instance.aimingPoint.position;
-
-            Vector3 tgtVel = Vector3.zero;
-            var targetRb = PlayerAiming.Instance.GetTargetRigidbody();
-            if (targetRb != null) tgtVel = targetRb.linearVelocity;
-
-            Vector3 interceptPoint;
-            bool ok = ProjectileCalculation.InterceptionPoint(
-                tgtPos,
-                transform.position,
-                tgtVel,
-                dashTargetSpeed > 0.01f ? dashTargetSpeed : PlayerStats.Instance.dashSpeed,
-                out interceptPoint
-            );
-
-            Vector3 desiredDir;
-            if (ok) desiredDir = (interceptPoint - transform.position);
-            else
-            {
-                Vector3 pred = tgtPos + tgtVel * meleeDashLeadFallbackTime;
-                desiredDir = (pred - transform.position);
-            }
-
-            if (desiredDir.sqrMagnitude > 0.0001f)
-            {
-                desiredDir.Normalize();
-
-                float maxRad = meleeDashHomingMaxTurnDegPerSec * Mathf.Deg2Rad * dt;
-                Vector3 limited = Vector3.RotateTowards(_meleeDashDir, desiredDir, maxRad, 0f);
-
-                _meleeDashDir = Vector3.Slerp(_meleeDashDir, limited, meleeDashHomingStrength * dt);
-                _meleeDashDir.Normalize();
-
-                dashDir = _meleeDashDir;
-            }
-        }
-
-        playerRigidbody.AddForce(dashDir * dashAccel, ForceMode.Acceleration);
-    }
-
-    private void EndMeleeDashAndFireHit1()
-    {
-        if (!_meleeDashActive) return;
-        _meleeDashActive = false;
-        attackFacingActive = false;
-
-        Vector3 platformVel = GetMobilePlatformVelocity();
-        Vector3 vWorld = playerRigidbody.linearVelocity;
-        Vector3 vRel = vWorld - platformVel;
-
-        Vector3 hvRel = new Vector3(vRel.x, 0f, vRel.z) * 0.5f;
-        playerRigidbody.linearVelocity = new Vector3(hvRel.x, vRel.y, hvRel.z) + platformVel;
-    }
     private void ApplyDashFixed(float dt)
     {
         if (Time.time > dashRequestUntil) return;
@@ -832,8 +600,6 @@ public class PlayerMovement : MonoBehaviour
     public bool IsDashActive => Time.time <= dashActiveUntil;
     public bool IsDashAttackBlocked => Time.time <= dashAttackLockUntil;
 
-    public bool IsMeleeDashActive => _meleeDashActive;
-
     // 玩家相對「腳下平台」的水平速度。沒站平台 => 等於世界速度；站在移動的船上不動 => ≈0
     
     public float HorizontalSpeedRelativeToPlatform
@@ -855,52 +621,9 @@ public class PlayerMovement : MonoBehaviour
             return playerRigidbody.linearVelocity.y;
         }
     }
-    private bool IsMeleeHandAttack(AttackManager attackManager, Weapon w)
-    {
-        var stats = PlayerStats.Instance;
-        if (stats == null || attackManager == null || w == null) return false;
-
-        // 只針對左右手；肩膀目前你的資料結構係 Range only
-        if (w == attackManager.leftHandWeapon) return stats.leftHand.weaponKind == HandWeaponKind.Melee;
-        if (w == attackManager.rightHandWeapon) return stats.rightHand.weaponKind == HandWeaponKind.Melee;
-
-        return false;
-    }
-
-    public void LockGravity()
-    {
-        if (playerRigidbody == null) return;
-
-        if (_gravityLockCount == 0)
-        {
-            _cachedUseGravity = playerRigidbody.useGravity;
-            playerRigidbody.useGravity = false;   // ✅ gravity = 0
-        }
-
-        _gravityLockCount++;
-    }
-
-    public void UnlockGravity()
-    {
-        if (playerRigidbody == null) return;
-
-        _gravityLockCount = Mathf.Max(0, _gravityLockCount - 1);
-
-        if (_gravityLockCount == 0)
-        {
-            playerRigidbody.useGravity = _cachedUseGravity; // ✅ restore
-        }
-    }
     public void OnCollisionEnter(Collision collision)
     {
         Debug.Log("Hit: " + collision.gameObject + ",tag:" + collision.gameObject.tag + ", linearVelocity: "+ playerRigidbody.linearVelocity.magnitude);
-        /*
-        if (collision.gameObject.tag == "Enemy" && playerRigidbody.linearVelocity.magnitude > 5f)
-        {
-            Debug.Log("Weeeeeeeee");
-            playerAnimation.MeleeAttackFeedback.PlayFeedbacks(this.transform.position);
-        }
-        */
     }
     // Mobile Platform carry (velocity-based)
     private bool _onMobilePlatform = false;
@@ -929,6 +652,9 @@ public class PlayerMovement : MonoBehaviour
         _onMobilePlatform = true;
         playerAnimation.SetSimulationSpaceLandship();
         attackManager.SetOnShip(rb);
+
+        if (PlayerAiming.Instance != null)
+            PlayerAiming.Instance.SetPlatform(_mobilePlatformTf);   // 讓鏡頭跟船的朝向
     }
     public void OnTriggerExit(Collider other)
     {
@@ -940,6 +666,9 @@ public class PlayerMovement : MonoBehaviour
         _mobilePlatformRotInit = false;
         playerAnimation.SetSimulationSpaceWorld();
         attackManager.SetOffShip();
+
+        if (PlayerAiming.Instance != null)
+            PlayerAiming.Instance.SetPlatform(null);
     }
 
     private Vector3 GetMobilePlatformVelocity()
@@ -980,6 +709,7 @@ public class PlayerMovement : MonoBehaviour
             if (Mathf.Abs(yaw) > 0.0001f)
             {
                 characterModel.Rotate(0f, yaw, 0f, Space.World);
+
             }
         }
 

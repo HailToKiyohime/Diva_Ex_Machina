@@ -1,14 +1,14 @@
 ﻿using UnityEngine;
 using UnityEngine.AI;
 using System.Collections.Generic;
-
+/*
 public enum EnemyState
 {
     Idle,
     Chasing,
     Attacking,
 }
-
+*/
 [System.Serializable]
 public class TargetPriority
 {
@@ -23,6 +23,7 @@ public class TargetPriority
 
 public class EnemyBrain : MonoBehaviour
 {
+    /*
     public List<TargetPriority> targetList = new List<TargetPriority>();
 
     public Vector3 spwanLocation;
@@ -470,5 +471,5 @@ public class EnemyBrain : MonoBehaviour
             pathFinder.FindPath();
             _nextAllowedRepathTime = 0f;
         }
-    }
+    }*/
 }

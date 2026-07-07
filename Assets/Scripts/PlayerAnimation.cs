@@ -670,20 +670,6 @@ public class PlayerAnimation : MonoBehaviour
     }
 
 
-    // ===== Animation Events =====
-    // 左手攻擊動畫 clip 的 Animation Event 直接叫呢個
-    public void AnimEvent_SpawnSwordSlash_Left()
-    {
-        if (attackManager == null) return;
-        attackManager.AnimEvent_SpawnSwordSlash_Left();
-    }
-
-    // 右手攻擊動畫 clip 的 Animation Event 直接叫呢個
-    public void AnimEvent_SpawnSwordSlash_Right()
-    {
-        if (attackManager == null) return;
-        attackManager.AnimEvent_SpawnSwordSlash_Right();
-    }
     public void OnCollisionEnter(Collision collision)
     {
         Debug.Log("Hit:" + collision.gameObject);
@@ -731,8 +717,13 @@ public class PlayerAnimation : MonoBehaviour
             rightMuzzleMain.simulationSpace = ParticleSystemSimulationSpace.World;
         }
     }
+
     public void PlayWalkFeedback()
     {
         walkFeedback?.PlayFeedbacks(this.transform.position);
+    }
+    public void StopWalkFeedback()
+    {
+        walkFeedback?.StopFeedbacks();
     }
 }

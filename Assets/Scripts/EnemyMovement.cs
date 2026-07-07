@@ -3,6 +3,7 @@ using UnityEngine.EventSystems;
 
 public class EnemyMovement : MonoBehaviour
 {
+    /*
     private EnemyStats stats;
     [SerializeField] private Vector3 moveDirection = new Vector3(0, 0, 0);
 
@@ -147,5 +148,5 @@ public class EnemyMovement : MonoBehaviour
     {
         if (!_onMobilePlatform || _mobilePlatformRb == null) return Vector3.zero;
         return _mobilePlatformRb.linearVelocity; // Unity 6
-    }
+    }*/
 }

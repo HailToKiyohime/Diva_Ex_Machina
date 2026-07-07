@@ -92,6 +92,7 @@ public class EnemyStats : MonoBehaviour, IDamageable
 
     private void AddAggro(GameObject attacker, float amountOfDamage)
     {
+        /*
         if (attacker == null || enemyBrain == null) return;
 
         TargetPriority existing = enemyBrain.targetList
@@ -118,7 +119,7 @@ public class EnemyStats : MonoBehaviour, IDamageable
                 damageCauseByTarget = amountOfDamage,
                 damageAggro = Mathf.FloorToInt(amountOfDamage / threshold)
             });
-        }
+        }*/
     }
 
     public float GetDefenseMultiplier(float defenseValue)
