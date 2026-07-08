@@ -7,7 +7,6 @@ public class PathFinder : MonoBehaviour
     public bool isTargetOnShip = false;
     public bool isOnShip = false;
     private NavMeshPath path;
-    public Vector3[] pathArray;
 
     [SerializeField] private Transform realShipRoot;
     [SerializeField] private Transform ghostShipRoot;
@@ -15,8 +14,8 @@ public class PathFinder : MonoBehaviour
     void Start()
     {
         path = new NavMeshPath();
-        pathArray = System.Array.Empty<Vector3>();   // 避免還沒算過就回 null
     }
+
     public Vector3[] FindPath(Vector3 targetLocation)
     {
         if (isOnShip && isTargetOnShip)// if both side on ship, convert gobal coordinates to ship local coordinates
@@ -104,7 +103,6 @@ public class PathFinder : MonoBehaviour
         if (path.status == NavMeshPathStatus.PathInvalid || path.corners.Length == 0)
             return System.Array.Empty<Vector3>();
 
-        pathArray = path.corners;
-        return pathArray;
+        return path.corners;
     }
 }

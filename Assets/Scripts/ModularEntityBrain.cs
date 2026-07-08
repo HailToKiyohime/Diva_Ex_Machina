@@ -47,10 +47,13 @@ public class TargerPreference
 
 public class ModularEntityBrain : MonoBehaviour
 {
+    private PathFinder pathFinder;
+
     public EnemyState currentState;
     public List<TargerPreference> targetPreferences = new List<TargerPreference>();
     public List<Target> targets = new List<Target>();
 
+    protected Vector3[] path;
     public Vector3 nextWaypoint;
     public Vector3 destination;
     public Vector3 spawnLocation;
@@ -75,14 +78,16 @@ public class ModularEntityBrain : MonoBehaviour
     public float reactionCoolDown = 3f;
     public float reactionChance = 0.5f;
 
-    private float destinationTimer;   // ³æ¤@­p®É¾¹¡A­Ë¼Æ¨ì 0 ´N§ó·s destination
+    private float destinationTimer;  
 
-    // Runtime lookup cache¡G§â targetPreferences Åu¥­¦¨ type -> decrease multiplier
-    // lookup ±q­ì¥»¨C­Ó target ³£­n¶]¤@½ü¤º¼h loop (O(n*m)) ÅÜ¦¨ O(1)
     private readonly Dictionary<TargetType, float> decayMultiplierByType = new Dictionary<TargetType, float>();
+
+    [SerializeField] private float waypointArriveRadius = 1.5f;
+    private int currentWaypointIndex = 0;
 
     public void Start()
     {
+        pathFinder = gameObject.GetComponent<PathFinder>();
         currentState = EnemyState.Idle;
         RebuildPreferenceCache();
     }
@@ -90,7 +95,8 @@ public class ModularEntityBrain : MonoBehaviour
     public void FixedUpdate()
     {
         PriorityUpdate();
-        StateUpdate();
+        PathUpdate();
+        StateBehaviour();
     }
 
     protected void PriorityUpdate()
@@ -98,12 +104,10 @@ public class ModularEntityBrain : MonoBehaviour
         float dt = Time.fixedDeltaTime;
         if (targets.Count > 1)
         {
-            // ­Ë§Ç¡GRemoveAt ®É¤£·|¼vÅTÁÙ¨S³B²z¨ìªº¸û¤p index
             for (int x = targets.Count - 1; x >= 0; x--)
             {
                 Target t = targets[x];
 
-                // §ä¤£¨ì¹ïÀ³ preference ®É multiplier ºû«ù 1¡]µ¥¦P­ì¥»ªº else ¤À¤ä¡^
                 float typeMultiplier = 1f;
                 if (decayMultiplierByType.TryGetValue(t.type, out float found))
                     typeMultiplier = found;
@@ -115,46 +119,72 @@ public class ModularEntityBrain : MonoBehaviour
             }
         }
     }
-
-    // ¥u­n¦b runtime ¥Îµ{¦¡§ï¹L targetPreferences¡A´N©I¥s³o­Ó­««Ø cache
-    // ¥u¦b Inspector ³]©w¡Bplay «e©T©wªº¸Ü¡AStart ¶]¤@¦¸´N°÷
     protected void RebuildPreferenceCache()
     {
         decayMultiplierByType.Clear();
         for (int i = 0; i < targetPreferences.Count; i++)
         {
-            // ¥Î indexer ¦Ó«D Add¡G¦P type ­«½Æ®É¡u«á­±»\«e­±¡v¡A¸ò­ì¥» loop ¦æ¬°¤@­P
             decayMultiplierByType[targetPreferences[i].targetType] = targetPreferences[i].priorityDecreaseMultiplier;
         }
     }
 
-    protected void StateUpdate()
+    protected void StateBehaviour()
     {
-        destinationTimer -= Time.fixedDeltaTime;
-        if (destinationTimer > 0f) return;   // ÁÙ¨S¨ì®É¶¡¡A¤°»ò³£¤£°µ
-
-        // ®É¶¡¨ì¡G°õ¦æ¡u·í«e state¡vªº behaviour¡A¨Ã¥Î¡u·í«e state ªº range¡v­« roll ¤U¤@¦¸¶¡¹j
         switch (currentState)
         {
             case EnemyState.Idle:
                 IdleBehaviour();
-                destinationTimer = RollInterval(idleDestinationUpdateRange);
                 break;
             case EnemyState.Patrolling:
                 PatrollingBehaviour();
-                destinationTimer = RollInterval(patrolDestinationUpdateRange);
                 break;
             case EnemyState.Retreat:
                 RetreatBehaviour();
-                destinationTimer = RollInterval(retreatDestinationUpdateRange);
                 break;
             case EnemyState.Chasing:
                 ChasingBehaviour();
-                destinationTimer = RollInterval(chaseDestinationUpdateRange);
                 break;
             case EnemyState.Combat:
                 CombatBehaviour();
+                break;
+        }
+    }
+
+    protected void PathUpdate()
+    {
+        destinationTimer -= Time.fixedDeltaTime;
+        if (destinationTimer > 0f) return;
+
+        Vector2 r;
+        switch (currentState)
+        {
+            case EnemyState.Idle:
+                destinationTimer = RollInterval(idleDestinationUpdateRange);
+                r = Random.insideUnitCircle * idleActivityAreaRadius;
+                destination = spawnLocation + new Vector3(r.x, 0f, r.y);
+                path = pathFinder.FindPath(destination);
+                break;
+            case EnemyState.Patrolling:
+                destinationTimer = RollInterval(patrolDestinationUpdateRange);
+                r = Random.insideUnitCircle * patrolActivityAreaRadius;
+                destination = spawnLocation + new Vector3(r.x, 0f, r.y);
+                path = pathFinder.FindPath(destination);
+                break;
+            case EnemyState.Retreat:
+                destinationTimer = RollInterval(retreatDestinationUpdateRange);
+                destination = spawnLocation;
+                path = pathFinder.FindPath(destination);
+                break;
+            case EnemyState.Chasing:
+                destinationTimer = RollInterval(chaseDestinationUpdateRange);
+                destination = FindTarget().position;
+                path = pathFinder.FindPath(destination);
+                break;
+            case EnemyState.Combat:
                 destinationTimer = RollInterval(combatDestinationUpdateRange);
+                r = Random.insideUnitCircle * combatActivityAreaRadius;
+                destination = spawnLocation + new Vector3(r.x, 0f, r.y);
+                path = pathFinder.FindPath(destination);
                 break;
         }
     }
@@ -171,19 +201,34 @@ public class ModularEntityBrain : MonoBehaviour
         return bestTarget.targetTransform;
     }
 
+    public Vector3 FindNextWaypoint()
+    {
+        if (path == null || path.Length == 0)
+            return transform.position;
+
+        // path å¯èƒ½æ›éã€è®ŠçŸ­ï¼Œå¤¾ä½é¿å…è¶Šç•Œ
+        if (currentWaypointIndex > path.Length - 1)
+            currentWaypointIndex = path.Length - 1;
+
+        // å·²ç¶“æŠµé”çš„ corner å°±å¾€å‰æ¨é€²ï¼›åˆ°æœ€å¾Œä¸€å€‹å°±åœåœ¨é‚£ï¼Œä¸å† +1ï¼ˆè‡ªç„¶ä¸æœƒè¶Šç•Œï¼‰
+        while (currentWaypointIndex < path.Length - 1 &&
+               Vector3.Distance(transform.position, path[currentWaypointIndex]) < waypointArriveRadius)
+        {
+            currentWaypointIndex++;
+        }
+
+        return path[currentWaypointIndex];
+    }
+
     private float RollInterval(Vector2 range){ 
         return Random.Range(range.x, range.y); 
     }
     protected void IdleBehaviour()
     {
-        Vector2 r = Random.insideUnitCircle * idleActivityAreaRadius;
-        destination = spawnLocation + new Vector3(r.x, 0f, r.y);
     }
 
     protected void PatrollingBehaviour()
     {
-        Vector2 r = Random.insideUnitCircle * patrolActivityAreaRadius;
-        destination = spawnLocation + new Vector3(r.x, 0f, r.y);
     }
 
     protected void RetreatBehaviour()
@@ -198,14 +243,12 @@ public class ModularEntityBrain : MonoBehaviour
 
     protected void CombatBehaviour()
     {
-        Vector3 r = Random.insideUnitCircle * combatActivityAreaRadius;
-        destination = spawnLocation + new Vector3(r.x, 0f, r.y);
 
     }
     public void ChangeState(EnemyState next)
     {
         currentState = next;
-        destinationTimer = 0f;   // ¤U¤@¦¸ StateUpdate ¥ß¨èÄ²µo¡A°¨¤W¬D·s destination
+        destinationTimer = 0f;  
     }
 
 }
