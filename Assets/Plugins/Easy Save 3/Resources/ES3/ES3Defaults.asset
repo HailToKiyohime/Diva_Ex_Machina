@@ -41,6 +41,8 @@ MonoBehaviour:
     - Lofelt.NiceVibrations
     - Lofelt.NiceVibrations.Demo
     - MoreMountains.Tools
+    - NaughtyAttributes.Core
+    - NaughtyAttributes.Test
     - PotaToon.Runtime
     showAdvancedSettings: 0
   addMgrToSceneAutomatically: 0
