@@ -548,7 +548,6 @@ public class PlayerMovement : MonoBehaviour
         float targetX = localMove.x; // 左右
         float targetY = localMove.z; // 前後
 
-        // 根據輸入大小決定目標長度（0~1），這樣可以有快走/慢走的過渡（如果主人之後要加）
         float targetMagnitude = Mathf.Clamp01(new Vector2(targetX, targetY).magnitude);
         if (targetMagnitude < 0.001f)
         {
@@ -556,11 +555,9 @@ public class PlayerMovement : MonoBehaviour
             targetY = 0f;
         }
 
-        // 平滑左右 / 前後輸入
         animX = Mathf.MoveTowards(animX, targetX, movementBlendSpeed * Time.deltaTime);
         animY = Mathf.MoveTowards(animY, targetY, movementBlendSpeed * Time.deltaTime);
 
-        // 統一送進動畫：animX = 左右，animY = 前後
         playerAnimation.SetMovementParameters(animX, animY);
     }
     private void StartAimHold(float seconds)
@@ -569,7 +566,6 @@ public class PlayerMovement : MonoBehaviour
         _aimHoldUntil = Mathf.Max(_aimHoldUntil, Time.time + seconds);
     }
 
-    // 取得「準星/鎖定」在水平面的目標朝向（跟你射擊對準算法一致）
     private bool TryGetAimForwardFlat(out Vector3 flatForward)
     {
         flatForward = Vector3.zero;
@@ -594,7 +590,6 @@ public class PlayerMovement : MonoBehaviour
     // ---- Thruster VFX state (read-only) ----
     public bool IsGrounded => grounded;
 
-    // 你原本的飛行判定就是靠 flyRequestUntil buffer，這裡沿用同一條準則
     public bool IsFlyingActive => !grounded && Time.time <= flyRequestUntil;
 
     public bool IsDashActive => Time.time <= dashActiveUntil;
