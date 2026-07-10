@@ -1,6 +1,8 @@
-using UnityEngine;
-using System.Collections.Generic;
 using NaughtyAttributes;
+using NUnit.Framework;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.EventSystems;
 
 [System.Serializable]
 public enum EntityState
@@ -188,7 +190,7 @@ public class ModularEntityBrain : MonoBehaviour
             case EntityState.Combat:
                 destinationTimer = RollInterval(combatDestinationUpdateRange);
                 r = Random.insideUnitCircle * combatActivityAreaRadius;
-                destination = spawnLocation + new Vector3(r.x, 0f, r.y);
+                destination = FindTarget().position + new Vector3(r.x, 0f, r.y);
                 SetPath(pathFinder.FindPath(destination));
                 break;
         }
@@ -263,14 +265,24 @@ public class ModularEntityBrain : MonoBehaviour
     {
         if (path == null || path.Length == 0) return;
         Vector3 nextWaypoint = FindNextWaypoint();
+        Vector3 moveDirection = nextWaypoint - transform.position;
+        moveDirection.y = 0f;
+        float dist = moveDirection.magnitude;
         if (currentWaypointIndex == path.Length - 1 && Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
         {
             destinationTimer = 0f;
         }
         else
         {
-            Vector3 moveDirection = nextWaypoint - transform.position;
-            modularEntityMovement.HorizontalMovement(moveDirection.x, moveDirection.z);
+            float throttle = Mathf.Clamp01(dist / slowDownRadius);
+            Vector3 dir = moveDirection / dist * throttle;
+
+            float signedAngle = Vector3.SignedAngle(modularEntityMovement.MeshForward, moveDirection, Vector3.up);
+            if (Mathf.Abs(signedAngle) < 60)
+            {
+                modularEntityMovement.HorizontalMovement(dir.x, dir.z);
+            }
+            FaceMoveDirection(moveDirection);
         }
     }
 
@@ -278,14 +290,20 @@ public class ModularEntityBrain : MonoBehaviour
     {
         if (path == null || path.Length == 0) return;
         Vector3 nextWaypoint = FindNextWaypoint();
+        Vector3 moveDirection = nextWaypoint - transform.position;
+        moveDirection.y = 0f;
         if (currentWaypointIndex == path.Length - 1 && Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
         {
             ChangeState(EntityState.Patrolling);
         }
         else
         {
-            Vector3 moveDirection = nextWaypoint - transform.position;
-            modularEntityMovement.HorizontalMovement(moveDirection.x, moveDirection.z);
+            float signedAngle = Vector3.SignedAngle(modularEntityMovement.MeshForward, moveDirection, Vector3.up);
+            if (Mathf.Abs(signedAngle) < 120)
+            {
+                modularEntityMovement.HorizontalMovement(moveDirection.x, moveDirection.z);
+            }
+            FaceMoveDirection(moveDirection);
         }
     }
 
@@ -293,14 +311,23 @@ public class ModularEntityBrain : MonoBehaviour
     {
         if (path == null || path.Length == 0) return;
         Vector3 nextWaypoint = FindNextWaypoint();
+        Vector3 moveDirection = nextWaypoint - transform.position;
+        moveDirection.y = 0f;
         if (Vector3.Distance(transform.position, FindTarget().position) < combatActivityAreaRadius/2)
         {
             ChangeState(EntityState.Combat);
+        }else if (currentWaypointIndex == path.Length - 1 && Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
+        {
+            ChangeState(EntityState.Chasing);
         }
         else
         {
-            Vector3 moveDirection = nextWaypoint - transform.position;
-            modularEntityMovement.HorizontalMovement(moveDirection.x, moveDirection.z);
+            float signedAngle = Vector3.SignedAngle(modularEntityMovement.MeshForward, moveDirection, Vector3.up);
+            if (Mathf.Abs(signedAngle) < 120)
+            {
+                modularEntityMovement.HorizontalMovement(moveDirection.x, moveDirection.z);
+            }
+            FaceMoveDirection(moveDirection);
         }
     }
 
@@ -308,14 +335,20 @@ public class ModularEntityBrain : MonoBehaviour
     {
         if (path == null || path.Length == 0) return;
         Vector3 nextWaypoint = FindNextWaypoint();
-        if (Vector3.Distance(transform.position, nextWaypoint) < combatActivityAreaRadius / 2)
+        Vector3 moveDirection = nextWaypoint - transform.position;
+        moveDirection.y = 0f;
+        if (currentWaypointIndex == path.Length - 1 && Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
         {
-            destinationTimer = 0f;
+            ChangeState(EntityState.Combat);
         }
         else
         {
-            Vector3 moveDirection = nextWaypoint - transform.position;
-            modularEntityMovement.HorizontalMovement(moveDirection.x, moveDirection.z);
+            float signedAngle = Vector3.SignedAngle(modularEntityMovement.MeshForward, moveDirection, Vector3.up);
+            if (Mathf.Abs(signedAngle) < 160)
+            {
+                modularEntityMovement.HorizontalMovement(moveDirection.x, moveDirection.z);
+            }
+            FaceMoveDirection(moveDirection);
         }
     }
     public void ChangeState(EntityState next)
