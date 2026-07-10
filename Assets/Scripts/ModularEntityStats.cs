@@ -14,6 +14,8 @@ public class ModularEntityStats : MonoBehaviour, IDamageable
     public float sprintSpeed;
     public float accelerationSpeed;
     public float decelerationSpeed;
+
+    public float rotationSpeed;
     // Optional events
     public event Action OnDeath;
 

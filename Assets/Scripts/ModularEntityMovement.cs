@@ -9,6 +9,7 @@ public class ModularEntityMovement : MonoBehaviour
     [SerializeField] private ModularEntityStats modularEntityStats;
 
     [SerializeField] private Transform entityOrientation;
+    [SerializeField] private Transform entityMesh;
     private Vector3 moveDirection = new Vector3(0, 0, 0);
 
     [Header("Jump Setting")]
@@ -66,7 +67,7 @@ public class ModularEntityMovement : MonoBehaviour
 
         if (moveDirection.sqrMagnitude < 0.0001f)
             moveDirection = Vector3.zero;
-        else
+        else if (moveDirection.sqrMagnitude > 1f)
             moveDirection.Normalize();
     }
     public void VerticalMovement()
@@ -120,6 +121,14 @@ public class ModularEntityMovement : MonoBehaviour
         return _mobilePlatformRb.linearVelocity; // Unity 6
     }
 
+    public void RotateMesh(float direction, float maxDegrees = -1f)
+    {
+        if (direction == 0f) return;
+        float step = modularEntityStats.rotationSpeed * Time.fixedDeltaTime;
+        if (maxDegrees >= 0f) step = Mathf.Min(step, maxDegrees);   // 不超過剩餘角度 → 不過頭
+        entityMesh.Rotate(Vector3.up, direction * step);
+    }
+
     public void OnTriggerStay(Collider other)
     {
         if (!other.CompareTag("Mobile Platform")) return;
@@ -137,5 +146,15 @@ public class ModularEntityMovement : MonoBehaviour
         }
 
         _onMobilePlatform = true;
+    }
+
+    public Vector3 MeshForward
+    {
+        get
+        {
+            Vector3 f = entityMesh.forward;
+            f.y = 0f;
+            return f.sqrMagnitude > 0.0001f ? f.normalized : entityMesh.forward;
+        }
     }
 }

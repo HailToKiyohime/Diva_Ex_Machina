@@ -85,8 +85,10 @@ public class ModularEntityBrain : MonoBehaviour
     private readonly Dictionary<TargetType, float> decayMultiplierByType = new Dictionary<TargetType, float>();
 
     [SerializeField] private float waypointArriveRadius = 5f;
+    [SerializeField] private float slowDownRadius = 6f;
     private int currentWaypointIndex = 0;
 
+    [SerializeField] private float facingDeadzone = 1f;   // 角度誤差小於此就不轉，避免抖動
     public void Start()
     {
         spawnLocation = transform.position;
@@ -219,7 +221,7 @@ public class ModularEntityBrain : MonoBehaviour
 
         // 已經抵達的 corner 就往前推進；到最後一個就停在那，不再 +1（自然不會越界）
         while (currentWaypointIndex < path.Length - 1 &&
-               Vector3.Distance(transform.position, path[currentWaypointIndex]) < waypointArriveRadius)
+               Vector2.Distance(new Vector2(transform.position.x, transform.position.z), new Vector2(path[currentWaypointIndex].x, path[currentWaypointIndex].z)) < waypointArriveRadius)
         {
             currentWaypointIndex++;
         }
@@ -234,14 +236,25 @@ public class ModularEntityBrain : MonoBehaviour
     {
         if (path == null || path.Length == 0) return; 
         Vector3 nextWaypoint = FindNextWaypoint();
-        if (Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
+        Vector3 moveDirection = nextWaypoint - transform.position;
+        moveDirection.y = 0f;
+        float dist = moveDirection.magnitude;
+
+        if (dist < waypointArriveRadius)
         {
             modularEntityMovement.HorizontalMovement(0f, 0f);
         }
         else
         {
-            Vector3 moveDirection = nextWaypoint - transform.position;
-            modularEntityMovement.HorizontalMovement(moveDirection.x, moveDirection.z);
+            float throttle = Mathf.Clamp01(dist / slowDownRadius);
+            Vector3 dir = moveDirection / dist * throttle;
+
+            float signedAngle = Vector3.SignedAngle(modularEntityMovement.MeshForward, moveDirection, Vector3.up);
+            if (Mathf.Abs(signedAngle) < 30)
+            {
+                modularEntityMovement.HorizontalMovement(dir.x, dir.z);
+            }
+            FaceMoveDirection(moveDirection);
         }
 
     }
@@ -310,5 +323,15 @@ public class ModularEntityBrain : MonoBehaviour
         currentState = next;
         destinationTimer = 0f;  
     }
+    private void FaceMoveDirection(Vector3 worldDir)
+    {
+        worldDir.y = 0f;
+        if (worldDir.sqrMagnitude < 0.0001f) return;
 
+        float signedAngle = Vector3.SignedAngle(modularEntityMovement.MeshForward, worldDir, Vector3.up);
+        if (Mathf.Abs(signedAngle) < facingDeadzone) return;
+
+        // 傳入剩餘角度的絕對值，RotateMesh 會夾住不過頭
+        modularEntityMovement.RotateMesh(Mathf.Sign(signedAngle), Mathf.Abs(signedAngle));
+    }
 }
