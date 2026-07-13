@@ -1,8 +1,6 @@
 using NaughtyAttributes;
-using NUnit.Framework;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.EventSystems;
 
 [System.Serializable]
 public enum EntityState
@@ -82,7 +80,7 @@ public class ModularEntityBrain : MonoBehaviour
     public float reactionCoolDown = 3f;
     public float reactionChance = 0.5f;
 
-    private float destinationTimer;  
+    private float destinationTimer;
 
     private readonly Dictionary<TargetType, float> decayMultiplierByType = new Dictionary<TargetType, float>();
 
@@ -91,6 +89,7 @@ public class ModularEntityBrain : MonoBehaviour
     private int currentWaypointIndex = 0;
 
     [SerializeField] private float facingDeadzone = 1f;   // 角度誤差小於此就不轉，避免抖動
+
     public void Start()
     {
         spawnLocation = transform.position;
@@ -183,16 +182,24 @@ public class ModularEntityBrain : MonoBehaviour
                 SetPath(pathFinder.FindPath(destination));
                 break;
             case EntityState.Chasing:
-                destinationTimer = RollInterval(chaseDestinationUpdateRange);
-                destination = FindTarget().position;
-                SetPath(pathFinder.FindPath(destination));
-                break;
+                {
+                    destinationTimer = RollInterval(chaseDestinationUpdateRange);
+                    Transform chaseTarget = FindTarget();
+                    if (chaseTarget == null) { ChangeState(EntityState.Patrolling); break; }   // 沒目標 → 回巡邏
+                    destination = chaseTarget.position;
+                    SetPath(pathFinder.FindPath(destination));
+                    break;
+                }
             case EntityState.Combat:
-                destinationTimer = RollInterval(combatDestinationUpdateRange);
-                r = Random.insideUnitCircle * combatActivityAreaRadius;
-                destination = FindTarget().position + new Vector3(r.x, 0f, r.y);
-                SetPath(pathFinder.FindPath(destination));
-                break;
+                {
+                    destinationTimer = RollInterval(combatDestinationUpdateRange);
+                    Transform combatTarget = FindTarget();
+                    if (combatTarget == null) { ChangeState(EntityState.Patrolling); break; }   // 沒目標 → 回巡邏
+                    r = Random.insideUnitCircle * combatActivityAreaRadius;
+                    destination = combatTarget.position + new Vector3(r.x, 0f, r.y);
+                    SetPath(pathFinder.FindPath(destination));
+                    break;
+                }
         }
     }
 
@@ -214,29 +221,43 @@ public class ModularEntityBrain : MonoBehaviour
     }
     public Vector3 FindNextWaypoint()
     {
-        if (path == null || path.Length == 0)
+        // ★ 每幀跟 PathFinder 要「用當下船姿態投影出來的」即時路徑，而不是讀凍結快取
+        //    → 船移動時航點跟著貼合，不 stale。地面路徑時直接回傳原路徑，行為不變。
+        Vector3[] livePath = pathFinder.GetCurrentWorldPath();
+
+        if (livePath == null || livePath.Length == 0)
             return transform.position;
 
         // path 可能換過、變短，夾住避免越界
-        if (currentWaypointIndex > path.Length - 1)
-            currentWaypointIndex = path.Length - 1;
+        if (currentWaypointIndex > livePath.Length - 1)
+            currentWaypointIndex = livePath.Length - 1;
 
         // 已經抵達的 corner 就往前推進；到最後一個就停在那，不再 +1（自然不會越界）
-        while (currentWaypointIndex < path.Length - 1 &&
-               Vector2.Distance(new Vector2(transform.position.x, transform.position.z), new Vector2(path[currentWaypointIndex].x, path[currentWaypointIndex].z)) < waypointArriveRadius)
+        while (currentWaypointIndex < livePath.Length - 1 &&
+               Vector2.Distance(new Vector2(transform.position.x, transform.position.z), new Vector2(livePath[currentWaypointIndex].x, livePath[currentWaypointIndex].z)) < waypointArriveRadius)
         {
             currentWaypointIndex++;
         }
 
-        return path[currentWaypointIndex];
+        return livePath[currentWaypointIndex];
     }
 
-    private float RollInterval(Vector2 range){ 
-        return Random.Range(range.x, range.y); 
+    private float RollInterval(Vector2 range)
+    {
+        return Random.Range(range.x, range.y);
     }
+
+    // 依距離縮放的移動方向：近了自動減速，避免全速衝過頭繞圈。dist 為 0 時回 zero 防 NaN。
+    private Vector3 ThrottledDir(Vector3 moveDirection, float dist)
+    {
+        if (dist < 0.0001f) return Vector3.zero;
+        float throttle = Mathf.Clamp01(dist / slowDownRadius);
+        return moveDirection / dist * throttle;
+    }
+
     protected void IdleBehaviour()
     {
-        if (path == null || path.Length == 0) return; 
+        if (path == null || path.Length == 0) return;
         Vector3 nextWaypoint = FindNextWaypoint();
         Vector3 moveDirection = nextWaypoint - transform.position;
         moveDirection.y = 0f;
@@ -248,9 +269,7 @@ public class ModularEntityBrain : MonoBehaviour
         }
         else
         {
-            float throttle = Mathf.Clamp01(dist / slowDownRadius);
-            Vector3 dir = moveDirection / dist * throttle;
-
+            Vector3 dir = ThrottledDir(moveDirection, dist);
             float signedAngle = Vector3.SignedAngle(modularEntityMovement.MeshForward, moveDirection, Vector3.up);
             if (Mathf.Abs(signedAngle) < 30)
             {
@@ -258,7 +277,6 @@ public class ModularEntityBrain : MonoBehaviour
             }
             FaceMoveDirection(moveDirection);
         }
-
     }
 
     protected void PatrollingBehaviour()
@@ -268,15 +286,14 @@ public class ModularEntityBrain : MonoBehaviour
         Vector3 moveDirection = nextWaypoint - transform.position;
         moveDirection.y = 0f;
         float dist = moveDirection.magnitude;
+
         if (currentWaypointIndex == path.Length - 1 && Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
         {
-            destinationTimer = 0f;
+            destinationTimer = 0f;   // 到達巡邏點 → 下一幀重挑新點（留在 Patrolling）
         }
         else
         {
-            float throttle = Mathf.Clamp01(dist / slowDownRadius);
-            Vector3 dir = moveDirection / dist * throttle;
-
+            Vector3 dir = ThrottledDir(moveDirection, dist);
             float signedAngle = Vector3.SignedAngle(modularEntityMovement.MeshForward, moveDirection, Vector3.up);
             if (Mathf.Abs(signedAngle) < 60)
             {
@@ -292,9 +309,10 @@ public class ModularEntityBrain : MonoBehaviour
         Vector3 nextWaypoint = FindNextWaypoint();
         Vector3 moveDirection = nextWaypoint - transform.position;
         moveDirection.y = 0f;
+
         if (currentWaypointIndex == path.Length - 1 && Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
         {
-            ChangeState(EntityState.Patrolling);
+            ChangeState(EntityState.Patrolling);   // 撤退到位 → 真正切換狀態
         }
         else
         {
@@ -310,15 +328,21 @@ public class ModularEntityBrain : MonoBehaviour
     protected void ChasingBehaviour()
     {
         if (path == null || path.Length == 0) return;
+
+        Transform target = FindTarget();
+        if (target == null) { ChangeState(EntityState.Patrolling); return; }   // 目標消失 → 回巡邏
+
         Vector3 nextWaypoint = FindNextWaypoint();
         Vector3 moveDirection = nextWaypoint - transform.position;
         moveDirection.y = 0f;
-        if (Vector3.Distance(transform.position, FindTarget().position) < combatActivityAreaRadius/2)
+
+        if (Vector3.Distance(transform.position, target.position) < combatActivityAreaRadius / 2)
         {
-            ChangeState(EntityState.Combat);
-        }else if (currentWaypointIndex == path.Length - 1 && Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
+            ChangeState(EntityState.Combat);   // 進入戰鬥範圍 → 真正切換狀態
+        }
+        else if (currentWaypointIndex == path.Length - 1 && Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
         {
-            ChangeState(EntityState.Chasing);
+            destinationTimer = 0f;   // 走完舊追擊路徑但還沒近 → 下一幀用目標當下位置重算（留在 Chasing）
         }
         else
         {
@@ -337,9 +361,10 @@ public class ModularEntityBrain : MonoBehaviour
         Vector3 nextWaypoint = FindNextWaypoint();
         Vector3 moveDirection = nextWaypoint - transform.position;
         moveDirection.y = 0f;
+
         if (currentWaypointIndex == path.Length - 1 && Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
         {
-            ChangeState(EntityState.Combat);
+            destinationTimer = 0f;   // 到達徘徊點 → 下一幀重挑新徘徊點（留在 Combat）
         }
         else
         {
@@ -354,7 +379,7 @@ public class ModularEntityBrain : MonoBehaviour
     public void ChangeState(EntityState next)
     {
         currentState = next;
-        destinationTimer = 0f;  
+        destinationTimer = 0f;
     }
     private void FaceMoveDirection(Vector3 worldDir)
     {
