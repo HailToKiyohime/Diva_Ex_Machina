@@ -2,14 +2,14 @@ using UnityEngine;
 
 public class ShipPassenger : MonoBehaviour
 {
-    public bool IsOnShip { get; private set; }
+    public bool isOnShip { get; private set; }
 
     private void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Mobile Platform")) IsOnShip = true;
+        if (other.CompareTag("Mobile Platform")) isOnShip = true;
     }
     private void OnTriggerExit(Collider other)
     {
-        if (other.CompareTag("Mobile Platform")) IsOnShip = false;
+        if (other.CompareTag("Mobile Platform")) isOnShip = false;
     }
 }
