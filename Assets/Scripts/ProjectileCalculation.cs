@@ -84,7 +84,7 @@ public class ProjectileCalculation
         float muzzleSpeed,
         out Vector3 result)
     {
-        // ¡X¡X your dynamic version :contentReference[oaicite:1]{index=1}
+        // ï¿½Xï¿½X your dynamic version :contentReference[oaicite:1]{index=1}
         const int maxIter = 6;
         result = Vector3.zero;
 

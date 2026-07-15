@@ -49,6 +49,9 @@ public class ModularEntityBrain : MonoBehaviour
 {
     public ModularEntityMovement modularEntityMovement;
 
+    [Header("Turrets")]
+    [SerializeField] private TurretController[] turrets;   // 0..N 座，Inspector 拖或自動抓
+
     private PathFinder pathFinder;
     private ShipPassenger selfPassenger;   // 自己的船上狀態（掛在同一個 GameObject 上）
 
@@ -98,6 +101,9 @@ public class ModularEntityBrain : MonoBehaviour
         selfPassenger = gameObject.GetComponent<ShipPassenger>();
         currentState = EntityState.Idle;
         RebuildPreferenceCache();
+
+        if (turrets == null || turrets.Length == 0)
+            turrets = GetComponentsInChildren<TurretController>();
     }
 
     public void FixedUpdate()
@@ -396,6 +402,15 @@ public class ModularEntityBrain : MonoBehaviour
             }
             FaceMoveDirection(moveDirection);
         }
+
+        Transform target = FindTarget();
+        if (target != null)
+        {
+            Rigidbody targetRb = target.GetComponentInParent<Rigidbody>();
+            Vector3 targetVel = targetRb != null ? targetRb.linearVelocity : Vector3.zero;
+            UpdateTurretAiming(target, targetVel);
+
+        }
     }
     public void ChangeState(EntityState next)
     {
@@ -412,5 +427,32 @@ public class ModularEntityBrain : MonoBehaviour
 
         // 傳入剩餘角度的絕對值，RotateMesh 會夾住不過頭
         modularEntityMovement.RotateMesh(Mathf.Sign(signedAngle), Mathf.Abs(signedAngle));
+    }
+
+    // 每座砲塔用「自己的彈速」算自己的攔截點
+    private void UpdateTurretAiming(Transform target, Vector3 targetVelocity)
+    {
+        for (int i = 0; i < turrets.Length; i++)
+        {
+            TurretController turret = turrets[i];
+            if (turret == null) continue;
+
+            // 讀 turret 自己的 bulletSpeed —— 資料在哪，就去哪讀
+            if (ProjectileCalculation.InterceptionPoint(
+                    target.position,                  // a: 目標現在位置
+                    turret.MuzzlePosition,            // b: 這座砲塔的砲口
+                    targetVelocity,                   // vA: 目標速度
+                    turret.bulletSpeed,               // sB: 這座砲塔的彈速
+                    out Vector3 interceptPoint))
+            {
+                turret.targetLocation = interceptPoint;
+                turret.Shoot();
+            }
+            else
+            {
+                // 解不出攔截（目標太快/彈太慢）→ 退回直接瞄準現在位置
+                turret.targetLocation = target.position;
+            }
+        }
     }
 }

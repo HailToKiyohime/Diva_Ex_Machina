@@ -52,7 +52,7 @@ public class FirearmControlSystem : MonoBehaviour
     private Vector3[] _targetVel;
     private bool[] _hasLastTargetPos;
 
-    // °O¿ý¡G­pºâ¤W¤@¦¸ aimPoint¡A´£¨Ñµ¹ IsWithinFireCone ¨Ï¥Î
+    // ï¿½Oï¿½ï¿½ï¿½Gï¿½pï¿½ï¿½Wï¿½@ï¿½ï¿½ aimPointï¿½Aï¿½ï¿½ï¿½Ñµï¿½ IsWithinFireCone ï¿½Ï¥ï¿½
     private Vector3[] _lastAimPoint;
 
     private struct Runtime
@@ -144,11 +144,11 @@ public class FirearmControlSystem : MonoBehaviour
             var fa = firearms[i];
             if (fa == null) continue;
             UpdateTargetVelocity(i, fa);
-            TickFiring(i, fa); // ´«¼u¡B§N«o­Ë¼Æ¯d¦b Update
+            TickFiring(i, fa); // ï¿½ï¿½ï¿½uï¿½Bï¿½Nï¿½oï¿½Ë¼Æ¯dï¿½b Update
         }
     }
 
-    private void LateUpdate() // ¡ö ºË·Ç§ï¨ì LateUpdate
+    private void LateUpdate() // ï¿½ï¿½ ï¿½Ë·Ç§ï¿½ï¿½ LateUpdate
     {
         if (firearms == null) return;
         for (int i = 0; i < firearms.Length; i++)
@@ -157,7 +157,7 @@ public class FirearmControlSystem : MonoBehaviour
             if (fa == null) continue;
             var t = ResolveTarget(fa);
             if (t != null)
-                AimOne(i, fa, t, _targetVel[i]); // ¦¹®É defaultTarget ¤w³Q EnemyBrain §ó·s§¹²¦
+                AimOne(i, fa, t, _targetVel[i]); // ï¿½ï¿½ï¿½ï¿½ defaultTarget ï¿½wï¿½Q EnemyBrain ï¿½ï¿½sï¿½ï¿½ï¿½ï¿½
         }
     }
 
