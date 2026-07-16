@@ -111,9 +111,7 @@ public class ModularEntityMovement : MonoBehaviour
     // Mobile Platform carry (velocity-based)
     private bool _onMobilePlatform = false;
     private Rigidbody _mobilePlatformRb = null;
-    private Transform _mobilePlatformTf;
-    private Quaternion _mobilePlatformLastRot;
-    private bool _mobilePlatformRotInit;
+
 
     private Vector3 GetMobilePlatformVelocity()
     {
@@ -139,10 +137,6 @@ public class ModularEntityMovement : MonoBehaviour
         if (_mobilePlatformRb != rb)
         {
             _mobilePlatformRb = rb;
-            _mobilePlatformTf = rb.transform;
-
-            _mobilePlatformLastRot = rb.rotation;
-            _mobilePlatformRotInit = true;
         }
 
         _onMobilePlatform = true;

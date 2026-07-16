@@ -29578,7 +29578,7 @@ MonoBehaviour:
   energyDamage: 0
   coldDamage: 0
   bulletSpeed: 100
-  bulletSpread: 5
+  bulletSpread: 2
   bulletPerRound: 1
   roundsPerFire: 1
   timeBetweenShots: 0
