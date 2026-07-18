@@ -288,6 +288,8 @@ public class ModularEntityBrain : MonoBehaviour
         moveDirection.y = 0f;
         float dist = moveDirection.magnitude;
 
+        ResetTurretAiming(moveDirection); // 閒置時砲塔不瞄準，避免亂射
+
         if (dist < waypointArriveRadius)
         {
             modularEntityMovement.HorizontalMovement(0f, 0f);
@@ -314,6 +316,10 @@ public class ModularEntityBrain : MonoBehaviour
         Vector3 moveDirection = nextWaypoint - transform.position;
         moveDirection.y = 0f;
         float dist = moveDirection.magnitude;
+
+
+        ResetTurretAiming(moveDirection); // 巡邏時砲塔不瞄準，避免亂射
+
         if (currentWaypointIndex == path.Length - 1 && Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
         {
             destinationTimer = 0f;   // 到達巡邏點 → 下一幀重挑新點（留在 Patrolling）
@@ -338,6 +344,9 @@ public class ModularEntityBrain : MonoBehaviour
         Vector3 nextWaypoint = FindNextWaypoint();
         Vector3 moveDirection = nextWaypoint - transform.position;
         moveDirection.y = 0f;
+
+        ResetTurretAiming(moveDirection); // 撤退時砲塔不瞄準，避免亂射
+
         if (currentWaypointIndex == path.Length - 1 && Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
         {
             ChangeState(EntityState.Patrolling);   // 撤退到位 → 真正切換狀態
@@ -363,6 +372,8 @@ public class ModularEntityBrain : MonoBehaviour
         Vector3 nextWaypoint = FindNextWaypoint();
         Vector3 moveDirection = nextWaypoint - transform.position;
         moveDirection.y = 0f;
+
+        ResetTurretAiming(moveDirection);   // 追擊時砲塔不瞄準，避免亂射
 
         if (Vector3.Distance(transform.position, target.position) < combatActivityAreaRadius / 2)
         {
@@ -446,12 +457,42 @@ public class ModularEntityBrain : MonoBehaviour
                     out Vector3 interceptPoint))
             {
                 turret.targetLocation = interceptPoint;
-                turret.Shoot();
+                if (turret.HasLineOfSightTo(target))
+                    turret.Shoot();
             }
             else
             {
                 // 解不出攔截（目標太快/彈太慢）→ 退回直接瞄準現在位置
                 turret.targetLocation = target.position;
+                if (turret.HasLineOfSightTo(target))
+                    turret.Shoot();   // 直瞄退路也一樣:看得到就打
+            }
+        }
+    }
+
+    //將每座砲塔轉向實體的移動方向（砲管放平）；沒有移動方向時退回中立朝向
+    private void ResetTurretAiming(Vector3 moveDirection)
+    {
+        if (turrets == null) return;
+
+        moveDirection.y = 0f;
+        bool hasDirection = moveDirection.sqrMagnitude > 0.0001f;
+        if (hasDirection) moveDirection.Normalize();
+
+        for (int i = 0; i < turrets.Length; i++)
+        {
+            TurretController turret = turrets[i];
+            if (turret == null) continue;
+
+            if (hasDirection)
+            {
+                // 沿移動方向、與 pitch 軸同高的遠處虛擬點 → yaw 對準移動方向、pitch 歸零
+                turret.targetLocation = turret.PitchPivotPosition + moveDirection * 20f;
+            }
+            else
+            {
+                // 靜止（沒有移動方向）→ 回中立朝向
+                turret.targetLocation = turret.RestAimPoint;
             }
         }
     }

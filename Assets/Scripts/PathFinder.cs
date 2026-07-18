@@ -25,6 +25,7 @@ public class PathFinder : MonoBehaviour
     private Vector3[] lastPathGhost = System.Array.Empty<Vector3>();
     private bool lastPathOnShip = false;
 
+    [SerializeField] private float disembarkDistance = 50f;
     void Start()
     {
         path = new NavMeshPath();
@@ -40,10 +41,31 @@ public class PathFinder : MonoBehaviour
             result = ComputeGhostPath(transform.position, targetLocation);
             lastPathOnShip = true;
         }
-        else if (isOnShip && !isTargetOnShip)// if entity on ship but target not on ship, find path to ship docking point
+        else if (isOnShip && !isTargetOnShip)// if entity on ship but target not on ship
         {
-            result = ComputeGhostPath(transform.position, GetTargetClosestDockingLocation());
+            // 先算「走到 dock」的船上路徑
+            Vector3 dockPos = GetTargetClosestDockingLocation();
+            result = ComputeGhostPath(transform.position, dockPos);
             lastPathOnShip = true;
+
+            // ★ 在路徑尾端追加一個「離船點」：dock 往船外方向延伸幾公尺。
+            //   實體為了走到它，必然跨出船的 trigger → isOnShip 翻 false
+            //   → 下次 PathUpdate 自然改用地面路徑直奔目標。
+            if (result.Length > 0)
+            {
+                Vector3 exitPoint = GetDisembarkPoint(dockPos);
+                var extended = new Vector3[result.Length + 1];
+                result.CopyTo(extended, 0);
+                extended[extended.Length - 1] = exitPoint;
+                result = extended;
+
+                // ghost 快取也要同步追加，否則 GetCurrentWorldPath 投影出來會少最後一點
+                var extendedGhost = new Vector3[lastPathGhost.Length + 1];
+                lastPathGhost.CopyTo(extendedGhost, 0);
+                extendedGhost[extendedGhost.Length - 1] =
+                    ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, exitPoint);
+                lastPathGhost = extendedGhost;
+            }
         }
         else if (!isOnShip && isTargetOnShip) // if player not on ship but target on ship, find path to ship docking point
         {
@@ -170,5 +192,21 @@ public class PathFinder : MonoBehaviour
             Gizmos.DrawLine(draw[i], draw[i + 1]);
 
         Gizmos.DrawLine(transform.position, draw[0]);
+    }
+    private Vector3 GetDisembarkPoint(Vector3 dockPos)
+    {
+        Vector3 outward = dockPos - realShipRoot.position;
+        outward.y = 0f;
+        if (outward.sqrMagnitude < 0.0001f) outward = realShipRoot.forward;   // dock 在船中心的退路
+        outward.Normalize();
+
+        Vector3 candidate = dockPos + outward * disembarkDistance;
+
+        // 貼回地面 navmesh（船外是地面 navmesh 的領域）
+        if (UnityEngine.AI.NavMesh.SamplePosition(candidate, out UnityEngine.AI.NavMeshHit hit,
+                navSampleMaxDistance, UnityEngine.AI.NavMesh.AllAreas))
+            return hit.position;
+
+        return candidate;   // sample 失敗就用原始點，至少方向是對的
     }
 }

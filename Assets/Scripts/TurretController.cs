@@ -3,6 +3,7 @@ using UnityEngine;
 
 public class TurretController : MonoBehaviour
 {
+    public Vector3 PitchPivotPosition => pitchTransform != null ? pitchTransform.position : transform.position;
     public float BulletSpeed => bulletSpeed;
     public Vector3 MuzzlePosition => muzzle != null ? muzzle.position : transform.position;
 
@@ -220,7 +221,24 @@ public class TurretController : MonoBehaviour
             AimHitTransform = null;
         }
     }
+    public bool HasLineOfSightTo(Transform target)
+    {
+        if (target == null || muzzle == null) return false;
 
+        Vector3 origin = muzzle.position;
+        Vector3 toTarget = target.position - origin;
+        float dist = toTarget.magnitude;
+        if (dist < 0.001f) return true;   // 貼在一起,視為可見
+
+        if (Physics.Raycast(origin, toTarget / dist, out RaycastHit hit, dist, aimRayMask, QueryTriggerInteraction.Ignore))
+        {
+            // 打到的東西是目標自己(或目標的子 collider)→ 視線通
+            return hit.transform == target || hit.transform.IsChildOf(target);
+        }
+
+        // 射線全程沒打到任何東西 → 中間沒障礙,視線通
+        return true;
+    }
     public void Yaw()
     {
         if (yawTransform == null) return;
@@ -289,5 +307,22 @@ public class TurretController : MonoBehaviour
         // 目標點畫成綠色，方便對照「槍管實際指向」vs「想指向的目標」
         Gizmos.color = Color.green;
         Gizmos.DrawWireSphere(targetLocation, 0.5f);
+    }
+
+    public Vector3 RestAimPoint
+    {
+        get
+        {
+            // 用 yaw 的父空間定義「中心朝向」——跟 Yaw() 的計算基準一致
+            Transform basis = yawTransform != null ? yawTransform.parent : transform;
+            if (basis == null) basis = transform;
+
+            Vector3 centerDir = basis.rotation * Quaternion.Euler(0f, yawCenter, 0f) * Vector3.forward;
+
+            // 起點用 pitch 軸的位置：目標與它同高 → localDir.y = 0 → pitch 歸零（放平）
+            Vector3 origin = pitchTransform != null ? pitchTransform.position : transform.position;
+
+            return origin + centerDir * 20f;   // 20m 遠處的虛擬點，距離不重要，方向才重要
+        }
     }
 }
