@@ -107,7 +107,7 @@ MonoBehaviour:
   isMelee: 0
   ignoreLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 16384
   enemyLayer:
     serializedVersion: 2
     m_Bits: 8448

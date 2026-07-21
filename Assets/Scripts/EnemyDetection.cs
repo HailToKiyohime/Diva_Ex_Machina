@@ -1,4 +1,5 @@
 using UnityEngine;
+using static UnityEngine.UI.Image;
 
 public class EnemyDetection : MonoBehaviour
 {
@@ -13,10 +14,11 @@ public class EnemyDetection : MonoBehaviour
     {
         if (other.tag == "Player" && other.tag == "Defence Fortifications")
         {
-            RaycastHit hit;
-            if (Physics.Linecast(transform.position, other.transform.position, out hit))
+            Vector3 dir = (other.transform.position - transform.position).normalized;
+            int aimRayMask = LayerMask.GetMask("Player", "Defence Fortifications");
+            if (Physics.Raycast(transform.position, dir, out RaycastHit hit, Mathf.Infinity, aimRayMask, QueryTriggerInteraction.Ignore))
             {
-
+                enemyBrain.
             }
         }
     }

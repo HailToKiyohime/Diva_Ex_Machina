@@ -496,4 +496,21 @@ public class ModularEntityBrain : MonoBehaviour
             }
         }
     }
+
+    public void AddTarget(Transform targetTransform, TargetType type, float priority, float priorityDecreaseMultiplier)
+    {
+        if (targetTransform == null) return;
+        // 已經有這個目標了？就更新它的優先度
+        for (int i = 0; i < targets.Count; i++)
+        {
+            if (targets[i].targetTransform == targetTransform)
+            {
+                targets[i].targetPriority = priority;
+                targets[i].priorityDecreaseMultiplier = priorityDecreaseMultiplier;
+                return;
+            }
+        }
+        // 沒有就新增
+        targets.Add(new Target(targetTransform, priority, priorityDecreaseMultiplier));
+    }
 }

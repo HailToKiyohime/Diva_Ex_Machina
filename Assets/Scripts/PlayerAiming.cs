@@ -103,7 +103,7 @@ public class PlayerAiming : MonoBehaviour
 
     private CinemachineThirdPersonFollow _thirdPersonFollow;
 
-
+    public LayerMask ignoreLayer;
 
     // Debug hook (optional)
     private int _autoAimLastWriteFrame = -1;
@@ -533,8 +533,8 @@ public class PlayerAiming : MonoBehaviour
 
         ray = mainCam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
         SmoothResetCrosshairToCenter();
-
-        if (playerOrientation && Physics.Raycast(ray, out RaycastHit hit, freeAimMaxDistance, ~0, QueryTriggerInteraction.Ignore))
+        int layerMask = ~ignoreLayer;
+        if (playerOrientation && Physics.Raycast(ray, out RaycastHit hit, freeAimMaxDistance, layerMask, QueryTriggerInteraction.Ignore))
         {
             if (aimingPoint) aimingPoint.position = hit.point;
             if (UIManager.Instance != null)
