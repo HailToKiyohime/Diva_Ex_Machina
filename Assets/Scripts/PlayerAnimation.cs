@@ -57,6 +57,7 @@ public class PlayerAnimation : MonoBehaviour
     public MMF_Player walkFeedback;
 
     public MMF_Player dustFeedback;
+    public MMF_Player dustFeedback_OnShip;
     [Header("Gun")]
     [SerializeField] private ParticleSystem[] leftMuzzle;
     [SerializeField] private ParticleSystem[] rightMuzzle;
@@ -656,9 +657,14 @@ public class PlayerAnimation : MonoBehaviour
     {
         dustFeedback?.PlayFeedbacks(this.transform.position);
     }
+        public void DustEffect_OnShip()
+    {
+        dustFeedback_OnShip?.PlayFeedbacks(this.transform.position);
+    }
     public void StopDustEffect()
     {
         dustFeedback?.StopFeedbacks();
+        dustFeedback_OnShip?.StopFeedbacks();
     }
     public void AnimEvent_MeleeImpact()
     {

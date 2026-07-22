@@ -423,7 +423,7 @@ public class AttackManager : MonoBehaviour
                     var targetRb = PlayerAiming.Instance.GetTargetRigidbody();
                     if (TrySampleTarget(targetRb, out Vector3 tgtPos, out Vector3 tgtVel))
                     {
-                        if (ProjectileCalculation.InterceptionPoint(tgtPos, muzzle.position, tgtVel, w.range.bulletSpeed, out var predicted))
+                        if (MathToolKit.InterceptionPoint(tgtPos, muzzle.position, tgtVel, w.range.bulletSpeed, out var predicted))
                             targetPoint = predicted;
                         else
                             targetPoint = tgtPos;

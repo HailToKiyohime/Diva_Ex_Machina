@@ -133,7 +133,7 @@ public class ModularEntityBrain : MonoBehaviour
             }
         }
     }
-    protected void RebuildPreferenceCache()
+    protected virtual void RebuildPreferenceCache()
     {
         decayMultiplierByType.Clear();
         for (int i = 0; i < targetPreferences.Count; i++)
@@ -142,7 +142,7 @@ public class ModularEntityBrain : MonoBehaviour
         }
     }
 
-    protected void StateBehaviour()
+    protected virtual void StateBehaviour()
     {
         switch (currentState)
         {
@@ -167,7 +167,7 @@ public class ModularEntityBrain : MonoBehaviour
     // ★ 算路徑前，把「自己」與「目標」的船上狀態餵給 PathFinder。
     //   target == null 代表目的地是自己算出來的點（Idle/Patrol 隨機點、Retreat 的 spawnLocation），
     //   那種點跟自己在同一個空間，所以 isTargetOnShip 跟著 isOnShip 走。
-    private void SyncShipFlags(Transform target)
+    protected virtual void SyncShipFlags(Transform target)
     {
         pathFinder.isOnShip = selfPassenger != null && selfPassenger.isOnShip;
 
@@ -185,7 +185,7 @@ public class ModularEntityBrain : MonoBehaviour
         }
     }
 
-    protected void PathUpdate()
+    protected virtual void PathUpdate()
     {
         destinationTimer -= Time.fixedDeltaTime;
         if (destinationTimer > 0f) return;
@@ -307,9 +307,14 @@ public class ModularEntityBrain : MonoBehaviour
             FaceMoveDirection(moveDirection);
         }
 
+        if (targets.Count != 0)
+        {
+            ChangeState(EntityState.Chasing);
+        }
+
     }
 
-    protected void PatrollingBehaviour()
+    protected virtual void PatrollingBehaviour()
     {
         if (path == null || path.Length == 0) return;
         Vector3 nextWaypoint = FindNextWaypoint();
@@ -338,7 +343,7 @@ public class ModularEntityBrain : MonoBehaviour
         }
     }
 
-    protected void RetreatBehaviour()
+    protected virtual void RetreatBehaviour()
     {
         if (path == null || path.Length == 0) return;
         Vector3 nextWaypoint = FindNextWaypoint();
@@ -362,7 +367,7 @@ public class ModularEntityBrain : MonoBehaviour
         }
     }
 
-    protected void ChasingBehaviour()
+    protected virtual void ChasingBehaviour()
     {
         if (path == null || path.Length == 0) return;
 
@@ -394,7 +399,7 @@ public class ModularEntityBrain : MonoBehaviour
         }
     }
 
-    protected void CombatBehaviour()
+    protected virtual void CombatBehaviour()
     {
         if (path == null || path.Length == 0) return;
         Vector3 nextWaypoint = FindNextWaypoint();
@@ -423,12 +428,12 @@ public class ModularEntityBrain : MonoBehaviour
 
         }
     }
-    public void ChangeState(EntityState next)
+    protected virtual void ChangeState(EntityState next)
     {
         currentState = next;
         destinationTimer = 0f;
     }
-    private void FaceMoveDirection(Vector3 worldDir)
+    protected virtual void FaceMoveDirection(Vector3 worldDir)
     {
         worldDir.y = 0f;
         if (worldDir.sqrMagnitude < 0.0001f) return;
@@ -441,7 +446,7 @@ public class ModularEntityBrain : MonoBehaviour
     }
 
     // 每座砲塔用「自己的彈速」算自己的攔截點
-    private void UpdateTurretAiming(Transform target, Vector3 targetVelocity)
+    protected virtual void UpdateTurretAiming(Transform target, Vector3 targetVelocity)
     {
         for (int i = 0; i < turrets.Length; i++)
         {
@@ -449,7 +454,7 @@ public class ModularEntityBrain : MonoBehaviour
             if (turret == null) continue;
 
             // 讀 turret 自己的 bulletSpeed —— 資料在哪，就去哪讀
-            if (ProjectileCalculation.InterceptionPoint(
+            if (MathToolKit.InterceptionPoint(
                     target.position,                  // a: 目標現在位置
                     turret.MuzzlePosition,            // b: 這座砲塔的砲口
                     targetVelocity,                   // vA: 目標速度
@@ -471,7 +476,7 @@ public class ModularEntityBrain : MonoBehaviour
     }
 
     //將每座砲塔轉向實體的移動方向（砲管放平）；沒有移動方向時退回中立朝向
-    private void ResetTurretAiming(Vector3 moveDirection)
+    protected virtual void ResetTurretAiming(Vector3 moveDirection)
     {
         if (turrets == null) return;
 
@@ -497,19 +502,9 @@ public class ModularEntityBrain : MonoBehaviour
         }
     }
 
-    public void AddTarget(Transform targetTransform, TargetType type, float priority, float priorityDecreaseMultiplier)
+    public virtual void AddTarget(Transform targetTransform, TargetType type, float priority, float priorityDecreaseMultiplier)
     {
         if (targetTransform == null) return;
-        // 已經有這個目標了？就更新它的優先度
-        for (int i = 0; i < targets.Count; i++)
-        {
-            if (targets[i].targetTransform == targetTransform)
-            {
-                targets[i].targetPriority = priority;
-                targets[i].priorityDecreaseMultiplier = priorityDecreaseMultiplier;
-                return;
-            }
-        }
         // 沒有就新增
         targets.Add(new Target(targetTransform, priority, priorityDecreaseMultiplier));
     }

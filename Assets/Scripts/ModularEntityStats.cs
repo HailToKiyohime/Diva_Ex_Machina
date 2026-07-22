@@ -20,6 +20,7 @@ public class ModularEntityStats : MonoBehaviour, IDamageable
     public event Action OnDeath;
 
     public ModularEntityBrain enemyBrain;
+    public ModularEntityEffectManager modularEntityEffectManager;
 
     public float jumpHeight;
 
@@ -34,7 +35,7 @@ public class ModularEntityStats : MonoBehaviour, IDamageable
         if (amount <= 0f) return;
 
         health -= amount;
-
+        modularEntityEffectManager.PlayDamageFeedback(amount);
 
         if (health <= 0f)
         {
@@ -48,4 +49,5 @@ public class ModularEntityStats : MonoBehaviour, IDamageable
         float reduction = Mathf.Clamp01(defenseValue / 1000f);
         return 1f - reduction;
     }
+
 }

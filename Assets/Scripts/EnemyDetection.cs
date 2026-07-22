@@ -3,7 +3,7 @@ using static UnityEngine.UI.Image;
 
 public class EnemyDetection : MonoBehaviour
 {
-    private ModularEntityBrain enemyBrain;
+    public ModularEntityBrain enemyBrain;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -12,14 +12,25 @@ public class EnemyDetection : MonoBehaviour
     }
     public void OnTriggerEnter(Collider other)
     {
-        if (other.tag == "Player" && other.tag == "Defence Fortifications")
+        Debug.Log("tag == " + other.tag);
+        for (int x = enemyBrain.targets.Count - 1; x >= 0; x--)
         {
-            Vector3 dir = (other.transform.position - transform.position).normalized;
-            int aimRayMask = LayerMask.GetMask("Player", "Defence Fortifications");
-            if (Physics.Raycast(transform.position, dir, out RaycastHit hit, Mathf.Infinity, aimRayMask, QueryTriggerInteraction.Ignore))
+            if (enemyBrain.targets[x].targetTransform == other.transform)
             {
-                enemyBrain.
+                return;
             }
+        }
+        if (other.tag == "Player")
+        {
+            enemyBrain.AddTarget(other.transform, TargetType.Player, 3,1);
+        }
+        else if (other.tag == "Defence Fortifications")
+        {
+            enemyBrain.AddTarget(other.transform, TargetType.Building, 3, 1);
+
+        }else if (other.tag == "Obstacle")  
+        {
+            enemyBrain.AddTarget(other.transform, TargetType.Obstacle, 3, 1);
         }
     }
 

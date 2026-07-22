@@ -223,7 +223,7 @@ public class FirearmControlSystem : MonoBehaviour
         Vector3 aimPoint = target.position;
         if (fa.bulletSpeed > 0.01f)
         {
-            if (ProjectileCalculation.InterceptionPoint(target.position, origin, targetVel, fa.bulletSpeed, out var c))
+            if (MathToolKit.InterceptionPoint(target.position, origin, targetVel, fa.bulletSpeed, out var c))
                 aimPoint = c;
         }
 

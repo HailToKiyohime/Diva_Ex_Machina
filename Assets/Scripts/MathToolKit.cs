@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ProjectileCalculation
+public class MathToolKit
 {
     public static bool InterceptionDirection(Vector3 a, Vector3 b, Vector3 vA, float sB, out Vector3 result)
     {
@@ -122,5 +122,13 @@ public class ProjectileCalculation
         root1 = (-b + Mathf.Sqrt(discriminant)) / (2 * a);
         root2 = (-b - Mathf.Sqrt(discriminant)) / (2 * a);
         return discriminant > 0 ? 2 : 1;
+    }
+
+    public static Vector3 GetPointAtTargetBack(Transform a, Transform b, float distance = 10f)
+    {
+        Vector3 offset = b.position - a.position;
+        offset.y = 0f;
+        if (offset.sqrMagnitude < 0.0001f) return b.position;
+        return b.position + offset.normalized * distance;
     }
 }

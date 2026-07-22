@@ -722,7 +722,14 @@ public class PlayerMovement : MonoBehaviour
             float t = Mathf.InverseLerp(dustMinSpeed, dustMaxSpeed, speed); // 0~1，自動 clamp
             float interval = Mathf.Lerp(dustIntervalSlow, dustIntervalFast, t);
             _nextDustTime = Time.time + interval;
-            playerAnimation.DustEffect();
+            if (!_onMobilePlatform)
+            {
+                playerAnimation.DustEffect();
+            }
+            else
+            {
+                playerAnimation.DustEffect_OnShip();
+            }
         }
     }
 }
