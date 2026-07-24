@@ -94,7 +94,7 @@ public class ModularEntityBrain : MonoBehaviour
 
     [SerializeField] protected float facingDeadzone = 1f;   // 角度誤差小於此就不轉，避免抖動
 
-    public virtual void Start()
+    protected virtual void Start()
     {
         spawnLocation = transform.position;
         pathFinder = gameObject.GetComponent<PathFinder>();
@@ -248,7 +248,7 @@ public class ModularEntityBrain : MonoBehaviour
         }
         return bestTarget.targetTransform;
     }
-    private void SetPath(Vector3[] newPath)
+    protected void SetPath(Vector3[] newPath)
     {
         path = newPath;
         currentWaypointIndex = 0;
@@ -276,7 +276,7 @@ public class ModularEntityBrain : MonoBehaviour
         return livePath[currentWaypointIndex];
     }
 
-    private float RollInterval(Vector2 range)
+    protected float RollInterval(Vector2 range)
     {
         return Random.Range(range.x, range.y);
     }

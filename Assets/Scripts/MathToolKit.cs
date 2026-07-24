@@ -131,4 +131,17 @@ public class MathToolKit
         if (offset.sqrMagnitude < 0.0001f) return b.position;
         return b.position + offset.normalized * distance;
     }
+    public static Vector3 GetRandomPointInRing(Vector3 a, float outerRadius, float innerRadius)
+    {
+
+        // 一樣用 Sqrt 對 r² 均勻取樣,讓點平均鋪滿整個紅環
+        float r = Mathf.Sqrt(Random.Range(innerRadius * innerRadius, outerRadius * outerRadius));
+        float angle = Random.Range(0f, Mathf.PI * 2f);
+
+        float offsetX = r * Mathf.Cos(angle);
+        float offsetZ = r * Mathf.Sin(angle);
+
+        // 放在 XZ 平面,高度沿用中心點 a.y
+        return new Vector3(a.x + offsetX, a.y, a.z + offsetZ);
+    }
 }
