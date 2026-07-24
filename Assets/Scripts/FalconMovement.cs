@@ -9,7 +9,9 @@ public class FalconMovement : ModularEntityMovement
     [SerializeField] private float damping = 8f;
     [SerializeField] private float heightTolerance = 0.02f;
     [SerializeField] private float hoverRaycastDistance = 100f;
-
+    // 懸停 raycast 的結果，給 brain 的距離量測共用
+    public bool HasGroundBelow { get; private set; }
+    public Vector3 GroundBelowPoint { get; private set; }
     public override void FixedUpdate()
     {
         base.FixedUpdate();              // GroundCheck + ApplyHorizontalMovementFixed（下面已 override）
@@ -34,10 +36,13 @@ public class FalconMovement : ModularEntityMovement
 
     public void VerticalMovement(float targetHeight)
     {
-        // 往下找真正的地面（groundPoint 是隼自己的腳，不能當基準）
-        if (!Physics.Raycast(groundPoint.position, Vector3.down, out RaycastHit hit,
-                             hoverRaycastDistance, whatIsGround))
-            return;
+
+
+        HasGroundBelow = Physics.Raycast(groundPoint.position, Vector3.down, out RaycastHit hit,
+                                         hoverRaycastDistance, whatIsGround);
+        if (!HasGroundBelow) return;   // 下方沒地面 → 不施力，自由落下
+
+        GroundBelowPoint = hit.point;
 
         float heightError = (hit.point.y + targetHeight) - groundPoint.position.y;
 

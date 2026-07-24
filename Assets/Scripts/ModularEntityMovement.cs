@@ -119,7 +119,7 @@ public class ModularEntityMovement : MonoBehaviour
         return _mobilePlatformRb.linearVelocity; // Unity 6
     }
 
-    public void RotateMesh(float direction, float maxDegrees = -1f)
+    public virtual void RotateMesh(float direction, float maxDegrees = -1f)
     {
         if (direction == 0f) return;
         float step = modularEntityStats.rotationSpeed * Time.fixedDeltaTime;

@@ -94,7 +94,7 @@ public class ModularEntityBrain : MonoBehaviour
 
     [SerializeField] protected float facingDeadzone = 1f;   // 角度誤差小於此就不轉，避免抖動
 
-    public void Start()
+    public virtual void Start()
     {
         spawnLocation = transform.position;
         pathFinder = gameObject.GetComponent<PathFinder>();
@@ -291,7 +291,7 @@ public class ModularEntityBrain : MonoBehaviour
 
         ResetTurretAiming(moveDirection); // 巡邏時砲塔不瞄準，避免亂射
 
-        if (currentWaypointIndex == path.Length - 1 && Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
+        if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
         {
             destinationTimer = 0f;   // 到達巡邏點 → 下一幀重挑新點（留在 Patrolling）
         }
@@ -321,7 +321,7 @@ public class ModularEntityBrain : MonoBehaviour
 
         ResetTurretAiming(moveDirection); // 巡邏時砲塔不瞄準，避免亂射
 
-        if (currentWaypointIndex == path.Length - 1 && Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
+        if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
         {
             destinationTimer = 0f;   // 到達巡邏點 → 下一幀重挑新點（留在 Patrolling）
         }
@@ -348,7 +348,7 @@ public class ModularEntityBrain : MonoBehaviour
 
         ResetTurretAiming(moveDirection); // 撤退時砲塔不瞄準，避免亂射
 
-        if (currentWaypointIndex == path.Length - 1 && Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
+        if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
         {
             ChangeState(EntityState.Patrolling);   // 撤退到位 → 真正切換狀態
         }
@@ -376,11 +376,11 @@ public class ModularEntityBrain : MonoBehaviour
 
         ResetTurretAiming(moveDirection);   // 追擊時砲塔不瞄準，避免亂射
 
-        if (Vector3.Distance(transform.position, target.position) < combatActivityAreaRadius / 2)
+        if (DistanceToPoint(target.position) < combatActivityAreaRadius / 2)
         {
             ChangeState(EntityState.Combat);   // 進入戰鬥範圍 → 真正切換狀態
         }
-        else if (currentWaypointIndex == path.Length - 1 && Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
+        else if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
         {
             destinationTimer = 0f;   // 走完舊路徑但還沒近 → 下一幀用目標當下位置重算（留在 Chasing）
         }
@@ -401,7 +401,7 @@ public class ModularEntityBrain : MonoBehaviour
         Vector3 nextWaypoint = FindNextWaypoint();
         Vector3 moveDirection = nextWaypoint - transform.position;
         moveDirection.y = 0f;
-        if (currentWaypointIndex == path.Length - 1 && Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
+        if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
         {
             destinationTimer = 0f;   // 到達徘徊點 → 下一幀重挑新徘徊點（留在 Combat）
         }
@@ -503,5 +503,10 @@ public class ModularEntityBrain : MonoBehaviour
         if (targetTransform == null) return;
         // 沒有就新增
         targets.Add(new Target(targetTransform, priority, priorityDecreaseMultiplier));
+    }
+
+    protected virtual float DistanceToPoint(Vector3 point)
+    {
+        return Vector3.Distance(transform.position, point);
     }
 }
