@@ -50,10 +50,10 @@ public class ModularEntityBrain : MonoBehaviour
     public ModularEntityMovement modularEntityMovement;
 
     [Header("Turrets")]
-    [SerializeField] private TurretController[] turrets;   // 0..N 座，Inspector 拖或自動抓
+    [SerializeField] protected TurretController[] turrets;   // 0..N 座，Inspector 拖或自動抓
 
-    private PathFinder pathFinder;
-    private ShipPassenger selfPassenger;   // 自己的船上狀態（掛在同一個 GameObject 上）
+    protected PathFinder pathFinder;
+    protected ShipPassenger selfPassenger;   // 自己的船上狀態（掛在同一個 GameObject 上）
 
     public EntityState currentState;
     public List<TargerPreference> targetPreferences = new List<TargerPreference>();
@@ -84,15 +84,15 @@ public class ModularEntityBrain : MonoBehaviour
     public float reactionCoolDown = 3f;
     public float reactionChance = 0.5f;
 
-    private float destinationTimer;
+    protected float destinationTimer;
 
     private readonly Dictionary<TargetType, float> decayMultiplierByType = new Dictionary<TargetType, float>();
 
-    [SerializeField] private float waypointArriveRadius = 5f;
-    [SerializeField] private float slowDownRadius = 6f;
-    private int currentWaypointIndex = 0;
+    [SerializeField] protected float waypointArriveRadius = 5f;
+    [SerializeField] protected float slowDownRadius = 6f;
+    protected int currentWaypointIndex = 0;
 
-    [SerializeField] private float facingDeadzone = 1f;   // 角度誤差小於此就不轉，避免抖動
+    [SerializeField] protected float facingDeadzone = 1f;   // 角度誤差小於此就不轉，避免抖動
 
     public void Start()
     {
@@ -106,7 +106,7 @@ public class ModularEntityBrain : MonoBehaviour
             turrets = GetComponentsInChildren<TurretController>();
     }
 
-    public void FixedUpdate()
+    public virtual void FixedUpdate()
     {
         PriorityUpdate();
         PathUpdate();
@@ -280,7 +280,7 @@ public class ModularEntityBrain : MonoBehaviour
     {
         return Random.Range(range.x, range.y);
     }
-    protected void IdleBehaviour()
+    protected virtual void IdleBehaviour()
     {
         if (path == null || path.Length == 0) return;
         Vector3 nextWaypoint = FindNextWaypoint();
@@ -288,11 +288,12 @@ public class ModularEntityBrain : MonoBehaviour
         moveDirection.y = 0f;
         float dist = moveDirection.magnitude;
 
-        ResetTurretAiming(moveDirection); // 閒置時砲塔不瞄準，避免亂射
 
-        if (dist < waypointArriveRadius)
+        ResetTurretAiming(moveDirection); // 巡邏時砲塔不瞄準，避免亂射
+
+        if (currentWaypointIndex == path.Length - 1 && Vector3.Distance(transform.position, nextWaypoint) < waypointArriveRadius)
         {
-            modularEntityMovement.HorizontalMovement(0f, 0f);
+            destinationTimer = 0f;   // 到達巡邏點 → 下一幀重挑新點（留在 Patrolling）
         }
         else
         {
@@ -300,16 +301,11 @@ public class ModularEntityBrain : MonoBehaviour
             Vector3 dir = moveDirection / dist * throttle;
 
             float signedAngle = Vector3.SignedAngle(modularEntityMovement.MeshForward, moveDirection, Vector3.up);
-            if (Mathf.Abs(signedAngle) < 30)
+            if (Mathf.Abs(signedAngle) < 180)
             {
                 modularEntityMovement.HorizontalMovement(dir.x, dir.z);
             }
             FaceMoveDirection(moveDirection);
-        }
-
-        if (targets.Count != 0)
-        {
-            ChangeState(EntityState.Chasing);
         }
 
     }
@@ -335,7 +331,7 @@ public class ModularEntityBrain : MonoBehaviour
             Vector3 dir = moveDirection / dist * throttle;
 
             float signedAngle = Vector3.SignedAngle(modularEntityMovement.MeshForward, moveDirection, Vector3.up);
-            if (Mathf.Abs(signedAngle) < 60)
+            if (Mathf.Abs(signedAngle) < 180)
             {
                 modularEntityMovement.HorizontalMovement(dir.x, dir.z);
             }

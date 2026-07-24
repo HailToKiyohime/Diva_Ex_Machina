@@ -4,29 +4,29 @@ using UnityEngine.EventSystems;
 public class ModularEntityMovement : MonoBehaviour
 {
     [Header("Rigidbody")]
-    [SerializeField] private Rigidbody entityRigidbody;
+    [SerializeField] protected Rigidbody entityRigidbody;
     [Header("Entity Stats")]
-    [SerializeField] private ModularEntityStats modularEntityStats;
+    [SerializeField] protected ModularEntityStats modularEntityStats;
 
-    [SerializeField] private Transform entityOrientation;
-    [SerializeField] private Transform entityMesh;
-    private Vector3 moveDirection = new Vector3(0, 0, 0);
+    [SerializeField] protected Transform entityOrientation;
+    [SerializeField] protected Transform entityMesh;
+    protected Vector3 moveDirection = new Vector3(0, 0, 0);
 
     [Header("Jump Setting")]
-    [SerializeField] private Transform groundPoint;
-    [SerializeField] private LayerMask whatIsGround;
-    [SerializeField] private bool grounded;
-    [SerializeField] private bool readyToJump;
-    private float jumpCooldown = 0.25f;
-    private float groundCheckDistance = 0.1f;
+    [SerializeField] protected Transform groundPoint;
+    [SerializeField] protected LayerMask whatIsGround;
+    [SerializeField] protected bool grounded;
+    [SerializeField] protected bool readyToJump;
+    protected float jumpCooldown = 0.25f;
+    protected float groundCheckDistance = 0.1f;
 
-    public void FixedUpdate()
+    public virtual void FixedUpdate()
     {
         GroundCheck();
         ApplyHorizontalMovementFixed(Time.fixedDeltaTime);
     }
 
-    private void ApplyHorizontalMovementFixed(float dt)
+    protected virtual void ApplyHorizontalMovementFixed(float dt)
     {
 
         Vector3 platformVel = GetMobilePlatformVelocity();
@@ -52,7 +52,7 @@ public class ModularEntityMovement : MonoBehaviour
         entityRigidbody.linearVelocity = outRel2 + platformVel;      // ✅ 設定一次，不累加
     }
 
-    public void HorizontalMovement(float moveX, float moveZ)
+    public virtual void HorizontalMovement(float moveX, float moveZ)
     {
         Vector3 forward = entityOrientation.forward;
         forward.y = 0f;
@@ -70,7 +70,7 @@ public class ModularEntityMovement : MonoBehaviour
         else if (moveDirection.sqrMagnitude > 1f)
             moveDirection.Normalize();
     }
-    public void VerticalMovement()
+    protected virtual void VerticalMovement()
     {
         if (grounded && readyToJump)
         {
@@ -81,7 +81,7 @@ public class ModularEntityMovement : MonoBehaviour
         }
     }
 
-    public float convertJumpHeightToForce(float jumpHeight)
+    protected virtual float convertJumpHeightToForce(float jumpHeight)
     {
         float g = Mathf.Abs(Physics.gravity.y);
         float v0 = Mathf.Sqrt(2f * g * jumpHeight);
@@ -90,7 +90,7 @@ public class ModularEntityMovement : MonoBehaviour
 
         return impulseMagnitude;
     }
-    private void ResetJump()
+    public virtual void ResetJump()
     {
         readyToJump = true;
     }
@@ -109,11 +109,11 @@ public class ModularEntityMovement : MonoBehaviour
     }
 
     // Mobile Platform carry (velocity-based)
-    private bool _onMobilePlatform = false;
-    private Rigidbody _mobilePlatformRb = null;
+    protected  bool _onMobilePlatform = false;
+    protected Rigidbody _mobilePlatformRb = null;
 
 
-    private Vector3 GetMobilePlatformVelocity()
+    protected virtual Vector3 GetMobilePlatformVelocity()
     {
         if (!_onMobilePlatform || _mobilePlatformRb == null) return Vector3.zero;
         return _mobilePlatformRb.linearVelocity; // Unity 6
@@ -150,5 +150,10 @@ public class ModularEntityMovement : MonoBehaviour
             f.y = 0f;
             return f.sqrMagnitude > 0.0001f ? f.normalized : entityMesh.forward;
         }
+    }
+
+    public Transform GetGroundPoint()
+    {
+        return groundPoint;
     }
 }
