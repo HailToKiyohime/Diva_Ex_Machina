@@ -7,53 +7,68 @@ public class FalconMovement : ModularEntityMovement
     [SerializeField] private float heightTolerance = 0.02f;
     [SerializeField] private float hoverRaycastDistance = 100f;
 
+    [Header("Banking")]
+    [SerializeField] private Transform bankPivot;          // FalconMesh 底下的 BankPivot（roll 專用中間層）
+    [SerializeField] private float maxBankAngle = 35f;     // 最大傾斜角（度）
+    [SerializeField] private float bankPerDegPerSec = 0.5f;// 迴轉率(度/秒) → 傾斜角 的比例
+    [SerializeField] private float bankLerpSpeed = 5f;     // 傾斜過渡的平滑速度
+    [SerializeField] private float bankReturnSpeed = 70f;  // 沒轉彎時 bank 回正速度（度/秒）
+
+
+    [SerializeField] private float approachGain = 3f;       // 高度誤差 → 期望垂直速度 的比例
+    [SerializeField] private float maxVerticalSpeed = 15f;  // 俯衝/爬升速度上限
+    private float targetBank;    // 由 RotateMesh 每次被呼叫時設定
+    private float currentBank;   // 實際套用的傾斜角，平滑追向 targetBank
+
     // 懸停 raycast 的結果（brain 若需要「腳下地面」的資訊可以直接讀，不用再打一次射線）
     public bool HasGroundBelow { get; private set; }
     public Vector3 GroundBelowPoint { get; private set; }
 
-    // ★ 不在 FixedUpdate 呼叫 VerticalMovement —— 改由 brain 的每個 state 各自呼叫，
-    //   因為每個 state 的飛行高度不同。base.FixedUpdate 仍負責 GroundCheck + 水平移動。
+    public override void FixedUpdate()
+    {
+        base.FixedUpdate();   // GroundCheck + ApplyHorizontalMovementFixed（下面已 override）
+        UpdateBank();         // 每幀更新傾斜（含回正）
+    }
 
     /// <summary>
     /// 維持在「腳下地面 + targetHeight」的高度。由 brain 的各個 state behaviour 呼叫。
     /// </summary>
     public void VerticalMovement(float targetHeight)
     {
-        // 往下找真正的地面：groundPoint 是隼自己的腳，會跟著隼飛，不能當高度基準
         HasGroundBelow = Physics.Raycast(groundPoint.position, Vector3.down, out RaycastHit hit,
                                          hoverRaycastDistance, whatIsGround);
-        if (!HasGroundBelow) return;   // 下方沒地面（飛出地圖 / 峽谷）→ 這幀不施力，自由落下
+        if (!HasGroundBelow) return;
 
         GroundBelowPoint = hit.point;
 
-        float realTargetHeight = hit.point.y + targetHeight;
-        float heightError = realTargetHeight - groundPoint.position.y;
+        float heightError = (hit.point.y + targetHeight) - groundPoint.position.y;
 
-        float verticalAcceleration = heightError * modularEntityStats.accelerationSpeed;
-        verticalAcceleration -= entityRigidbody.linearVelocity.y * damping;
-
-        verticalAcceleration = Mathf.Clamp(
-            verticalAcceleration,
-            -modularEntityStats.accelerationSpeed,
-            modularEntityStats.accelerationSpeed
+        // 目標垂直速度：離目標越遠飛越快，接近時線性收斂（類似水平的 throttle）
+        float desiredVerticalSpeed = Mathf.Clamp(
+            heightError * approachGain,          // 誤差 → 期望速度
+            -maxVerticalSpeed, maxVerticalSpeed
         );
 
-        entityRigidbody.AddForce(Vector3.up * verticalAcceleration, ForceMode.Acceleration);
+        float currentVy = entityRigidbody.linearVelocity.y;
 
-        // 已經到位就把殘餘垂直速度歸零，避免無止盡的微幅上下抖動
-        if (Mathf.Abs(heightError) < heightTolerance &&
-            Mathf.Abs(entityRigidbody.linearVelocity.y) < 0.05f)
-        {
-            Vector3 velocity = entityRigidbody.linearVelocity;
-            velocity.y = 0f;
-            entityRigidbody.linearVelocity = velocity;
-        }
+        // ★ 這一幀是要加速還是減速？跟 falcon 水平移動同一套判斷
+        //   朝目標速度靠近時：若「往目標的變化」是在縮小速度大小 → 用 deceleration
+        bool decelerating = Mathf.Abs(desiredVerticalSpeed) < Mathf.Abs(currentVy)
+                            || Mathf.Sign(desiredVerticalSpeed) != Mathf.Sign(currentVy);
+        float rate = decelerating
+            ? modularEntityStats.decelerationSpeed
+            : modularEntityStats.accelerationSpeed;
+
+        // 用選定的 rate 逼近目標垂直速度（rate 單位是「速度變化/秒」= 加速度）
+        float newVy = Mathf.MoveTowards(currentVy, desiredVerticalSpeed, rate * Time.fixedDeltaTime);
+
+        Vector3 v = entityRigidbody.linearVelocity;
+        v.y = newVy;
+        entityRigidbody.linearVelocity = v;
     }
 
     /// <summary>
     /// 與 base 唯一的差別：減速時用 decelerationSpeed，加速時才用 accelerationSpeed。
-    /// brain 靠 throttle（接近航點就變小）降低目標速度，這裡負責「真的煞得下來」，
-    /// 速度低了迴轉半徑才小（r = v / ω），轉彎才靈活。
     /// moveDirection 為零時目標速度為零 → 一樣走減速路徑 → 停下來懸停。
     /// </summary>
     protected override void ApplyHorizontalMovementFixed(float dt)
@@ -73,5 +88,34 @@ public class FalconMovement : ModularEntityMovement
         entityRigidbody.linearVelocity = new Vector3(horizontalRel.x, vRel.y, horizontalRel.z) + platformVel;
     }
 
+    /// <summary>
+    /// base 照舊做 yaw（繞 up 累加）。這裡「額外」依這一幀的迴轉率設定目標傾斜角。
+    /// roll 落在子物件 bankPivot 上，跟 entityMesh 的 yaw 完全分離，不互相污染。
+    /// </summary>
+    public override void RotateMesh(float direction, float maxDegrees = -1f)
+    {
+        base.RotateMesh(direction, maxDegrees);   // ★ 先做原本的 yaw，行為完全不變
 
+        if (bankPivot == null) return;
+
+        // 這一幀實際轉了多少度（base 已夾過 maxDegrees / rotationSpeed），換算成 度/秒
+        float step = modularEntityStats.rotationSpeed * Time.fixedDeltaTime;
+        if (maxDegrees >= 0f) step = Mathf.Min(step, maxDegrees);
+        float turnRateDegPerSec = (step * Mathf.Sign(direction)) / Time.fixedDeltaTime;
+
+        // 迴轉率越高 → 傾斜越大。負號決定傾斜側，歪錯邊就把負號拿掉。
+        targetBank = Mathf.Clamp(-turnRateDegPerSec * bankPerDegPerSec, -maxBankAngle, maxBankAngle);
+    }
+
+    // 每幀更新傾斜：RotateMesh 沒被呼叫（直線飛行）時，targetBank 主動衰減回 0 → 平飛回正
+    private void UpdateBank()
+    {
+        if (bankPivot == null) return;
+
+        targetBank = Mathf.MoveTowards(targetBank, 0f, bankReturnSpeed * Time.fixedDeltaTime);
+        currentBank = Mathf.Lerp(currentBank, targetBank, bankLerpSpeed * Time.fixedDeltaTime);
+
+        // 只寫 z 軸；bankPivot 不負責 yaw，所以 x/y 恆為 0
+        bankPivot.localEulerAngles = new Vector3(0f, 0f, currentBank);
+    }
 }

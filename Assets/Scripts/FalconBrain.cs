@@ -233,7 +233,7 @@ public class FalconBrain : ModularEntityBrain
                     destinationTimer = RollInterval(combatDestinationUpdateRange);
                     Transform combatTarget = FindTarget();
                     if (combatTarget == null) { ChangeState(EntityState.Patrolling); break; }   // 沒目標 → 回巡邏
-                    destination = MathToolKit.GetPointAtTargetBack(transform, combatTarget,5);
+                    destination = MathToolKit.GetPointAtTargetBack(transform, combatTarget,10);
                     SyncShipFlags(combatTarget);
                     SetPath(pathFinder.FindPath(destination));
                     break;
