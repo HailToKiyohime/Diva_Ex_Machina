@@ -25,6 +25,9 @@ public class MoveWithVelocity : MonoBehaviour
     [Header("Camera Rotation Sync")]
     public Transform cameraTransform;
 
+    [Header("Ignore Spline Height")]
+    public float fixedHeight = 1.6f;   // 船固定的 Y（世界高度）
+
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
@@ -44,8 +47,12 @@ public class MoveWithVelocity : MonoBehaviour
         float tAhead = loop ? Mathf.Repeat(t + lookAhead, 1f) : Mathf.Clamp01(t + lookAhead);
 
         Vector3 targetPos = spline.EvaluatePosition(tAhead);
+        targetPos.y = fixedHeight;   // ★ 忽略 spline 的 y，鎖定在固定高度
+
+
 
         Vector3 toTarget = (targetPos - rb.position);
+        toTarget.y = 0f;             // ★ 只用水平分量算移動方向，y 不參與驅動
         Vector3 desiredVel = toTarget.sqrMagnitude > 0.000001f ? toTarget.normalized * speed : Vector3.zero;
 
         Vector3 dv = desiredVel - rb.linearVelocity;
