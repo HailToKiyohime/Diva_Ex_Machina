@@ -180,6 +180,7 @@ public class FalconBrain : ModularEntityBrain
             Vector3 targetVel = targetRb != null ? targetRb.linearVelocity : Vector3.zero;
             UpdateTurretAiming(target, targetVel);
         }
+
     }
 
     protected override void PathUpdate()

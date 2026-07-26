@@ -46,7 +46,6 @@ public class PlayerAnimation : MonoBehaviour
     [SerializeField] private float attackFov = 80f;
     [SerializeField] private float normalFov = 65f;
     [SerializeField] private float fovBlendInTime = 0.10f;
-    [SerializeField] private float fovBlendOutTime = 0.15f;
     private Coroutine _fovRoutine;
     public CinemachineCamera Camera;
 

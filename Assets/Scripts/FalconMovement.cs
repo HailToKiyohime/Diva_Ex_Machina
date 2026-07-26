@@ -3,8 +3,6 @@ using UnityEngine;
 public class FalconMovement : ModularEntityMovement
 {
     [Header("Hover")]
-    [SerializeField] private float damping = 8f;
-    [SerializeField] private float heightTolerance = 0.02f;
     [SerializeField] private float hoverRaycastDistance = 100f;
 
     [Header("Banking")]

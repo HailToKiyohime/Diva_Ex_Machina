@@ -14,7 +14,7 @@ public class AdvancedButton : Selectable, IPointerClickHandler
     private Coroutine _resetRoutine;
 
     // 注意：Reset 是 Unity Message，不是 virtual，不要 override
-    protected void Reset()
+    protected override void Reset()
     {
         // 取得或補上 Image，並指定 targetGraphic
         var imageComponent = GetComponent<Image>();

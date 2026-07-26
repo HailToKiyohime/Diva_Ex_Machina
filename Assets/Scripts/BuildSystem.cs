@@ -116,7 +116,6 @@ public class BuildSystem : MonoBehaviour
     {
         if (buildToggles == null || buildToggles.Length == 0) return;
 
-        bool anyOff = false;
         bool allOff = true;
 
         for (int i = 0; i < buildToggles.Length; i++)
@@ -124,12 +123,8 @@ public class BuildSystem : MonoBehaviour
             var t = buildToggles[i];
             if (!t) continue;
 
-            if (!t.isOn) anyOff = true;
             if (t.isOn) allOff = false;
         }
-
-        // 你如果真的是「任何一個 off 就清掉」
-        // if (anyOff) ClearBuildingFootprints();
 
         // 通常更像是「全部都 off 才清掉」
         if (allOff) ClearBuildingFootprints();
