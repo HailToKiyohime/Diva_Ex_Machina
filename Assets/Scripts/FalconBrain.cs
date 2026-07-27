@@ -1,10 +1,11 @@
 using NaughtyAttributes;
+using UnityEditor.Timeline.Actions;
 using UnityEngine;
 
 public class FalconBrain : ModularEntityBrain
 {
     private FalconMovement falconMovement;
-
+    public FalconStats modularEntityStats;
     [Header("Flight Height (per state)")]
     [SerializeField] private float idleHeight = 10f;
     [SerializeField] private float patrolHeight = 10f;
@@ -14,6 +15,9 @@ public class FalconBrain : ModularEntityBrain
     [Header("Retreat Setting")]
     [MinMaxSlider(0f, 100f)]
     public Vector2 retreatAreaRadius = new Vector2(50f, 60f);
+
+
+    public MissileLauncherController missileLauncherController; // Missile launcher controller reference
     protected override void Start()
     {
         base.Start();
@@ -112,11 +116,18 @@ public class FalconBrain : ModularEntityBrain
         if (currentWaypointIndex == path.Length - 1 && dist < waypointArriveRadius|| Vector3.Distance(transform.position, FindTarget().position)> combatActivityAreaRadius)
         {
             ChangeState(EntityState.Combat);   // 撤退到位 → 真正切換狀態
+            Invoke(nameof(ChangeStateToRetreat), 10f); // 延遲調用 ChangeStateToRetreat 方法
         }
         else
         {
             FlyTowards(moveDirection, dist);
         }
+    }
+
+    private void ChangeStateToRetreat()
+    {
+        ChangeState(EntityState.Retreat);
+        CancelInvoke(nameof(ChangeStateToRetreat)); // 取消延遲調用，避免重複調用
     }
 
     protected override void ChasingBehaviour()
@@ -166,6 +177,7 @@ public class FalconBrain : ModularEntityBrain
 
         if (currentWaypointIndex == path.Length - 1 && dist < waypointArriveRadius)
         {
+            Invoke(nameof(LaunchMissile), 1f); // 延遲 1 秒發射導彈
             ChangeState(EntityState.Retreat);
         }
         else
@@ -182,7 +194,6 @@ public class FalconBrain : ModularEntityBrain
         }
 
     }
-
     protected override void PathUpdate()
     {
         destinationTimer -= Time.fixedDeltaTime;
@@ -233,12 +244,31 @@ public class FalconBrain : ModularEntityBrain
                 {
                     destinationTimer = RollInterval(combatDestinationUpdateRange);
                     Transform combatTarget = FindTarget();
-                    if (combatTarget == null) { ChangeState(EntityState.Patrolling); break; }   // 沒目標 → 回巡邏
-                    destination = MathToolKit.GetPointAtTargetBack(transform, combatTarget,10);
+                    if (combatTarget == null) { 
+                        ChangeState(EntityState.Patrolling); break; 
+                    }   // 沒目標 → 回巡邏
+
+                    if(MathToolKit.InterceptionPoint(combatTarget.position, transform.position, (combatTarget.GetComponentInParent<Rigidbody>().linearVelocity/2), modularEntityStats.sprintSpeed, out Vector3 interceptPoint))
+                    {
+                       destination = MathToolKit.GetPointAtTargetBack(transform.position, interceptPoint,10);
+                    }
+                    else
+                    {
+                        destination = MathToolKit.GetPointAtTargetBack(transform, combatTarget, 10);
+                    }
                     SyncShipFlags(combatTarget);
                     SetPath(pathFinder.FindPath(destination));
                     break;
                 }
+        }
+    }
+
+    private void LaunchMissile()
+    {
+        Transform target = FindTarget();
+        if (target != null)
+        {
+            StartCoroutine(missileLauncherController.Launch(target));
         }
     }
 }

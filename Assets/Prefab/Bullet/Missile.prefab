@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 9067150830255424435}
   - component: {fileID: -2983661135857915499}
   m_Layer: 10
-  m_Name: Rifle Bullet
+  m_Name: Missile
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -107,16 +107,16 @@ MonoBehaviour:
   isMelee: 0
   ignoreLayer:
     serializedVersion: 2
-    m_Bits: 82176
+    m_Bits: 66048
   enemyLayer:
     serializedVersion: 2
-    m_Bits: 512
+    m_Bits: 256
   ignoreObstacles: 0
-  homingDegreePerSecond: 0
+  homingDegreePerSecond: 180
   homingRange: 50
   homingSearchAngle: 40
-  homingLoseAngle: 90
-  maxHomingAngle: 120
+  homingLoseAngle: 180
+  maxHomingAngle: 360
   retargetInterval: 0.15
   homingRequireLineOfSight: 0
   homingObstacleLayer:
@@ -241,6 +241,18 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7603267757058564947, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7807621411852193943, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: InitialModule.startColor.maxColor.b
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7807621411852193943, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: InitialModule.startColor.maxColor.g
+      value: 0.009995077
+      objectReference: {fileID: 0}
+    - target: {fileID: 7807621411852193943, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
+      propertyPath: InitialModule.startColor.maxColor.r
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}

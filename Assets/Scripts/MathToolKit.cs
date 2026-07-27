@@ -131,6 +131,13 @@ public class MathToolKit
         if (offset.sqrMagnitude < 0.0001f) return b.position;
         return b.position + offset.normalized * distance;
     }
+    public static Vector3 GetPointAtTargetBack(Vector3 a, Vector3 b, float distance = 10f)
+    {
+        Vector3 offset = b - a;
+        offset.y = 0f;
+        if (offset.sqrMagnitude < 0.0001f) return b;
+        return b + offset.normalized * distance;
+    }
     public static Vector3 GetRandomPointInRing(Vector3 a, float outerRadius, float innerRadius)
     {
 

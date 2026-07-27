@@ -123,7 +123,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   alignToVelocity: 1
-  homingStartDelay: 0
+  homingStartDelay: 0.1
   lockAssignedTarget: 1
   penetration: 0
   meleeImpactOwnerAnim: {fileID: 0}
