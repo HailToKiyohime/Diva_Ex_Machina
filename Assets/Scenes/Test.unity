@@ -21599,7 +21599,7 @@ MonoBehaviour:
   missileLanchSpeed: 60
   missilePrefab: {fileID: 3891428710695554583, guid: 126e18b9eafdbe44c8e736eb44b26213, type: 3}
   launchStraightUp: 0
-  attacker: {fileID: 0}
+  attacker: {fileID: 6909393136711542496}
 --- !u!1 &820340226
 GameObject:
   m_ObjectHideFlags: 0
