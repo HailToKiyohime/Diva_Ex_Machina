@@ -116,4 +116,10 @@ public class FalconMovement : ModularEntityMovement
         // 只寫 z 軸；bankPivot 不負責 yaw，所以 x/y 恆為 0
         bankPivot.localEulerAngles = new Vector3(0f, 0f, currentBank);
     }
+    //returns the height of the entity above the ground. If there is no ground below, returns 0.
+    public float FlyHeight()
+    {
+        if (!HasGroundBelow) return 0f;
+        return groundPoint.position.y - GroundBelowPoint.y;
+    }
 }

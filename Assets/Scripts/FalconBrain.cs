@@ -116,7 +116,7 @@ public class FalconBrain : ModularEntityBrain
         if (currentWaypointIndex == path.Length - 1 && dist < waypointArriveRadius|| Vector3.Distance(transform.position, FindTarget().position)> combatActivityAreaRadius)
         {
             ChangeState(EntityState.Combat);   // 撤退到位 → 真正切換狀態
-            Invoke(nameof(ChangeStateToRetreat), 10f); // 延遲調用 ChangeStateToRetreat 方法
+            Invoke(nameof(ChangeStateToRetreat), Random.Range(5f, 10f)); // 延遲調用 ChangeStateToRetreat 方法
         }
         else
         {
@@ -177,8 +177,21 @@ public class FalconBrain : ModularEntityBrain
 
         if (currentWaypointIndex == path.Length - 1 && dist < waypointArriveRadius)
         {
-            Invoke(nameof(LaunchMissile), 1f); // 延遲 1 秒發射導彈
-            ChangeState(EntityState.Retreat);
+            int nextMove = Random.Range(0, 2);
+            if (nextMove == 0) {
+                Invoke(nameof(LaunchMissile), 1.5f); // 延遲 0.5 秒發射導彈
+                for (int i = 0; i < turrets.Length; i++)
+                {
+                    TurretController turret = turrets[i];
+                    if (turret == null) continue;
+                    turret.Reload();  // 重新裝填子彈
+                }
+                ChangeState(EntityState.Retreat);
+            }
+            else
+            {
+                destinationTimer = 0f;   // 走完舊路徑但還沒近 → 下一幀用目標當下位置重算
+            }
         }
         else
         {
@@ -265,10 +278,14 @@ public class FalconBrain : ModularEntityBrain
 
     private void LaunchMissile()
     {
-        Transform target = FindTarget();
-        if (target != null)
-        {
-            StartCoroutine(missileLauncherController.Launch(target));
+        // 檢查隼的高度是否大於 retreatHeight 的一半
+        if (falconMovement.FlyHeight()>retreatHeight/2) {
+            CancelInvoke(nameof(LaunchMissile)); // 取消延遲調用，避免重複調用
+            Transform target = FindTarget();
+            if (target != null)
+            {
+                StartCoroutine(missileLauncherController.Launch(target));
+            }
         }
     }
 }

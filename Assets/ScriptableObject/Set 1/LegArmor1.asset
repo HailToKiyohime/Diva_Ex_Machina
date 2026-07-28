@@ -30,13 +30,13 @@ MonoBehaviour:
     value: 15
   - attribute: 27
     mode: 0
-    value: -0.5
+    value: 2
   - attribute: 28
     mode: 0
-    value: 3
+    value: 5
   - attribute: 29
     mode: 0
-    value: 10
+    value: 15
   randomBuffs: []
   visualChange:
     heightOffset: 0.3

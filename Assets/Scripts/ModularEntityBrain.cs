@@ -307,7 +307,11 @@ public class ModularEntityBrain : MonoBehaviour
             }
             FaceMoveDirection(moveDirection);
         }
-
+        //if there is target in the list, change state to chasing
+        if (targets.Count > 0)
+        {
+            ChangeState(EntityState.Chasing);
+        }
     }
 
     protected virtual void PatrollingBehaviour()
