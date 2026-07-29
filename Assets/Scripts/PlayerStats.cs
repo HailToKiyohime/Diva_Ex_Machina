@@ -514,6 +514,8 @@ public class PlayerStats : MonoBehaviour, IDamageable
         dashSpeed = baseStats.dashSpeed;
         meleeDashDistance = baseStats.meleeDashDistance;
         meleeReloadTime = baseStats.meleeReloadTime;
+        meleeOutput = baseStats.meleeOutput;
+        meleeSpeed = baseStats.meleeSpeed;
 
         jumpHeight = baseStats.jumpHeight;
         flySpeed = baseStats.flySpeed;
@@ -796,14 +798,28 @@ public class PlayerStats : MonoBehaviour, IDamageable
     public float GetMeleeDashDistanceForHand(bool isLeftHand)
     {
         var hand = isLeftHand ? leftHand : rightHand;
-        return ApplyBuffListToValue(hand.buffs, Attributes.MeleeDashDistance, meleeDashDistance);
+        return ApplyBuffListToValue(hand.buffs, Attributes.MeleeDashDistance, baseStats.meleeDashDistance);
+    }
+
+    // 這隻手的最終近戰輸出倍率：baseStats.meleeOutput 再吃該手的武器側 buff
+    public float GetMeleeOutputForHand(bool isLeftHand)
+    {
+        var hand = isLeftHand ? leftHand : rightHand;
+        return ApplyBuffListToValue(hand.buffs, Attributes.MeleeOutput, baseStats.meleeOutput);
+    }
+
+    // 這隻手的最終近戰速度倍率（會拿去乘 Animator 的 melee layer speed）
+    public float GetMeleeSpeedForHand(bool isLeftHand)
+    {
+        var hand = isLeftHand ? leftHand : rightHand;
+        return ApplyBuffListToValue(hand.buffs, Attributes.MeleeSpeed, baseStats.meleeSpeed);
     }
 
     // The effective melee reload/cooldown time for the specified hand:
-    public float GetMeleeReloadTimeForHand(bool isLeftHand, float baseReloadTime)
+    public float GetMeleeReloadTimeForHand(bool isLeftHand)
     {
         var hand = isLeftHand ? leftHand : rightHand;
-        return ApplyBuffListToValue(hand.buffs, Attributes.MeleeReloadTime, baseReloadTime);
+        return ApplyBuffListToValue(hand.buffs, Attributes.MeleeReloadTime, baseStats.meleeReloadTime);
     }
 
     void ApplyAddToGlobal(EquipmentBuff buff)
@@ -836,9 +852,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
             case Attributes.AimingDistance: aimingDistance += buff.value; break;
             case Attributes.LockOnRange: lockOnRange += buff.value; break;
             case Attributes.AutoAimSpeed: autoAimSpeed += buff.value; break;
-
-            case Attributes.MeleeDashDistance: meleeDashDistance += buff.value; break;
-            case Attributes.MeleeReloadTime: meleeReloadTime += buff.value; break;
         }
     }
     void ApplyMultiplierToGlobal(EquipmentBuff buff)
@@ -872,9 +885,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
             case Attributes.AimingDistance: aimingDistance *= m; break;
             case Attributes.LockOnRange: lockOnRange *= m; break;
             case Attributes.AutoAimSpeed: autoAimSpeed *= m; break;
-
-            case Attributes.MeleeDashDistance: meleeDashDistance *= m; break;
-            case Attributes.MeleeReloadTime: meleeReloadTime *= m; break;
         }
     }
 

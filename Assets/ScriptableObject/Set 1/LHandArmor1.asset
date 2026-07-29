@@ -20,17 +20,25 @@ MonoBehaviour:
   skinnedMeshRenderer: {fileID: 3326239124440856559, guid: c58ebc8cff2b0b647a5479dc60601e9a, type: 3}
   buffs:
   - attribute: 3
+    mode: 0
     value: 5
   - attribute: 0
+    mode: 0
     value: 6
   - attribute: 6
+    mode: 0
+    value: 3
+  - attribute: 34
+    mode: 0
     value: 3
   randomBuffs:
   - buff:
       attribute: 0
+      mode: 0
       value: 5
     weight: 5
   - buff:
       attribute: 5
+      mode: 0
       value: 10
     weight: 1
