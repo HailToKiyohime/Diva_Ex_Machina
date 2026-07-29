@@ -39,7 +39,8 @@ public class RangeWeaponRuntimeState
 [System.Serializable]
 public class MeleeWeaponSettings
 {
-    public MeleeWeaponStance stance;
+    public MeleeWeaponClass weaponClass; // 由 blade × handle 經 MeleeStanceRules 推導
+    public MeleeGrip grip;               // 由另一隻手是否空著推導（runtime）
 
     public float meleeOutput = 1f;  // 傷害倍率（已含 buff）
     public float meleeSpeed = 1f;   // 動畫 / 連段速度倍率（已含 buff）
@@ -52,31 +53,35 @@ public class MeleeWeaponSettings
 [System.Serializable]
 public class MeleeWeaponRuntimeState
 {
-    public bool reloading;           // 冷卻中
-    public bool attacking;           // 揮擊中
-    public int comboIndex = -1;      // 目前第幾段，-1 = 不在連段
-    public float cooldownNormalized; // 0~1，給 UI 用
+    public bool reloading;              // 冷卻中
+    public bool attacking;              // 揮擊中
+    public int comboIndex = -1;        // 目前第幾段，-1 = 不在連段
+    public float cooldownNormalized;    // 0~1，給 UI 用
 }
 
 [System.Serializable]
 public class Weapon
 {
+
     public Transform muzzle;
     public GameObject bullet;
 
     // 目前這個槽位是遠程還是近戰（給 PlayerMovement / UI 分流用）
     public HandWeaponKind kind = HandWeaponKind.None;
 
-    // Damage Type（遠程近戰共用）
+    // Damage Type
     public WeaponDamage damage = new WeaponDamage();
 
-    // Range Weapon (Foldout)
-    public RangeWeaponSettings range = new RangeWeaponSettings();
-    public RangeWeaponRuntimeState rangeRuntime = new RangeWeaponRuntimeState();
-
-    // Melee Weapon (Foldout)
+    // Melee Weapon Specific (Foldout)
     public MeleeWeaponSettings melee = new MeleeWeaponSettings();
+    // Runtime State (Foldout)
     public MeleeWeaponRuntimeState meleeRuntime = new MeleeWeaponRuntimeState();
+
+    // Range Weapon Specific (Foldout)
+    public RangeWeaponSettings range = new RangeWeaponSettings();
+
+    // Runtime State (Foldout)
+    public RangeWeaponRuntimeState rangeRuntime = new RangeWeaponRuntimeState();
 
     // Reload UI runtime (0~1). When reloading, ammo bar shows this value.
     [HideInInspector] public float reloadNormalized;
@@ -108,6 +113,10 @@ public class AttackManager : MonoBehaviour
     // Shoulder Weapon Scource cache
     private ShoulderWeaponInstance _leftShoulderWeaponSource;
     private ShoulderWeaponInstance _rightShoulderWeaponSource;
+
+    [Header("Melee")]
+    [Tooltip("blade × handle → 武器類型 的組合規則表。鍛造 UI 與戰鬥系統共用同一份資產。")]
+    [SerializeField] private MeleeStanceRules stanceRules;
 
     [Header("Optional: used to add player velocity to sword slash")]
     [SerializeField] public Rigidbody playerRb;
@@ -142,8 +151,12 @@ public class AttackManager : MonoBehaviour
         var stats = PlayerStats.Instance;
         if (stats == null) return;
 
-        ApplyHand(stats.leftHand, leftHandWeapon, true, ref _leftRangeWeaponSource, ref _leftMeleeWeaponSource);
-        ApplyHand(stats.rightHand, rightHandWeapon, false, ref _rightRangeWeaponSource, ref _rightMeleeWeaponSource);
+        // 注意：左右手一起重算。握持方式（單手 / 雙手）取決於「另一隻手」，
+        // 所以卸下副手時主手必須跟著重算，這裡順序無關但兩邊都要跑。
+        ApplyHand(stats.leftHand, leftHandWeapon, true, stanceRules,
+                  ref _leftRangeWeaponSource, ref _leftMeleeWeaponSource);
+        ApplyHand(stats.rightHand, rightHandWeapon, false, stanceRules,
+                  ref _rightRangeWeaponSource, ref _rightMeleeWeaponSource);
 
 
         ApplyShoulder(stats.leftShoulder, leftShoulderWeapon, ref _leftShoulderWeaponSource);
@@ -186,9 +199,8 @@ public class AttackManager : MonoBehaviour
     {
         cachedSource = null;
 
-        // 注意：default(MeleeWeaponStance) == OneHandedPolearm，不是「無」。
-        // 判斷有沒有近戰武器一律用 outWeapon.kind，不要用 stance。
-        outWeapon.melee.stance = default;
+        outWeapon.melee.weaponClass = default;
+        outWeapon.melee.grip = default;
         outWeapon.melee.meleeOutput = 1f;
         outWeapon.melee.meleeSpeed = 1f;
         outWeapon.melee.dashDistance = 0f;
@@ -231,6 +243,7 @@ public class AttackManager : MonoBehaviour
         outWeapon.rangeRuntime.allowInvoke = false;
     }
     private static void ApplyHand(WeaponStats hand, Weapon outWeapon, bool isLeftHand,
+                                  MeleeStanceRules stanceRules,
                                   ref RangeWeaponInstance cachedRange,
                                   ref MeleeWeaponInstance cachedMelee)
     {
@@ -297,7 +310,7 @@ public class AttackManager : MonoBehaviour
         // ───── 近戰 ─────
         if (hand.weaponKind == HandWeaponKind.Melee)
         {
-            // ★ 原本的 bug：換成刀之後舊槍的 damage / rangeRuntime 會殘留
+            // ★ 這就是原本的 bug：換成刀之後舊槍的 damage / runtime 會殘留
             ClearRangeOutput(outWeapon, ref cachedRange);
 
             if (hand.meleeWeapon == null || hand.meleeWeapon.item is not MeleeWeapon mw)
@@ -315,9 +328,17 @@ public class AttackManager : MonoBehaviour
             outWeapon.damage.energyDamage = hand.GetAttribute(Attributes.EnergyDamage);
             outWeapon.damage.coldDamage = hand.GetAttribute(Attributes.ColdDamage);
 
-            // 2) 近戰專屬
+            // 2) 武器類型：每次現算，不存進 Instance。
+            //    這樣之後調整 MeleeStanceRules 時，存檔裡的舊武器不會停在舊值。
+            outWeapon.melee.weaponClass = (stanceRules != null)
+                ? stanceRules.ResolveClass(hand.meleeWeapon)
+                : MeleeWeaponClass.Sword;
+
+            // 3) 握持方式：另一隻手空著就是雙手持
+            outWeapon.melee.grip = MeleeStanceResolver.ResolveGrip(isLeftHand);
+
+            // 4) 近戰數值
             var ps = PlayerStats.Instance;
-            outWeapon.melee.stance = mw.meleeWeaponStance;
             outWeapon.melee.slashVfx = mw.swordSlash;
 
             if (ps != null)
@@ -335,7 +356,6 @@ public class AttackManager : MonoBehaviour
                 outWeapon.meleeRuntime.comboIndex = -1;
                 outWeapon.meleeRuntime.cooldownNormalized = 0f;
             }
-
             return;
         }
     }
@@ -406,7 +426,7 @@ public class AttackManager : MonoBehaviour
         float leftFill = CalcAmmoBarFill(leftHandWeapon);
         float rightFill = CalcAmmoBarFill(rightHandWeapon);
 
-        bool leftReloading =  leftHandWeapon != null && leftHandWeapon.rangeRuntime.reloading;
+        bool leftReloading = leftHandWeapon != null && leftHandWeapon.rangeRuntime.reloading;
 
         bool rightReloading = rightHandWeapon != null && rightHandWeapon.rangeRuntime.reloading;
 
@@ -593,7 +613,7 @@ public class AttackManager : MonoBehaviour
     public void StartReload(Weapon w)
     {
         if (w == null) return;
-        if (w.kind == HandWeaponKind.Melee) return;
+        if (w.kind == HandWeaponKind.Melee) return;   // 近戰不走換彈流程
         if (w.rangeRuntime.reloading) return;
 
         w.rangeRuntime.reloading = true;
