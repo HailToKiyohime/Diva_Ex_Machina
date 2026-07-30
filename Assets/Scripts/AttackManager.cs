@@ -48,6 +48,8 @@ public class MeleeWeaponSettings
     public float reloadTime;        // 連段結束後的硬直冷卻（已含 buff）
 
     public GameObject slashVfx;     // 來自 MeleeWeapon.swordSlash
+
+    public MeleeHitbox hitbox;      // 裝備時由 EquipmentManager 註冊到 instance 上
 }
 
 [System.Serializable]
@@ -206,6 +208,7 @@ public class AttackManager : MonoBehaviour
         outWeapon.melee.dashDistance = 0f;
         outWeapon.melee.reloadTime = 0f;
         outWeapon.melee.slashVfx = null;
+        outWeapon.melee.hitbox = null;
 
         outWeapon.meleeRuntime.reloading = false;
         outWeapon.meleeRuntime.attacking = false;
@@ -340,7 +343,7 @@ public class AttackManager : MonoBehaviour
             // 4) 近戰數值
             var ps = PlayerStats.Instance;
             outWeapon.melee.slashVfx = mw.swordSlash;
-
+            outWeapon.melee.hitbox = hand.meleeWeapon.hitbox;
             if (ps != null)
             {
                 outWeapon.melee.meleeOutput = ps.GetMeleeOutputForHand(isLeftHand);

@@ -616,10 +616,7 @@ public class PlayerMovement : MonoBehaviour
             return playerRigidbody.linearVelocity.y;
         }
     }
-    public void OnCollisionEnter(Collision collision)
-    {
-        Debug.Log("Hit: " + collision.gameObject + ",tag:" + collision.gameObject.tag + ", linearVelocity: "+ playerRigidbody.linearVelocity.magnitude);
-    }
+
     // Mobile Platform carry (velocity-based)
     private bool _onMobilePlatform = false;
     private Rigidbody _mobilePlatformRb = null;

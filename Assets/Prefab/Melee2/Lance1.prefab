@@ -188,13 +188,64 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 4449487210523686389, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
       insertIndex: -1
       addedObject: {fileID: 4825261571071945135}
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5070926402488667026}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5755983201317581769}
   m_SourcePrefab: {fileID: 100100000, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
 --- !u!4 &4979127790162344029 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
   m_PrefabInstance: {fileID: 4797410185177702326}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &5643778843091575527 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}
+  m_PrefabInstance: {fileID: 4797410185177702326}
+  m_PrefabAsset: {fileID: 0}
+--- !u!136 &5070926402488667026
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5643778843091575527}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.13417241
+  m_Height: 1.4244553
+  m_Direction: 1
+  m_Center: {x: 0.00000011920929, y: 0.7110397, z: 0.00000013783574}
+--- !u!114 &5755983201317581769
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5643778843091575527}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48f9b2806849f874bb385449377e91b5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MeleeHitbox
+  colliders:
+  - {fileID: 5070926402488667026}
+  addKinematicRigidbody: 0
+  logHits: 0
+  drawGizmoWhenOpen: 1
 --- !u!4 &9163719332427196995 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4449487210523686389, guid: 83be907f764dd874ab80f18d17bd39d8, type: 3}

@@ -304,6 +304,12 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3024569084458038871}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4821719940859074831}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1823105104084379910}
   m_SourcePrefab: {fileID: 100100000, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
 --- !u!4 &2966426190728645705 stripped
 Transform:
@@ -330,6 +336,44 @@ MonoBehaviour:
   playerAnimation: {fileID: 0}
   particles:
   - {fileID: 5655711919391702612}
+--- !u!114 &4821719940859074831
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6062413980630317493}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48f9b2806849f874bb385449377e91b5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MeleeHitbox
+  colliders:
+  - {fileID: 1823105104084379910}
+  addKinematicRigidbody: 0
+  logHits: 0
+  drawGizmoWhenOpen: 1
+--- !u!65 &1823105104084379910
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6062413980630317493}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.060564026, y: 1.2720766, z: 0.24381208}
+  m_Center: {x: 9.313226e-10, y: 0.58786, z: 0.030091446}
 --- !u!4 &6875261368348746511 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}

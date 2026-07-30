@@ -17,8 +17,6 @@ public class Bullet : MonoBehaviour
     public float lifespan = 5f;
     public Rigidbody rb;
 
-    public bool isMelee = false;
-
     public LayerMask ignoreLayer;
     public LayerMask enemyLayer;
     public bool ignoreObstacles = false;
@@ -99,11 +97,6 @@ public class Bullet : MonoBehaviour
 
     /// <summary>目前鎖定的目標（唯讀）。</summary>
     public Transform HomingTarget => _homingTarget;
-
-    public void SetMeleeImpactOwner(PlayerAnimation ownerAnim)
-    {
-        meleeImpactOwnerAnim = ownerAnim;
-    }
 
     // ═══════════════════ 外部指定目標 API ═══════════════════
 
@@ -422,8 +415,7 @@ public class Bullet : MonoBehaviour
         if (_destroyed) return;
         _destroyed = true;
 
-        if (isMelee) Destroy(gameObject, 0.1f);
-        else Destroy(gameObject);
+        Destroy(gameObject);
     }
 
     protected virtual void OnTriggerEnterFixed(Collider other)
@@ -471,15 +463,6 @@ public class Bullet : MonoBehaviour
             );
 
             target.TakeDamage(dmg, attacker);
-
-            // 近戰命中回饋
-            if (isMelee)
-            {
-                meleeImpactOwnerAnim?.AnimEvent_MeleeImpact();
-                var targetRb = (targetObj != null) ? targetObj.GetComponent<Rigidbody>() : null;
-                if (targetRb != null)
-                    targetRb.linearVelocity = Vector3.zero; // 命中時停住目標，回饋更明確（可選）
-            }
 
             // 避免穿過同一 collider 時重複觸發
             if (_selfCol != null && other != null)

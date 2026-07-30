@@ -22,6 +22,6 @@ MonoBehaviour:
   buffs: []
   randomBuffs: []
   meshRenderer: {fileID: -7511558181221131132, guid: 84805b1d016e53c4999290d2f59c93ed, type: 3}
-  attribute: 0
-  mainHandGrip: {fileID: 0}
-  offHandGrip: {fileID: 0}
+  attribute: 1
+  mainHandGripOffset: {x: 0, y: 0, z: 0}
+  offHandGripOffset: {x: 0, y: 0, z: 0}

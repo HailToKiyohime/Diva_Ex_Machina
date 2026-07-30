@@ -18,6 +18,5 @@ public struct DamageInfo
 
 public interface IDamageable
 {
-    // 由「被打的實體」自己套用防禦、結算血量
     void TakeDamage(DamageInfo damage, GameObject attacker);
 }

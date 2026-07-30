@@ -35,8 +35,8 @@ public class EquipmentSlot
 
 public class EquipmentManager : MonoBehaviour
 {
-    [SerializeField] private Transform leftMuzzleFlash;   
-    [SerializeField] private Transform rightMuzzleFlash;  
+    [SerializeField] private Transform leftMuzzleFlash;
+    [SerializeField] private Transform rightMuzzleFlash;
 
 
     [SerializeField] private Transform leftMuzzleFlashHolder;   // e.g. Player/FXHolders/L_MuzzleFlashHolder
@@ -214,11 +214,11 @@ public class EquipmentManager : MonoBehaviour
 
                 PlayerStats.Instance?.RecalculateFromEquipment();
                 RefreshEquipmentStatBlock();
-                return true; 
+                return true;
             }
-            return false; 
+            return false;
         }
-        return false; 
+        return false;
     }
 
     public bool TryEquipWeaponFromInventory(ItemInstance item, Transform mountPoint, int slotIndex)
@@ -364,24 +364,9 @@ public class EquipmentManager : MonoBehaviour
         {
             slot.equipedItem = Instantiate(mw.weaponPrefab, mountPoint, false);
 
-            // 找到 instance 內的 grip（用 SO 的名字）
-            var gripName = mw.mainHandGrip != null ? mw.mainHandGrip.name : null;
-            var grip = !string.IsNullOrEmpty(gripName) ? FindChildRecursive(slot.equipedItem.transform, gripName) : null;
+            // 握把對位不在這裡做：裝了 Handle 零件時，真正的握點由零件決定，
+            // 所以必須等零件全部掛完才對位（見本區塊末端的 AlignMeleeGrip）。
 
-            if (grip != null)
-            {
-
-                Quaternion gripOffset = Quaternion.identity;
-
-                SnapRootSoChildMatches(slot.equipedItem.transform, grip, mountPoint, gripOffset);
-
-
-                slot.equipedItem.transform.SetParent(mountPoint, true);
-            }
-            else
-            {
-                Debug.LogWarning($"Equip (Melee): cannot find grip by name '{gripName}' under '{slot.equipedItem.name}'");
-            }
             slot.item = item;
             if (mwi.colors != null && mwi.colors.Count > 0 && !string.IsNullOrEmpty(mwi.shaderName))
             {
@@ -411,10 +396,9 @@ public class EquipmentManager : MonoBehaviour
                 }
             }
 
-            if (FindChildRecursive(slot.equipedItem.transform, "MuzzlePoint") != null)
-            {
-                mwi.muzzlePoint = FindChildRecursive(slot.equipedItem.transform, "MuzzlePoint");
-            }
+            // 記下 Handle 零件的實體，零件掛完後要用它的握點做最後平移
+            GameObject handlePartGO = null;
+            MeleeWeaponPart handlePartSO = null;
 
             if (mwi.attachment != null)
             {
@@ -456,6 +440,12 @@ public class EquipmentManager : MonoBehaviour
                             part.transform.localRotation = Quaternion.identity;
                             part.transform.localScale = Vector3.one;
 
+                            if (attach.partType == WeaponPartType.Handle)
+                            {
+                                handlePartGO = part;
+                                handlePartSO = mwp;
+                            }
+
                             // apply saved colors (same as your existing logic)
                             if (attach.colors != null && attach.colors.Count > 0 && !string.IsNullOrEmpty(attach.shaderName))
                             {
@@ -492,10 +482,10 @@ public class EquipmentManager : MonoBehaviour
                             fx.transform.localPosition = Vector3.zero;
 
 
-                            fx.transform.localRotation = Quaternion.Euler(0, 90f, -90f); 
+                            fx.transform.localRotation = Quaternion.Euler(0, 90f, -90f);
                             fx.transform.localScale = new Vector3(mw.swordLength, mw.swordLength, 1);
 
-                            ApplyCoatingColors(fx, attach.colors); 
+                            ApplyCoatingColors(fx, attach.colors);
 
                             if (mw.defaultCoatingEffect != null)
                             {
@@ -509,6 +499,19 @@ public class EquipmentManager : MonoBehaviour
                         }
                     }
                 }
+            }
+
+            // ───── 握把對位（必須在零件全部掛完之後）─────
+            AlignMeleeGrip(slot.equipedItem.transform, mountPoint, mw, handlePartGO, handlePartSO);
+
+            // 註冊 hitbox。必須在零件掛完之後 —— hitbox 有可能長在零件上。
+            // 也必須在 RecalculateFromEquipment 之前，因為那會觸發
+            // OnHandWeaponDataChanged → AttackManager.ApplyHand 讀取這個欄位。
+            mwi.hitbox = slot.equipedItem.GetComponentInChildren<MeleeHitbox>(true);
+            if (mwi.hitbox == null)
+            {
+                Debug.LogWarning($"Equip (Melee): '{mw.itemName}' 上找不到 MeleeHitbox，" +
+                                 $"這把武器揮空氣。檢查刀刃上有沒有掛該組件。", slot.equipedItem);
             }
 
             PlayerStats.Instance?.RecalculateFromEquipment();
@@ -647,6 +650,47 @@ public class EquipmentManager : MonoBehaviour
         RefreshEquipmentStatBlock();
     }
 
+    // 近戰武器的握把對位。必須在所有零件掛完之後呼叫。
+    //
+    // 兩段式：
+    //   1) 用武器本體 SO 的 mainHandGrip 做完整對位（位置 + 旋轉）—— 維持既有行為
+    //   2) 有裝 Handle 零件 → 再做一次純平移，讓零件的 mainHandGripOffset 落到掛點
+    //
+    // 旋轉只由第 1 步決定。裝長柄在物理上就是「握點沿桿子往下滑」，是純位移，
+    // 刀刃朝向不變。順序不能反 —— TransformPoint 要等旋轉定案後才算得對。
+    //
+    // 效果：握點被推到柄上 → 刀刃自然離手更遠 → 攻擊距離自動變長，
+    //       所以 hitbox 不需要任何依 swordLength 的縮放邏輯。
+    private void AlignMeleeGrip(Transform weaponRoot, Transform mountPoint, MeleeWeapon mw,
+                                GameObject handlePartGO, MeleeWeaponPart handlePartSO)
+    {
+        if (weaponRoot == null || mountPoint == null || mw == null) return;
+
+        // 1) 本體握把：位置 + 旋轉
+        var baseGripName = (mw.mainHandGrip != null) ? mw.mainHandGrip.name : null;
+        var baseGrip = string.IsNullOrEmpty(baseGripName)
+            ? null
+            : FindChildRecursive(weaponRoot, baseGripName);
+
+        if (baseGrip != null)
+        {
+            SnapRootSoChildMatches(weaponRoot, baseGrip, mountPoint, Quaternion.identity);
+        }
+        else
+        {
+            Debug.LogWarning($"Equip (Melee): 找不到 '{mw.itemName}' 的握把節點 '{baseGripName}'，" +
+                             $"武器將沿用 prefab 相對掛點的原始姿態。");
+        }
+
+        // 2) Handle 零件的握點：純平移
+        if (handlePartGO != null && handlePartSO != null)
+        {
+            Vector3 gripWorld = handlePartGO.transform.TransformPoint(handlePartSO.mainHandGripOffset);
+            weaponRoot.position += (mountPoint.position - gripWorld);
+        }
+
+        weaponRoot.SetParent(mountPoint, true);
+    }
     private static void SnapRootSoChildMatches(Transform root, Transform child, Transform target, Quaternion childRotationOffset)
     {
         if (root == null || child == null || target == null) return;
@@ -682,7 +726,7 @@ public class EquipmentManager : MonoBehaviour
         if (ecc == null) return;
 
         ecc.colors = new List<Color>(colors);
-        ecc.ApplyFromColorsList();           
+        ecc.ApplyFromColorsList();
     }
 
     private static void ParentMuzzleFlashToMuzzle(Transform muzzleFlash, Transform muzzle)
