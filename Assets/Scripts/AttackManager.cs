@@ -1,93 +1,4 @@
-﻿using MoreMountains.Feedbacks;
-using System.Collections;
-using UnityEngine;
-using UnityEngine.XR;
-
-[System.Serializable]
-public class WeaponDamage
-{
-    public float physicalDamage;
-    public float explosionDamage;
-    public float energyDamage;
-    public float coldDamage;
-}
-
-[System.Serializable]
-public class RangeWeaponSettings
-{
-    public float reloadTime;
-    public int bulletPerShot;
-    public int roundPerTap;
-    public float timeBetweenShooting;
-    public float timeBetweenShots;
-    public float spread;
-    public int magazineSize;
-    public float bulletSpeed;
-    public int firingMode; // 0:Single, 1:Auto, 2:Charge
-}
-
-[System.Serializable]
-public class RangeWeaponRuntimeState
-{
-    public int bulletsLeft;
-    public bool shooting;
-    public bool reloading;
-    public bool readyToShoot;
-    public bool allowInvoke;
-}
-
-[System.Serializable]
-public class MeleeWeaponSettings
-{
-    public MeleeWeaponClass weaponClass; // 由 blade × handle 經 MeleeStanceRules 推導
-    public MeleeGrip grip;               // 由另一隻手是否空著推導（runtime）
-
-    public float meleeOutput = 1f;  // 傷害倍率（已含 buff）
-    public float meleeSpeed = 1f;   // 動畫 / 連段速度倍率（已含 buff）
-    public float dashDistance;      // 單段突進基礎距離（已含 buff）
-    public float reloadTime;        // 連段結束後的硬直冷卻（已含 buff）
-
-    public GameObject slashVfx;     // 來自 MeleeWeapon.swordSlash
-
-    public MeleeHitbox hitbox;      // 裝備時由 EquipmentManager 註冊到 instance 上
-}
-
-[System.Serializable]
-public class MeleeWeaponRuntimeState
-{
-    public bool reloading;              // 冷卻中
-    public bool attacking;              // 揮擊中
-    public int comboIndex = -1;        // 目前第幾段，-1 = 不在連段
-    public float cooldownNormalized;    // 0~1，給 UI 用
-}
-
-[System.Serializable]
-public class Weapon
-{
-
-    public Transform muzzle;
-    public GameObject bullet;
-
-    // 目前這個槽位是遠程還是近戰（給 PlayerMovement / UI 分流用）
-    public HandWeaponKind kind = HandWeaponKind.None;
-
-    // Damage Type
-    public WeaponDamage damage = new WeaponDamage();
-
-    // Melee Weapon Specific (Foldout)
-    public MeleeWeaponSettings melee = new MeleeWeaponSettings();
-    // Runtime State (Foldout)
-    public MeleeWeaponRuntimeState meleeRuntime = new MeleeWeaponRuntimeState();
-
-    // Range Weapon Specific (Foldout)
-    public RangeWeaponSettings range = new RangeWeaponSettings();
-
-    // Runtime State (Foldout)
-    public RangeWeaponRuntimeState rangeRuntime = new RangeWeaponRuntimeState();
-
-    // Reload UI runtime (0~1). When reloading, ammo bar shows this value.
-    [HideInInspector] public float reloadNormalized;
-}
+﻿using UnityEngine;
 
 public class AttackManager : MonoBehaviour
 {
@@ -96,13 +7,15 @@ public class AttackManager : MonoBehaviour
 
     public PlayerAnimation playerAnimation;
 
+    [Header("Sub Controllers")]
+    [Tooltip("遠程攻擊的實作。掛在同一個 GameObject 上，Awake 會自動抓。")]
+    [SerializeField] private RangeAttackController rangeController;
+    // 第 4 步會在這裡加上 MeleeAttackController
+
     public Weapon leftHandWeapon;
     public Weapon rightHandWeapon;
     public Weapon leftShoulderWeapon;
     public Weapon rightShoulderWeapon;
-
-    // Just for testing
-    public GameObject testBulletPrefab;
 
     // 用來判斷「是否換了一把武器」，以便重置子彈等 runtime state
     private RangeWeaponInstance _leftRangeWeaponSource;
@@ -123,15 +36,14 @@ public class AttackManager : MonoBehaviour
     [Header("Optional: used to add player velocity to sword slash")]
     [SerializeField] public Rigidbody playerRb;
 
-    [Header("Debug")]
-    [Tooltip("開火時在 Scene 視圖畫出：黃 = 準星 ray（相機出發）、紅 = 子彈實際方向（槍口出發），持續 1 秒。")]
-    [SerializeField] private bool debugDrawFireRay = false;
-
 
     private void Awake()
     {
         if (playerRb == null)
             playerRb = GetComponentInParent<Rigidbody>();
+
+        if (rangeController == null)
+            rangeController = GetComponent<RangeAttackController>();
     }
     private void OnEnable()
     {
@@ -418,7 +330,7 @@ public class AttackManager : MonoBehaviour
         }
     }
 
-    private void PushAmmoUI()
+    public void PushAmmoUI()
     {
         var ui = UIManager.Instance;
         if (ui == null) return;
@@ -463,231 +375,35 @@ public class AttackManager : MonoBehaviour
         return Mathf.Clamp01((float)w.rangeRuntime.bulletsLeft / w.range.magazineSize);
     }
 
-    public bool TryStartShoot(Weapon w)
+    // ────────────────────────────────────────────────
+    //  統一攻擊入口
+    //
+    //  PlayerMovement.ProcessAttackFacingAndAttack 做完面向與時機判定之後，
+    //  一律呼叫這裡，由武器種類決定交給誰。呼叫端不需要知道是刀還是槍。
+    // ────────────────────────────────────────────────
+
+    public bool TryAttack(Weapon w)
     {
         if (w == null) return false;
-        if (w.kind == HandWeaponKind.Melee) return false;
 
-        // 沒子彈就嘗試換彈（跟 HandleAttack 同邏輯）
-        if (w.rangeRuntime.readyToShoot && !w.rangeRuntime.reloading && w.rangeRuntime.bulletsLeft <= 0)
-            StartReload(w);
-
-        // 可以射擊才真正開火
-        if (w.rangeRuntime.readyToShoot && !w.rangeRuntime.reloading && w.rangeRuntime.bulletsLeft > 0)
+        if (w.kind == HandWeaponKind.Melee)
         {
-            w.rangeRuntime.bulletsLeft = Mathf.Max(0, w.rangeRuntime.bulletsLeft);
-            w.rangeRuntime.readyToShoot = false;
-            StartCoroutine(Shoot(w, PlayerAiming.Instance.GetRay()));
-            return true;
-        }
-
-        return false;
-    }
-
-    private IEnumerator Shoot(Weapon w, Ray ray)
-    {
-        w.rangeRuntime.readyToShoot = false;
-        int shotsToFire = Mathf.Min(w.range.roundPerTap, w.rangeRuntime.bulletsLeft);
-
-        var bulletPrefab = (w.bullet != null) ? w.bullet : testBulletPrefab;
-        var muzzle = w.muzzle;
-        if (bulletPrefab == null || muzzle == null)
-            yield break;
-
-        for (int i = 0; i < shotsToFire; i++)
-        {
-            for (int x = 0; x < w.range.bulletPerShot; x++)
-            {
-                bool isLeft = (w == leftHandWeapon);
-                bool isRight = (w == rightHandWeapon);
-
-                if (isLeft)
-                {
-                    playerAnimation.LeftWeaponMuzzleFlash();
-                }
-                else if (isRight)
-                {
-                    playerAnimation.RightWeaponMuzzleFlash();
-                }
-
-                var currentBullet = Instantiate(bulletPrefab, muzzle.position, Quaternion.identity);
-                var bulletComp = currentBullet.GetComponent<Bullet>();
-
-                bulletComp.attacker = playerRb.gameObject;
-
-                if (bulletComp != null)
-                {
-                    // 1) 傷害（已由 ApplyHand / ApplyShoulder 同步到 w.damage）
-                    bulletComp.physicalDamage = w.damage.physicalDamage;
-                    bulletComp.explosionDamage = w.damage.explosionDamage;
-                    bulletComp.energyDamage = w.damage.energyDamage;
-                    bulletComp.coldDamage = w.damage.coldDamage;
-
-                    // 2) 暴擊（先用 PlayerStats 的最終值；之後要做「武器/零件暴擊」再擴充）
-                    var ps = PlayerStats.Instance;
-                    if (ps != null)
-                    {
-                        bulletComp.criticalChance = ps.criticalChance;
-                        bulletComp.criticalMultiplier = ps.criticalMultiplier;
-                    }
-                }
-
-                Vector3 targetPoint;
-
-                Vector3 movingPlatformOffset = Vector3.zero;
-
-                // Burst（roundPerTap > 1）每一發都改用「當幀最新」的準星 ray；
-                // 原本整個 burst 沿用扣扳機那一刻的舊 ray，相機一轉就會歪。
-                Ray fireRay = (PlayerAiming.Instance != null) ? PlayerAiming.Instance.GetRay() : ray;
-
-                bool constrained = PlayerAiming.Instance.lockOn;
-                if (constrained)
-                {
-                    var targetRb = PlayerAiming.Instance.GetTargetRigidbody();
-                    if (TrySampleTarget(targetRb, out Vector3 tgtPos, out Vector3 tgtVel))
-                    {
-                        if (MathToolKit.InterceptionPoint(tgtPos, muzzle.position, tgtVel, w.range.bulletSpeed, out var predicted))
-                            targetPoint = predicted;
-                        else
-                            targetPoint = tgtPos;
-                    }
-                    else
-                    {
-                        targetPoint = fireRay.GetPoint(100f);
-                        if (shipRB != null && onShip == true)
-                        {
-                            movingPlatformOffset = shipRB.linearVelocity;
-                        }
-                    }
-                }
-                else
-                {
-                    targetPoint = fireRay.GetPoint(100f);
-                    if (shipRB != null && onShip == true)
-                    {
-                        movingPlatformOffset = shipRB.linearVelocity;
-                    }
-                }
-
-                Vector3 dirNoSpread = (targetPoint - muzzle.position).normalized;
-
-                Vector3 right = Vector3.Cross(dirNoSpread, Vector3.up);
-                if (right.sqrMagnitude < 0.0001f)
-                    right = Vector3.Cross(dirNoSpread, Vector3.right);
-                right.Normalize();
-                Vector3 up = Vector3.Cross(right, dirNoSpread);
-
-                float maxRad = w.range.spread * Mathf.Deg2Rad;
-                float cosMax = Mathf.Cos(maxRad);
-
-                float cosAlpha = Mathf.Lerp(1f, cosMax, Random.value);
-                float sinAlpha = Mathf.Sqrt(1f - cosAlpha * cosAlpha);
-                float phi = Random.Range(0f, Mathf.PI * 2f);
-
-                Vector3 lateral = right * Mathf.Cos(phi) + up * Mathf.Sin(phi);
-                Vector3 dirWithSpread = dirNoSpread * cosAlpha + lateral * sinAlpha;
-
-                if (debugDrawFireRay)
-                {
-                    Debug.DrawRay(fireRay.origin, fireRay.direction * 100f, Color.yellow, 1f);
-                    Debug.DrawRay(muzzle.position, dirNoSpread * 100f, Color.red, 1f);
-                }
-
-                var rb = currentBullet.GetComponent<Rigidbody>();
-                if (rb) rb.linearVelocity = (dirWithSpread * w.range.bulletSpeed) + movingPlatformOffset;
-                //make bullet face the direction it's moving
-                currentBullet.transform.forward = (dirWithSpread * w.range.bulletSpeed);
-            }
-
-            w.rangeRuntime.bulletsLeft--;
-            PushAmmoUI();
-
-            if (i < shotsToFire - 1)
-                yield return new WaitForSeconds(w.range.timeBetweenShots);
-        }
-
-        if (w.rangeRuntime.allowInvoke)
-        {
-            w.rangeRuntime.allowInvoke = false;
-            StartCoroutine(ResetShotCooldown(w));
-        }
-    }
-
-    public void StartReload(Weapon w)
-    {
-        if (w == null) return;
-        if (w.kind == HandWeaponKind.Melee) return;   // 近戰不走換彈流程
-        if (w.rangeRuntime.reloading) return;
-
-        w.rangeRuntime.reloading = true;
-        w.reloadNormalized = 0f;
-        PushAmmoUI();
-        playerAnimation.AnimEvent_Reload();
-
-        if (w.range.reloadTime <= 0f)
-        {
-            w.reloadNormalized = 1f;
-            PushAmmoUI();
-            FinishReload(w);
-            PushAmmoUI();
-            return;
-        }
-
-        StartCoroutine(ReloadCoroutine(w));
-    }
-
-    private IEnumerator ReloadCoroutine(Weapon w)
-    {
-        float elapsed = 0f;
-
-        while (elapsed < w.range.reloadTime)
-        {
-            elapsed += Time.deltaTime;
-            w.reloadNormalized = Mathf.Clamp01(elapsed / w.range.reloadTime);
-            PushAmmoUI();
-            yield return null;
-        }
-
-        w.reloadNormalized = 1f;
-        PushAmmoUI();
-
-        FinishReload(w);
-        PushAmmoUI();
-    }
-
-    private void FinishReload(Weapon w)
-    {
-        w.rangeRuntime.bulletsLeft = w.range.magazineSize;
-        w.rangeRuntime.reloading = false;
-        w.reloadNormalized = 0f;
-    }
-
-    private IEnumerator ResetShotCooldown(Weapon w)
-    {
-        yield return new WaitForSeconds(w.range.timeBetweenShooting);
-        w.rangeRuntime.readyToShoot = true;
-        w.rangeRuntime.allowInvoke = true;
-    }
-
-    private bool TrySampleTarget(Rigidbody rb, out Vector3 pos, out Vector3 vel)
-    {
-        pos = default;
-        vel = default;
-
-        if (!rb) return false;
-
-        try
-        {
-            pos = rb.position;
-            vel = rb.linearVelocity;
-            return true;
-        }
-        catch (MissingReferenceException)
-        {
+            // 第 4 步：改成 return meleeController != null && meleeController.TryStartMelee(w);
             return false;
         }
+
+        return (rangeController != null) && rangeController.TryStartShoot(w);
     }
 
+    // 舊名稱的轉接，讓 PlayerMovement 不用改。
+    public bool TryStartShoot(Weapon w) => TryAttack(w);
+
+    // 換彈是遠程專屬，但 PlayerController 直接呼叫這裡，所以保留轉接。
+    public void StartReload(Weapon w)
+    {
+        if (rangeController != null)
+            rangeController.StartReload(w);
+    }
 
     public void SetOnShip(Rigidbody rb)
     {
