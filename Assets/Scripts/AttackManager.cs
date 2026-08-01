@@ -10,7 +10,9 @@ public class AttackManager : MonoBehaviour
     [Header("Sub Controllers")]
     [Tooltip("遠程攻擊的實作。掛在同一個 GameObject 上，Awake 會自動抓。")]
     [SerializeField] private RangeAttackController rangeController;
-    // 第 4 步會在這裡加上 MeleeAttackController
+
+    [Tooltip("近戰連段的實作。掛在同一個 GameObject 上，Awake 會自動抓。")]
+    [SerializeField] private MeleeAttackController meleeController;
 
     public Weapon leftHandWeapon;
     public Weapon rightHandWeapon;
@@ -44,6 +46,9 @@ public class AttackManager : MonoBehaviour
 
         if (rangeController == null)
             rangeController = GetComponent<RangeAttackController>();
+
+        if (meleeController == null)
+            meleeController = GetComponent<MeleeAttackController>();
     }
     private void OnEnable()
     {
@@ -387,10 +392,7 @@ public class AttackManager : MonoBehaviour
         if (w == null) return false;
 
         if (w.kind == HandWeaponKind.Melee)
-        {
-            // 第 4 步：改成 return meleeController != null && meleeController.TryStartMelee(w);
-            return false;
-        }
+            return (meleeController != null) && meleeController.TryStartMelee(w);
 
         return (rangeController != null) && rangeController.TryStartShoot(w);
     }

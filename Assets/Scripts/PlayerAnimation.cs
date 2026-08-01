@@ -5,6 +5,10 @@ using UnityEngine;
 public class PlayerAnimation : MonoBehaviour
 {
     [SerializeField] private AttackManager attackManager;
+
+    [Tooltip("近戰連段控制器。留空則從 attackManager 的 GameObject 上自動抓。")]
+    [SerializeField] private MeleeAttackController meleeController;
+
     private Coroutine _initRoutine;
     public Animator anim;
     [SerializeField] private CapsuleCollider capsuleCollider;
@@ -70,6 +74,10 @@ public class PlayerAnimation : MonoBehaviour
     {
         anim = anim != null ? anim : GetComponent<Animator>();
         capsuleCollider = capsuleCollider != null ? capsuleCollider : GetComponent<CapsuleCollider>();
+
+        // 近戰 Animation Event 的轉發目標
+        if (meleeController == null && attackManager != null)
+            meleeController = attackManager.GetComponent<MeleeAttackController>();
 
         if (anim != null)
         {
@@ -656,7 +664,7 @@ public class PlayerAnimation : MonoBehaviour
     {
         dustFeedback?.PlayFeedbacks(this.transform.position);
     }
-        public void DustEffect_OnShip()
+    public void DustEffect_OnShip()
     {
         dustFeedback_OnShip?.PlayFeedbacks(this.transform.position);
     }
@@ -669,6 +677,29 @@ public class PlayerAnimation : MonoBehaviour
     {
         meleeAttackFeedback?.PlayFeedbacks(this.transform.position);
     }
+
+    // ────────────────────────────────────────────────
+    //  近戰連段的 Animation Event
+    //
+    //  這四個方法由攻擊 clip 上的 Animation Event 呼叫，單純轉發給
+    //  MeleeAttackController。全部無參數 —— 「哪隻手在揮」由控制器的內部狀態
+    //  決定，動畫不需要知道。
+    //
+    //  放置順序：HitboxOn → HitboxOff → ComboWindow → StepEnd
+    //  ComboWindow 一般抓在動畫 60~75% 的位置；太早開連段會失控，太晚開玩家
+    //  會覺得按鍵沒反應。
+    //
+    //  ★ AnimEvent_MeleeStepEnd 千萬不能漏，漏了會卡在攻擊狀態，
+    //    只能靠 MeleeAttackStep.maxStepDuration 兜底（會有明顯卡頓）。
+    // ────────────────────────────────────────────────
+
+    public void AnimEvent_MeleeHitboxOn() => meleeController?.OnHitboxOn();
+
+    public void AnimEvent_MeleeHitboxOff() => meleeController?.OnHitboxOff();
+
+    public void AnimEvent_MeleeComboWindow() => meleeController?.OnComboWindow();
+
+    public void AnimEvent_MeleeStepEnd() => meleeController?.OnStepEnd();
     public void AnimEvent_Reload()
     {
         reloadFeedback?.PlayFeedbacks(this.transform.position);

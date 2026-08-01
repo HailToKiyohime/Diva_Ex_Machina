@@ -25,11 +25,23 @@ public enum MeleeDashMode
 public class MeleeAttackStep
 {
     [Header("Animation")]
-    [Tooltip("Melee layer 內的 State 名稱，由 MeleeAttackController 用 CrossFade 播放")]
-    public string animStateName = "Melee_01";
+    [Tooltip("左手揮這一段時播放的 State 名稱（One_Hand_Melee_Attack 層內）。\n" +
+             "建議命名：{Class}_{Grip}_L_{Index}，例如 Sword_1H_L_01")]
+    public string animStateNameLeft = "Sword_1H_L_01";
+
+    [Tooltip("右手揮這一段時播放的 State 名稱。\n" +
+             "留空則沿用左手的名稱（動畫本身已處理左右對稱時可以只填一個）")]
+    public string animStateNameRight = "";
 
     [Tooltip("CrossFade 過渡時間（秒）。首段建議 0.04~0.06，後續段建議 0.08~0.12")]
     public float crossFadeTime = 0.08f;
+
+    /// <summary>取得這一段在指定手上要播的 State 名稱。右手留空則退回左手。</summary>
+    public string GetStateName(bool isLeftHand)
+    {
+        if (isLeftHand) return animStateNameLeft;
+        return string.IsNullOrWhiteSpace(animStateNameRight) ? animStateNameLeft : animStateNameRight;
+    }
 
     [Header("Damage")]
     [Tooltip("這一段的傷害倍率，乘在武器最終傷害之上")]
@@ -74,8 +86,11 @@ public class MeleeAttackStep
     public float hitStopDuration = 0f;
 
     [Header("Safety Fallback")]
-    [Tooltip("動畫忘了放 AnimEvent_MeleeStepEnd 時的保險絲（秒）。\n" +
-             "0 = 停用（不建議，會卡在攻擊狀態）")]
+    [Tooltip("★ 保險絲（秒）。時間到就強制結束這一段並關閉 hitbox。\n\n" +
+             "時間點全部由 clip 上的 Animation Event 驅動，所以只要有一個 clip 漏放\n" +
+             "AnimEvent_MeleeStepEnd，玩家就會永久卡在攻擊狀態。這個欄位是唯一的防線。\n" +
+             "設成比該段動畫長度稍長即可（例如動畫 0.8 秒就設 1.2）。\n" +
+             "0 = 停用，強烈不建議。")]
     public float maxStepDuration = 2f;
 }
 
@@ -227,8 +242,8 @@ public class MeleeComboLibrary : ScriptableObject
             var step = sequence.steps[i];
             if (step == null) continue;
 
-            if (string.IsNullOrWhiteSpace(step.animStateName))
-                Debug.LogWarning($"[MeleeComboLibrary] {label} 第 {i} 段沒有填 animStateName。", this);
+            if (string.IsNullOrWhiteSpace(step.animStateNameLeft))
+                Debug.LogWarning($"[MeleeComboLibrary] {label} 第 {i} 段沒有填 animStateNameLeft。", this);
 
             if (step.maxStepDuration <= 0f)
                 Debug.LogWarning($"[MeleeComboLibrary] {label} 第 {i} 段 maxStepDuration = 0，" +
