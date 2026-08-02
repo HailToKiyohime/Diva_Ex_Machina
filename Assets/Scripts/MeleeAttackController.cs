@@ -57,6 +57,7 @@ public class MeleeAttackController : MonoBehaviour
     private bool _activeIsLeft;            // 目前是哪隻手在揮
     private Weapon _activeWeapon;
     private MeleeAttackStep _activeStep;
+    private bool _activeIsFinisher;   // 新增欄位，放在 _activeStep 旁邊
 
     private float _stepDeadline;           // maxStepDuration 保險絲的到期時刻
     private float _leftCooldownUntil;      // 左手冷卻到什麼時候
@@ -130,6 +131,11 @@ public class MeleeAttackController : MonoBehaviour
         // 揮擊中且窗口還沒開 → 太早，忽略
         if (_attacking && !_windowOpen) return false;
 
+        // 終結技是連段的最後一段，後面沒有東西可接。
+        // 不擋的話，夾住的機制會讓玩家靠狂按無限重播終結技，
+        // OnStepEnd 永遠跑不到，冷卻也永遠不觸發。
+        if (_attacking && _activeIsFinisher) return false;
+
         int stepCount = comboLibrary.GetStepCount(w.melee.weaponClass, w.melee.grip);
         if (stepCount <= 0)
         {
@@ -160,6 +166,7 @@ public class MeleeAttackController : MonoBehaviour
         _activeWeapon = w;
         _activeIsLeft = isLeft;
         _activeStep = step;
+        _activeIsFinisher = (playedIndex == stepCount - 1);   // ← 新增
         _attacking = true;
         _windowOpen = false;
 
@@ -282,6 +289,7 @@ public class MeleeAttackController : MonoBehaviour
         _windowOpen = false;
         _activeWeapon = null;
         _activeStep = null;
+        _activeIsFinisher = false;   
         _stepDeadline = 0f;
 
         if (playerAnimation != null)

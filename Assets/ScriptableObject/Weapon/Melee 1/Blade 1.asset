@@ -18,7 +18,8 @@ MonoBehaviour:
   maxStack: 0
   dropPrefab: {fileID: 0}
   weaponPrefab: {fileID: 6062413980630317493, guid: 9ddaa685a2a2b2949a4c20dc97bee2c6, type: 3}
-  meleeWeaponStance: 4
+  attribute: 2
+  defaultHandleAttribute: 1
   buffs:
   - attribute: 0
     mode: 0
@@ -32,6 +33,9 @@ MonoBehaviour:
   - attribute: 8
     mode: 0
     value: 1
+  - attribute: 8
+    mode: 0
+    value: 1
   randomBuffs: []
   attachmentPoints:
   - pointTransform: {fileID: -6737475982703767480, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
@@ -40,7 +44,6 @@ MonoBehaviour:
     allowPart: 5
   meshRenderer: {fileID: 5702393946835736672, guid: 9ddaa685a2a2b2949a4c20dc97bee2c6, type: 3}
   defaultHandle: {fileID: 2247335557921061852, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
-  attribute: 2
   mainHandGrip: {fileID: 3088508940731471166, guid: 2553fd69c94a9444fbbdbc16c00f9723, type: 3}
   defaultCoatingEffect: {fileID: 2123748689605059989, guid: 8ceaf8810beb1b54bb2e8e7b064a941c, type: 3}
   swordLength: 0.65
