@@ -259,7 +259,7 @@ MonoBehaviour:
       steps:
       - animStateNameLeft: Lance_1H_L_01
         animStateNameRight: Lance_1H_R_01
-        crossFadeTime: 0.04
+        crossFadeTime: 0
         damageMultiplier: 1
         knockback: 0
         dashMode: 2
