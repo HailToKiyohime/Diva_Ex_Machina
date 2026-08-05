@@ -404,14 +404,17 @@ public class PlayerMovement : MonoBehaviour
         dashActiveUntil = Time.time + dashDuration;
         nextDashTime = Time.time + dashCooldown;
 
-        playerAnimation.setDashTrigger();
-
-        // Dash 取消了正在進行的近戰揮擊 → 讓控制器收尾（關 hitbox、停突進、進冷卻）
-        // CancelByDash 不會觸發煞車；這裡再清一次，擋掉上一段殘留的煞車視窗。
+        // ★ 順序很重要：先收掉近戰，再播 Dash 動畫。
+        //   近戰層是 Override 權重 1，CancelByDash → SetOffAttackLayer 需要
+        //   attackLayerBlendOutTime 才淡出。若先 setDashTrigger，這段期間
+        //   Dash 動畫會被近戰動畫蓋住，看起來像「沒播放」。
         CancelMeleeBrake();
+        StopMeleeDash();
 
         if (meleeController != null)
             meleeController.CancelByDash();
+
+        playerAnimation.setDashTrigger();
 
         CancelInvoke("ResetEnergyRegenerate");
         canRegenerateEnergy = false;
@@ -455,10 +458,11 @@ public class PlayerMovement : MonoBehaviour
     private Rigidbody _meleeDashTarget;   // null = Forward 模式。用 Rigidbody 才讀得到速度做攔截預判
     private AnimationCurve _meleeDashCurve;
 
+    private bool _meleeBraking;
     private float _meleeBrakeUntil;
 
     public bool IsMeleeDashing => _meleeDashing;
-    public bool IsMeleeBraking => Time.time < _meleeBrakeUntil;
+    public bool IsMeleeBraking => _meleeBraking;
 
     /// <summary>
     /// 收招煞車。由 MeleeAttackController 在 AnimEvent_MeleeStepEnd 時呼叫。
@@ -470,19 +474,36 @@ public class PlayerMovement : MonoBehaviour
     /// </summary>
     public void BeginMeleeBrake()
     {
-        _meleeBrakeUntil = Time.time + Mathf.Max(0f, meleeBrakeDuration);
+        // Dash 進行中不接受煞車。控制器那邊已經有 _attacking 守衛擋掉
+        // 「被取消的刀稍後才觸發 Brake」的情況，這裡是第二道防線 ——
+        // 煞車把玩家的逃生 Dash 歸零是絕對不能發生的事。
+        if (Time.time < dashActiveUntil) return;
 
-        // duration = 0 時立刻歸零，不等下一個 FixedUpdate
-        if (meleeBrakeDuration <= 0f)
-            ApplyMeleeBrakeFixed(Time.fixedDeltaTime);
+        _meleeBraking = true;
+        _meleeBrakeUntil = Time.time + Mathf.Max(0f, meleeBrakeDuration);
     }
 
-    public void CancelMeleeBrake() => _meleeBrakeUntil = 0f;
+    public void CancelMeleeBrake()
+    {
+        _meleeBraking = false;
+        _meleeBrakeUntil = 0f;
+    }
 
     private void ApplyMeleeBrakeFixed(float dt)
     {
-        if (Time.time >= _meleeBrakeUntil && meleeBrakeDuration > 0f) return;
-        if (playerRigidbody == null) return;
+        // ★ 用 bool 當閘門，不要用「時間 + duration」組合條件。
+        //   之前寫成 (Time.time >= until && duration > 0) 的話，duration = 0 會讓
+        //   整個條件恆為 false —— 煞車每幀都跑，把 Dash 在內的所有水平移動都吃掉。
+        if (!_meleeBraking) return;
+
+        if (playerRigidbody == null) { CancelMeleeBrake(); return; }
+
+        // duration = 0 表示立即歸零，這一幀做完就結束
+        if (meleeBrakeDuration > 0f && Time.time >= _meleeBrakeUntil)
+        {
+            CancelMeleeBrake();
+            return;
+        }
 
         Vector3 platformVel = GetMobilePlatformVelocity();
         Vector3 vRel = playerRigidbody.linearVelocity - platformVel;
@@ -496,10 +517,10 @@ public class PlayerMovement : MonoBehaviour
 
         horizontalRel = Vector3.Lerp(horizontalRel, Vector3.zero, k);
 
-        if (horizontalRel.sqrMagnitude < 0.01f)
+        if (horizontalRel.sqrMagnitude < 0.01f || meleeBrakeDuration <= 0f)
         {
             horizontalRel = Vector3.zero;
-            _meleeBrakeUntil = 0f;
+            CancelMeleeBrake();
         }
 
         playerRigidbody.linearVelocity =

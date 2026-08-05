@@ -336,12 +336,38 @@ public class MeleeAttackController : MonoBehaviour
         if (logStateChanges)
             Debug.Log("[Melee] cancelled by dash", this);
 
-        EndStep(brake: false);
+        OnStepEnd();
+    }
+
+    /// <summary>
+    /// 煞停突進動量。由 clip 上的 AnimEvent_MeleeBrake 觸發。
+    ///
+    /// 刻意跟 StepEnd 分開：煞車時機不一定跟收招結束重合。
+    /// 劈砍類想在刀刃落到底的瞬間就煞住（衝勢轉成打擊感），
+    /// 突刺類則可能想讓動量延續到收招末端。
+    ///
+    /// 沒放這個 event 的段就不會煞車，突進動量會自然衰減。
+    /// </summary>
+    public void OnBrake()
+    {
+        // ★ 這道守衛是必要的：Dash 取消揮擊時，SetOffAttackLayer 只把層權重淡到 0，
+        //   clip 本身還在那個 State 上繼續播，而 Animation Event 不管層權重多少
+        //   都會照常觸發。沒有這行的話，被取消的那一刀仍會在稍後煞掉玩家的 Dash。
+        if (!_attacking) return;
+
+        if (playerMovement == null) return;
+
+        playerMovement.StopMeleeDash();
+        playerMovement.BeginMeleeBrake();
+
+        if (logStateChanges)
+            Debug.Log("[Melee] brake", this);
     }
 
     /// <summary>刀刃結束傷害判定。</summary>
     public void OnHitboxOff()
     {
+        // 沒有 _attacking 守衛 —— 被取消的刀也該確保 hitbox 是關的（關兩次無害）。
         CloseAllHitboxes();
     }
 
@@ -359,22 +385,14 @@ public class MeleeAttackController : MonoBehaviour
     /// PlayStep 覆蓋掉狀態，這個 event 對舊的那一段就不再有意義）。
     /// 所以無論是終結技播完還是中途斷掉，處理方式相同：收招 + 進冷卻。
     /// </summary>
-    public void OnStepEnd() => EndStep(brake: true);
-
-    private void EndStep(bool brake)
+    public void OnStepEnd()
     {
         if (!_attacking) return;
 
         CloseAllHitboxes();
 
         if (playerMovement != null)
-        {
             playerMovement.StopMeleeDash();
-
-            // 收招煞車：把突進的動量吃掉，不然角色會滑出去。
-            // 被 Dash 取消時不煞 —— 玩家按 Shift 是要逃走。
-            if (brake) playerMovement.BeginMeleeBrake();
-        }
 
         BeginCooldown(_activeIsLeft);
         ResetCombo();

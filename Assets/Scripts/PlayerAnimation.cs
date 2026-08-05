@@ -685,10 +685,13 @@ public class PlayerAnimation : MonoBehaviour
     //  MeleeAttackController。全部無參數 —— 「哪隻手在揮」由控制器的內部狀態
     //  決定，動畫不需要知道。
     //
-    //  放置順序：DashStart → HitboxOn → HitboxOff → ComboWindow → StepEnd
+    //  放置順序：DashStart → HitboxOn → HitboxOff → Brake → ComboWindow → StepEnd
     //
     //  DashStart 只有 dashMode != None 的段需要，放在舉刀之後、HitboxOn 之前
     //  （先舉刀、再突進、再劈下）。
+    //
+    //  Brake 煞停突進動量，時機自由 —— 劈砍類放在刀刃落到底的瞬間（衝勢轉成
+    //  打擊感），突刺類可以晚一點讓動量延續。沒放的段就不煞車。
     //
     //  ComboWindow 一般抓在動畫 60~75% 的位置；太早開連段會失控，太晚開玩家
     //  會覺得按鍵沒反應。
@@ -702,6 +705,8 @@ public class PlayerAnimation : MonoBehaviour
     public void AnimEvent_MeleeHitboxOn() => meleeController?.OnHitboxOn();
 
     public void AnimEvent_MeleeHitboxOff() => meleeController?.OnHitboxOff();
+
+    public void AnimEvent_MeleeBrake() => meleeController?.OnBrake();
 
     public void AnimEvent_MeleeComboWindow() => meleeController?.OnComboWindow();
 
