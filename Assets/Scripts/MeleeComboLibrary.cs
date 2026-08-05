@@ -51,31 +51,23 @@ public class MeleeAttackStep
     public float knockback = 0f;
 
     [Header("Dash")]
+    [Tooltip("這一段的突進模式。突進由 clip 上的 AnimEvent_MeleeDashStart 觸發，\n" +
+             "所以 None 以外的段記得在動畫上放那個 event（放在舉刀之後、HitboxOn 之前）。")]
     public MeleeDashMode dashMode = MeleeDashMode.None;
 
-    [Tooltip("突進距離倍率，乘在 PlayerStats.GetMeleeDashDistanceForHand（已含 buff）之上")]
-    public float dashDistanceMultiplier = 1f;
+    [Tooltip("突進速度曲線。\n" +
+             "X = 0~1 已走完的距離比例，Y = 速度倍率（乘在 dashSpeed 之上）。\n\n" +
+             "由高到低 = 起步快、接近目標時減速（衝刺攻擊的標準手感）。\n" +
+             "由低到高 = 蓄力式加速。\n" +
+             "曲線末端趨近 0 時，控制器會套用速度下限避免永遠走不完。")]
+    public AnimationCurve dashCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0.2f);
 
-    [Tooltip("突進持續時間（秒）。會被 melee.meleeSpeed 反向縮放，速度越快突進越短")]
-    public float dashDuration = 0.15f;
-
-    [Tooltip("突進速度曲線。X = 0~1 正規化時間，Y = 0~1 已走完的距離比例。\n" +
-             "起手快煞車慢用 EaseOut，蓄力衝刺用 EaseIn")]
-    public AnimationCurve dashCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
-
-    [Tooltip("ToTarget 模式：停在目標前方多遠，避免穿模")]
+    [Tooltip("ToTarget 模式：距離目標多近就停下，避免穿模")]
     public float dashStopDistance = 1.5f;
 
-    [Tooltip("ToTarget 模式：目標偏離面向超過這個角度就不追，退化成 Forward（度）")]
-    [Range(0f, 180f)]
-    public float dashMaxTargetAngle = 90f;
-
     [Header("Flow")]
-    [Tooltip("這一段結束後、連段中斷時的硬直倍率。\n" +
-             "乘在 PlayerStats.GetMeleeReloadTimeForHand 之上。收招大的終結技可以調高")]
-    public float cooldownMultiplier = 1f;
-
-    [Tooltip("這一段能否被 Dash 取消（給玩家逃生窗口）")]
+    [Tooltip("這一段能否被 Dash 取消（給玩家逃生窗口）。\n" +
+             "取消時會關閉 hitbox、停止突進、並讓當前這隻手進入冷卻。")]
     public bool cancellableByDash = true;
 
     [Header("VFX / Feel")]
@@ -249,11 +241,11 @@ public class MeleeComboLibrary : ScriptableObject
                 Debug.LogWarning($"[MeleeComboLibrary] {label} 第 {i} 段 maxStepDuration = 0，" +
                                  $"若動畫漏放 StepEnd 事件會卡在攻擊狀態。", this);
 
-            if (step.dashMode != MeleeDashMode.None && step.dashDuration <= 0f)
-                Debug.LogWarning($"[MeleeComboLibrary] {label} 第 {i} 段有突進但 dashDuration = 0。", this);
+            if (step.damageMultiplier <= 0f)
+                Debug.LogWarning($"[MeleeComboLibrary] {label} 第 {i} 段 damageMultiplier = 0，這一段不會造成傷害。", this);
 
             if (step.dashMode != MeleeDashMode.None && (step.dashCurve == null || step.dashCurve.length == 0))
-                Debug.LogWarning($"[MeleeComboLibrary] {label} 第 {i} 段的 dashCurve 是空的，突進距離會恆為 0。", this);
+                Debug.LogWarning($"[MeleeComboLibrary] {label} 第 {i} 段的 dashCurve 是空的，突進會用固定速度。", this);
         }
     }
 #endif

@@ -681,17 +681,23 @@ public class PlayerAnimation : MonoBehaviour
     // ────────────────────────────────────────────────
     //  近戰連段的 Animation Event
     //
-    //  這四個方法由攻擊 clip 上的 Animation Event 呼叫，單純轉發給
+    //  這五個方法由攻擊 clip 上的 Animation Event 呼叫，單純轉發給
     //  MeleeAttackController。全部無參數 —— 「哪隻手在揮」由控制器的內部狀態
     //  決定，動畫不需要知道。
     //
-    //  放置順序：HitboxOn → HitboxOff → ComboWindow → StepEnd
+    //  放置順序：DashStart → HitboxOn → HitboxOff → ComboWindow → StepEnd
+    //
+    //  DashStart 只有 dashMode != None 的段需要，放在舉刀之後、HitboxOn 之前
+    //  （先舉刀、再突進、再劈下）。
+    //
     //  ComboWindow 一般抓在動畫 60~75% 的位置；太早開連段會失控，太晚開玩家
     //  會覺得按鍵沒反應。
     //
     //  ★ AnimEvent_MeleeStepEnd 千萬不能漏，漏了會卡在攻擊狀態，
     //    只能靠 MeleeAttackStep.maxStepDuration 兜底（會有明顯卡頓）。
     // ────────────────────────────────────────────────
+
+    public void AnimEvent_MeleeDashStart() => meleeController?.OnDashStart();
 
     public void AnimEvent_MeleeHitboxOn() => meleeController?.OnHitboxOn();
 

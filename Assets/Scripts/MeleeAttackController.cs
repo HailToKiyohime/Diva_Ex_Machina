@@ -31,6 +31,9 @@ public class MeleeAttackController : MonoBehaviour
     [SerializeField] private AttackManager attackManager;
     [SerializeField] private PlayerAnimation playerAnimation;
 
+    [Tooltip("突進的實際位移由 PlayerMovement 執行（那裡才有 Rigidbody 與平台速度）。")]
+    [SerializeField] private PlayerMovement playerMovement;
+
     [Header("Data")]
     [Tooltip("武器類型 × 握持 → 連段資料。整個專案通常只需要一份資產。")]
     [SerializeField] private MeleeComboLibrary comboLibrary;
@@ -57,7 +60,12 @@ public class MeleeAttackController : MonoBehaviour
     private bool _activeIsLeft;            // 目前是哪隻手在揮
     private Weapon _activeWeapon;
     private MeleeAttackStep _activeStep;
-    private bool _activeIsFinisher;   // 新增欄位，放在 _activeStep 旁邊
+    private bool _activeIsFinisher;        // 終結技不接受後續輸入
+
+    // 突進的能量結算：屬於「一整串連段」，不屬於任何一隻手。
+    // 第一隻真正突進的手付入場費，換手後不再付；連段 reset 才重新結算。
+    private bool _dashEnergyResolved;
+    private bool _dashEmpowered;           // true = 有能量的強化模式
 
     private float _stepDeadline;           // maxStepDuration 保險絲的到期時刻
     private float _leftCooldownUntil;      // 左手冷卻到什麼時候
@@ -75,6 +83,12 @@ public class MeleeAttackController : MonoBehaviour
 
         if (attacker == null && attackManager.playerRb != null)
             attacker = attackManager.playerRb.gameObject;
+
+        if (playerMovement == null && attackManager.playerRb != null)
+            playerMovement = attackManager.playerRb.GetComponentInChildren<PlayerMovement>();
+
+        if (playerMovement == null)
+            playerMovement = FindAnyObjectByType<PlayerMovement>();
 
         if (playerAnimation != null && playerAnimation.anim != null)
         {
@@ -176,6 +190,10 @@ public class MeleeAttackController : MonoBehaviour
         // 上一段的 hitbox 可能還開著（連段接得很快時），先關掉
         CloseAllHitboxes();
 
+        // 上一段的突進也要停 —— 新的一段有自己的 DashStart
+        if (playerMovement != null)
+            playerMovement.StopMeleeDash();
+
         float speed = Mathf.Max(0.01f, w.melee.meleeSpeed);
         _stepDeadline = (step.maxStepDuration > 0f)
             ? Time.time + (step.maxStepDuration / speed)
@@ -185,9 +203,8 @@ public class MeleeAttackController : MonoBehaviour
 
         if (logStateChanges)
         {
-            bool isFinisher = (playedIndex == stepCount - 1);
             Debug.Log($"[Melee] combo={comboIndex} played={playedIndex}/{stepCount - 1} " +
-                      $"hand={(isLeft ? "L" : "R")} {(isFinisher ? "FINISHER" : "")} " +
+                      $"hand={(isLeft ? "L" : "R")} {(_activeIsFinisher ? "FINISHER" : "")} " +
                       $"state={step.GetStateName(isLeft)}", this);
         }
     }
@@ -243,6 +260,85 @@ public class MeleeAttackController : MonoBehaviour
         hitbox.Open();
     }
 
+    /// <summary>
+    /// 開始突進。由 clip 上的 AnimEvent_MeleeDashStart 觸發，
+    /// 放在舉刀之後、HitboxOn 之前 —— 先舉刀、再突進、再劈下。
+    ///
+    /// 能量在「這一串連段第一個真正突進的段」結算一次：
+    ///   夠 → 扣能量，dashSpeed 全速、MeleeDashDistance 全程
+    ///   不夠 → 不扣，退化成 sprintSpeed、距離減半
+    /// 之後同一串的突進段沿用第一次的結果，不再檢查也不再扣。
+    /// </summary>
+    public void OnDashStart()
+    {
+        if (!_attacking || _activeWeapon == null || _activeStep == null) return;
+        if (_activeStep.dashMode == MeleeDashMode.None) return;
+        if (playerMovement == null) return;
+
+        var ps = PlayerStats.Instance;
+        if (ps == null) return;
+
+        // 一串連段只結算一次能量
+        if (!_dashEnergyResolved)
+        {
+            _dashEmpowered = (ps.currentEnergy >= ps.dashEnergyCost);
+            if (_dashEmpowered)
+                ps.currentEnergy -= ps.dashEnergyCost;
+
+            _dashEnergyResolved = true;
+
+            if (logStateChanges)
+                Debug.Log($"[Melee] dash energy resolved: {(_dashEmpowered ? "EMPOWERED" : "WEAKENED")}", this);
+        }
+
+        float baseDistance = _activeWeapon.melee.dashDistance;
+        float speed = _dashEmpowered ? ps.dashSpeed : ps.sprintSpeed;
+        float distance = _dashEmpowered ? baseDistance : (baseDistance * 0.5f);
+
+        // ToTarget：用 PlayerAiming 的鎖定目標。它只在 lockOnRange 圈內才會鎖定，
+        // 所以「圈外不追」是自動成立的，不需要額外的角度判定。
+        // 傳 Rigidbody 而不是 Transform —— PlayerMovement 需要目標速度來算攔截點。
+        Rigidbody target = null;
+        if (_activeStep.dashMode == MeleeDashMode.ToTarget && PlayerAiming.Instance != null)
+            target = PlayerAiming.Instance.GetTargetRigidbody();
+
+        // 沒有目標（或 Forward 模式）→ 沿角色當前面向
+        Vector3 dir = (target != null)
+            ? (target.position - playerMovement.transform.position)
+            : GetFacingDirection();
+
+        playerMovement.BeginMeleeDash(dir, speed, distance,
+                                      _activeStep.dashCurve, target, _activeStep.dashStopDistance);
+    }
+
+    private Vector3 GetFacingDirection()
+    {
+        var model = (playerAnimation != null) ? playerAnimation.transform : transform;
+        Vector3 f = model.forward;
+        f.y = 0f;
+        return (f.sqrMagnitude > 0.0001f) ? f.normalized : Vector3.forward;
+    }
+
+    /// <summary>
+    /// 這一段是否禁止 Dash 取消。PlayerMovement.DashAction 開頭會檢查。
+    /// </summary>
+    public bool IsBlockingDash =>
+        _attacking && _activeStep != null && !_activeStep.cancellableByDash;
+
+    /// <summary>
+    /// 揮擊被 Dash 取消。由 PlayerMovement.DashAction 成功時呼叫。
+    /// 跟 OnStepEnd 一樣收尾：關 hitbox、停突進、當前手進冷卻、reset。
+    /// </summary>
+    public void CancelByDash()
+    {
+        if (!_attacking) return;
+
+        if (logStateChanges)
+            Debug.Log("[Melee] cancelled by dash", this);
+
+        EndStep(brake: false);
+    }
+
     /// <summary>刀刃結束傷害判定。</summary>
     public void OnHitboxOff()
     {
@@ -263,11 +359,23 @@ public class MeleeAttackController : MonoBehaviour
     /// PlayStep 覆蓋掉狀態，這個 event 對舊的那一段就不再有意義）。
     /// 所以無論是終結技播完還是中途斷掉，處理方式相同：收招 + 進冷卻。
     /// </summary>
-    public void OnStepEnd()
+    public void OnStepEnd() => EndStep(brake: true);
+
+    private void EndStep(bool brake)
     {
         if (!_attacking) return;
 
         CloseAllHitboxes();
+
+        if (playerMovement != null)
+        {
+            playerMovement.StopMeleeDash();
+
+            // 收招煞車：把突進的動量吃掉，不然角色會滑出去。
+            // 被 Dash 取消時不煞 —— 玩家按 Shift 是要逃走。
+            if (brake) playerMovement.BeginMeleeBrake();
+        }
+
         BeginCooldown(_activeIsLeft);
         ResetCombo();
     }
@@ -289,8 +397,12 @@ public class MeleeAttackController : MonoBehaviour
         _windowOpen = false;
         _activeWeapon = null;
         _activeStep = null;
-        _activeIsFinisher = false;   
+        _activeIsFinisher = false;
         _stepDeadline = 0f;
+
+        // 能量入場費隨連段一起重置：下一串要重新結算
+        _dashEnergyResolved = false;
+        _dashEmpowered = false;
 
         if (playerAnimation != null)
             playerAnimation.SetOffAttackLayer();
@@ -304,9 +416,8 @@ public class MeleeAttackController : MonoBehaviour
         var w = isLeft ? attackManager.leftHandWeapon : attackManager.rightHandWeapon;
         if (w == null || w.kind != HandWeaponKind.Melee) return;
 
-        // 該段的 cooldownMultiplier（收招大的終結技可以調高）
-        float mul = (_activeStep != null) ? Mathf.Max(0f, _activeStep.cooldownMultiplier) : 1f;
-        float duration = Mathf.Max(0f, w.melee.reloadTime * mul);
+        // 硬直長度單純來自 MeleeReloadTime（武器側屬性，已含 buff）
+        float duration = Mathf.Max(0f, w.melee.reloadTime);
 
         if (isLeft) _leftCooldownUntil = Time.time + duration;
         else _rightCooldownUntil = Time.time + duration;

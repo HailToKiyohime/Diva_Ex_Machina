@@ -22,22 +22,29 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 1
         dashMode: 2
-        dashDistanceMultiplier: 1
-        dashDuration: 0.5
         dashCurve:
           serializedVersion: 2
           m_Curve:
           - serializedVersion: 3
-            time: 0
-            value: 0.9976196
-            inSlope: 0
-            outSlope: 0
+            time: -0.017345428
+            value: 0.8980408
+            inSlope: 0.11418128
+            outSlope: 0.11418128
             tangentMode: 0
             weightedMode: 0
             inWeight: 0
-            outWeight: 0
+            outWeight: 0.23582406
           - serializedVersion: 3
-            time: 1.1916809
+            time: 0.9839003
+            value: 1.0032873
+            inSlope: -0.07956378
+            outSlope: -0.07956378
+            tangentMode: 0
+            weightedMode: 0
+            inWeight: 0.17611095
+            outWeight: 1
+          - serializedVersion: 3
+            time: 1.1859131
             value: 0
             inSlope: -1.476192
             outSlope: -1.476192
@@ -48,9 +55,7 @@ MonoBehaviour:
           m_PreInfinity: 2
           m_PostInfinity: 2
           m_RotationOrder: 0
-        dashStopDistance: 0.2
-        dashMaxTargetAngle: 60
-        cooldownMultiplier: 1
+        dashStopDistance: 1.5
         cancellableByDash: 1
         slashVfxOverride: {fileID: 0}
         hitStopDuration: 1
@@ -61,8 +66,6 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 1
         dashMode: 1
-        dashDistanceMultiplier: 1
-        dashDuration: 0.1
         dashCurve:
           serializedVersion: 2
           m_Curve:
@@ -87,9 +90,7 @@ MonoBehaviour:
           m_PreInfinity: 2
           m_PostInfinity: 2
           m_RotationOrder: 0
-        dashStopDistance: 0.2
-        dashMaxTargetAngle: 60
-        cooldownMultiplier: 1
+        dashStopDistance: 1.5
         cancellableByDash: 0
         slashVfxOverride: {fileID: 0}
         hitStopDuration: 0
@@ -100,8 +101,6 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 0
         dashMode: 2
-        dashDistanceMultiplier: 1
-        dashDuration: 0.5
         dashCurve:
           serializedVersion: 2
           m_Curve:
@@ -127,8 +126,6 @@ MonoBehaviour:
           m_PostInfinity: 2
           m_RotationOrder: 0
         dashStopDistance: 0.2
-        dashMaxTargetAngle: 60
-        cooldownMultiplier: 1
         cancellableByDash: 1
         slashVfxOverride: {fileID: 0}
         hitStopDuration: 0
@@ -142,8 +139,6 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 0
         dashMode: 2
-        dashDistanceMultiplier: 1
-        dashDuration: 0.5
         dashCurve:
           serializedVersion: 2
           m_Curve:
@@ -169,8 +164,6 @@ MonoBehaviour:
           m_PostInfinity: 2
           m_RotationOrder: 0
         dashStopDistance: 0.2
-        dashMaxTargetAngle: 60
-        cooldownMultiplier: 0
         cancellableByDash: 1
         slashVfxOverride: {fileID: 0}
         hitStopDuration: 0
@@ -181,8 +174,6 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 0
         dashMode: 1
-        dashDistanceMultiplier: 1
-        dashDuration: 0.1
         dashCurve:
           serializedVersion: 2
           m_Curve:
@@ -208,8 +199,6 @@ MonoBehaviour:
           m_PostInfinity: 2
           m_RotationOrder: 0
         dashStopDistance: 0.2
-        dashMaxTargetAngle: 60
-        cooldownMultiplier: 1
         cancellableByDash: 0
         slashVfxOverride: {fileID: 0}
         hitStopDuration: 0
@@ -220,8 +209,6 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 0
         dashMode: 2
-        dashDistanceMultiplier: 1
-        dashDuration: 0.5
         dashCurve:
           serializedVersion: 2
           m_Curve:
@@ -247,8 +234,6 @@ MonoBehaviour:
           m_PostInfinity: 2
           m_RotationOrder: 0
         dashStopDistance: 0.2
-        dashMaxTargetAngle: 60
-        cooldownMultiplier: 1
         cancellableByDash: 1
         slashVfxOverride: {fileID: 0}
         hitStopDuration: 0
@@ -263,8 +248,6 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 0
         dashMode: 2
-        dashDistanceMultiplier: 1
-        dashDuration: 0.5
         dashCurve:
           serializedVersion: 2
           m_Curve:
@@ -290,8 +273,6 @@ MonoBehaviour:
           m_PostInfinity: 2
           m_RotationOrder: 0
         dashStopDistance: 0.2
-        dashMaxTargetAngle: 60
-        cooldownMultiplier: 1
         cancellableByDash: 1
         slashVfxOverride: {fileID: 0}
         hitStopDuration: 0
@@ -302,8 +283,6 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 0
         dashMode: 1
-        dashDistanceMultiplier: 1
-        dashDuration: 0.5
         dashCurve:
           serializedVersion: 2
           m_Curve:
@@ -329,8 +308,6 @@ MonoBehaviour:
           m_PostInfinity: 2
           m_RotationOrder: 0
         dashStopDistance: 0.2
-        dashMaxTargetAngle: 60
-        cooldownMultiplier: 1
         cancellableByDash: 0
         slashVfxOverride: {fileID: 0}
         hitStopDuration: 0
@@ -344,8 +321,6 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 0
         dashMode: 2
-        dashDistanceMultiplier: 1
-        dashDuration: 0.5
         dashCurve:
           serializedVersion: 2
           m_Curve:
@@ -371,8 +346,6 @@ MonoBehaviour:
           m_PostInfinity: 2
           m_RotationOrder: 0
         dashStopDistance: 0.2
-        dashMaxTargetAngle: 60
-        cooldownMultiplier: 1
         cancellableByDash: 1
         slashVfxOverride: {fileID: 0}
         hitStopDuration: 0
@@ -383,8 +356,6 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 0
         dashMode: 1
-        dashDistanceMultiplier: 1
-        dashDuration: 0.5
         dashCurve:
           serializedVersion: 2
           m_Curve:
@@ -410,8 +381,6 @@ MonoBehaviour:
           m_PostInfinity: 2
           m_RotationOrder: 0
         dashStopDistance: 0.2
-        dashMaxTargetAngle: 60
-        cooldownMultiplier: 1
         cancellableByDash: 0
         slashVfxOverride: {fileID: 0}
         hitStopDuration: 0

@@ -86,6 +86,8 @@ public class PlayerMovement : MonoBehaviour
         ApplyHorizontalMovementFixed(Time.fixedDeltaTime);
         ApplyFlyFixed(Time.fixedDeltaTime); // 新增
         ApplyDashFixed(Time.fixedDeltaTime); // 新增
+        ApplyMeleeDashFixed(Time.fixedDeltaTime);
+        ApplyMeleeBrakeFixed(Time.fixedDeltaTime);
 
     }
     private void ApplyHorizontalMovementFixed(float dt)
@@ -169,7 +171,7 @@ public class PlayerMovement : MonoBehaviour
 
         if (stats != null && (isLeft || isRight))
         {
-            var hand = isLeft ? stats.leftHand : stats.rightHand; 
+            var hand = isLeft ? stats.leftHand : stats.rightHand;
         }
 
 
@@ -363,6 +365,9 @@ public class PlayerMovement : MonoBehaviour
         var stats = PlayerStats.Instance;
         if (stats == null) return false;
 
+        // 近戰揮擊中，且這一段標記為不可取消 → 擋掉 Dash
+        if (meleeController != null && meleeController.IsBlockingDash) return false;
+
         if (Time.time < nextDashTime) return false;
         if (stats.currentEnergy <= 0) return false;
 
@@ -401,12 +406,224 @@ public class PlayerMovement : MonoBehaviour
 
         playerAnimation.setDashTrigger();
 
+        // Dash 取消了正在進行的近戰揮擊 → 讓控制器收尾（關 hitbox、停突進、進冷卻）
+        // CancelByDash 不會觸發煞車；這裡再清一次，擋掉上一段殘留的煞車視窗。
+        CancelMeleeBrake();
+
+        if (meleeController != null)
+            meleeController.CancelByDash();
+
         CancelInvoke("ResetEnergyRegenerate");
         canRegenerateEnergy = false;
 
 
         return true;
     }
+
+    // ────────────────────────────────────────────────
+    //  近戰突進
+    //
+    //  跟一般 Dash 的差別：
+    //    - 不受 dashCooldown 限制（它是攻擊的一部分，不是逃生手段）
+    //    - 不設 dashAttackLockUntil（不然連段會被自己鎖住）
+    //    - 能量由 MeleeAttackController 結算（一串連段只付一次入場費）
+    //
+    //  跟一般 Dash 相同的地方：全部走「相對平台」的速度判定。
+    //  在移動中的 Landship 上，世界空間的位移會被船速污染，所以進度必須
+    //  用相對平台的累積位移來算。
+    // ────────────────────────────────────────────────
+
+    [Header("Melee Dash")]
+    [SerializeField] private MeleeAttackController meleeController;
+
+    [Tooltip("突進的加速度。越大越快貼到目標速度，太小會軟綿綿。")]
+    [SerializeField] private float meleeDashAccel = 400f;
+
+    [Tooltip("dashCurve 末端趨近 0 時的速度下限倍率，避免永遠走不完全程。")]
+    [SerializeField] private float meleeDashMinSpeedFactor = 0.08f;
+
+    [Tooltip("一段近戰結束時的煞車時間（秒）。突進的動量若留著，收招後角色會滑出去。\n" +
+             "0.08~0.15 通常就很俐落；設 0 = 立即歸零（會有點生硬）。")]
+    [SerializeField] private float meleeBrakeDuration = 0.12f;
+
+    private bool _meleeDashing;
+    private Vector3 _meleeDashDir;
+    private float _meleeDashSpeed;        // 這次突進的最大速度
+    private float _meleeDashDistance;     // 這次突進的總距離
+    private float _meleeDashTravelled;    // 已走距離（相對平台）
+    private float _meleeDashStopDistance; // ToTarget 用
+    private Rigidbody _meleeDashTarget;   // null = Forward 模式。用 Rigidbody 才讀得到速度做攔截預判
+    private AnimationCurve _meleeDashCurve;
+
+    private float _meleeBrakeUntil;
+
+    public bool IsMeleeDashing => _meleeDashing;
+    public bool IsMeleeBraking => Time.time < _meleeBrakeUntil;
+
+    /// <summary>
+    /// 收招煞車。由 MeleeAttackController 在 AnimEvent_MeleeStepEnd 時呼叫。
+    ///
+    /// 只歸零「相對平台」的水平速度 —— 在移動的 Landship 上歸零世界速度
+    /// 會讓角色被船直接甩到船尾。垂直速度不動，收招時該落地還是要落地。
+    ///
+    /// 注意：被 Dash 取消時不會走這裡。玩家按 Shift 是要逃走，煞車會擋住他。
+    /// </summary>
+    public void BeginMeleeBrake()
+    {
+        _meleeBrakeUntil = Time.time + Mathf.Max(0f, meleeBrakeDuration);
+
+        // duration = 0 時立刻歸零，不等下一個 FixedUpdate
+        if (meleeBrakeDuration <= 0f)
+            ApplyMeleeBrakeFixed(Time.fixedDeltaTime);
+    }
+
+    public void CancelMeleeBrake() => _meleeBrakeUntil = 0f;
+
+    private void ApplyMeleeBrakeFixed(float dt)
+    {
+        if (Time.time >= _meleeBrakeUntil && meleeBrakeDuration > 0f) return;
+        if (playerRigidbody == null) return;
+
+        Vector3 platformVel = GetMobilePlatformVelocity();
+        Vector3 vRel = playerRigidbody.linearVelocity - platformVel;
+
+        Vector3 horizontalRel = new Vector3(vRel.x, 0f, vRel.z);
+
+        // 指數衰減：每幀砍掉固定比例，時間到之前會非常接近 0
+        float k = (meleeBrakeDuration > 0f)
+            ? Mathf.Clamp01(dt / meleeBrakeDuration * 3f)
+            : 1f;
+
+        horizontalRel = Vector3.Lerp(horizontalRel, Vector3.zero, k);
+
+        if (horizontalRel.sqrMagnitude < 0.01f)
+        {
+            horizontalRel = Vector3.zero;
+            _meleeBrakeUntil = 0f;
+        }
+
+        playerRigidbody.linearVelocity =
+            new Vector3(horizontalRel.x, vRel.y, horizontalRel.z) + platformVel;
+    }
+
+    /// <summary>
+    /// 開始一次近戰突進。由 MeleeAttackController 在 AnimEvent_MeleeDashStart 時呼叫。
+    /// speed 與 distance 已經由控制器依能量結算過（強化 / 衰弱模式）。
+    /// </summary>
+    public void BeginMeleeDash(Vector3 direction, float speed, float distance,
+                               AnimationCurve curve, Rigidbody target, float stopDistance)
+    {
+        direction.y = 0f;
+        if (direction.sqrMagnitude < 0.0001f || distance <= 0f || speed <= 0f)
+        {
+            StopMeleeDash();
+            return;
+        }
+
+        _meleeDashDir = direction.normalized;
+        _meleeDashSpeed = speed;
+        _meleeDashDistance = distance;
+        _meleeDashTravelled = 0f;
+        _meleeDashCurve = curve;
+        _meleeDashTarget = target;
+        _meleeDashStopDistance = Mathf.Max(0f, stopDistance);
+        _meleeDashing = true;
+    }
+
+    /// <summary>停止突進。距離走完、撞到停止距離、StepEnd、或被 Dash 取消時呼叫。</summary>
+    public void StopMeleeDash()
+    {
+        _meleeDashing = false;
+        _meleeDashTarget = null;
+        _meleeDashCurve = null;
+    }
+
+    private void ApplyMeleeDashFixed(float dt)
+    {
+        if (!_meleeDashing) return;
+        if (playerRigidbody == null) { StopMeleeDash(); return; }
+
+        Vector3 platformVel = GetMobilePlatformVelocity();
+        Vector3 vRel = playerRigidbody.linearVelocity - platformVel;
+        Vector3 horizontalRel = new Vector3(vRel.x, 0f, vRel.z);
+
+        // ToTarget：每幀重算方向，並且朝「攔截點」而不是目標當前位置。
+        //
+        // 朝當前位置衝是純追尾 —— 你永遠跑向敵人剛剛在的地方，形成尾隨曲線，
+        // 橫向移動的敵人幾乎打不到。攔截解算出「我用這個速度前進，會在哪裡跟它相遇」，
+        // 效果等同子彈的提前量。
+        if (_meleeDashTarget != null)
+        {
+            Vector3 selfPos = playerRigidbody.position;
+            Vector3 targetPos = _meleeDashTarget.position;
+
+            Vector3 toTarget = targetPos - selfPos;
+            toTarget.y = 0f;
+
+            if (toTarget.magnitude <= _meleeDashStopDistance)
+            {
+                StopMeleeDash();
+                return;
+            }
+
+            // 目標速度也要扣掉平台速度：兩者都站在同一艘船上時，
+            // 共同的船速不該被算成需要提前量的相對運動。
+            Vector3 targetVelRel = _meleeDashTarget.linearVelocity - platformVel;
+            targetVelRel.y = 0f;
+
+            Vector3 aimPoint = targetPos;
+
+            if (targetVelRel.sqrMagnitude > 0.01f &&
+                MathToolKit.InterceptionPoint(targetPos, selfPos, targetVelRel,
+                                              Mathf.Max(0.01f, _meleeDashSpeed), out var intercept))
+            {
+                intercept.y = targetPos.y;
+
+                // 目標比我快時解可能無效（跑到背後去）。
+                // 攔截方向跟目標方向反了就退回純追蹤。
+                Vector3 toIntercept = intercept - selfPos;
+                toIntercept.y = 0f;
+
+                if (toIntercept.sqrMagnitude > 0.0001f &&
+                    Vector3.Dot(toIntercept.normalized, toTarget.normalized) > 0f)
+                {
+                    aimPoint = intercept;
+                }
+            }
+
+            Vector3 dir = aimPoint - selfPos;
+            dir.y = 0f;
+
+            if (dir.sqrMagnitude > 0.0001f)
+                _meleeDashDir = dir.normalized;
+        }
+
+        // 進度用「相對平台」的累積位移，不能用世界座標距離
+        float vParallelRel = Vector3.Dot(horizontalRel, _meleeDashDir);
+        if (vParallelRel > 0f)
+            _meleeDashTravelled += vParallelRel * dt;
+
+        if (_meleeDashTravelled >= _meleeDashDistance)
+        {
+            StopMeleeDash();
+            return;
+        }
+
+        float progress = Mathf.Clamp01(_meleeDashTravelled / Mathf.Max(0.0001f, _meleeDashDistance));
+
+        float factor = (_meleeDashCurve != null && _meleeDashCurve.length > 0)
+            ? _meleeDashCurve.Evaluate(progress)
+            : 1f;
+        factor = Mathf.Max(meleeDashMinSpeedFactor, factor);
+
+        float targetSpeed = _meleeDashSpeed * factor;
+
+        // 已經達到這一刻的目標速度就不再推（跟 ApplyDashFixed 同邏輯）
+        if (vParallelRel >= targetSpeed) return;
+
+        playerRigidbody.AddForce(_meleeDashDir * meleeDashAccel, ForceMode.Acceleration);
+    }
+
     public void FlyAction()
     {
         // 空中且有能量才允許提出飛行請求
@@ -596,7 +813,7 @@ public class PlayerMovement : MonoBehaviour
     public bool IsDashAttackBlocked => Time.time <= dashAttackLockUntil;
 
     // 玩家相對「腳下平台」的水平速度。沒站平台 => 等於世界速度；站在移動的船上不動 => ≈0
-    
+
     public float HorizontalSpeedRelativeToPlatform
     {
         get
@@ -607,7 +824,7 @@ public class PlayerMovement : MonoBehaviour
             return vRel.magnitude;
         }
     }
-    
+
     public float VerticalVelocity
     {
         get
