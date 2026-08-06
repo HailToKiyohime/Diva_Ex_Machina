@@ -87,6 +87,7 @@ public class PlayerMovement : MonoBehaviour
         ApplyFlyFixed(Time.fixedDeltaTime); // 新增
         ApplyDashFixed(Time.fixedDeltaTime); // 新增
         ApplyMeleeDashFixed(Time.fixedDeltaTime);
+        ApplyMeleeHoverFixed(Time.fixedDeltaTime);
         ApplyMeleeBrakeFixed(Time.fixedDeltaTime);
 
     }
@@ -99,7 +100,11 @@ public class PlayerMovement : MonoBehaviour
         Vector3 vWorld = playerRigidbody.linearVelocity;
         Vector3 vRel = vWorld - platformVel;
 
-        Vector3 horizontalRel = new Vector3(vRel.x, 0f, vRel.z);
+        // 滯空中連垂直速度一起煞掉 —— 沒有重力可以自然衰減它，
+        // 殘留的 Y 會讓角色在空中緩慢飄走。
+        Vector3 horizontalRel = _meleeHovering
+            ? vRel
+            : new Vector3(vRel.x, 0f, vRel.z);
 
         if (moveDirection.sqrMagnitude < 0.0001f)
         {
@@ -351,7 +356,11 @@ public class PlayerMovement : MonoBehaviour
         Vector3 vWorld = playerRigidbody.linearVelocity;
         Vector3 vRel = vWorld - platformVel;
 
-        Vector3 horizontalRel = new Vector3(vRel.x, 0f, vRel.z);
+        // 滯空中連垂直速度一起煞掉 —— 沒有重力可以自然衰減它，
+        // 殘留的 Y 會讓角色在空中緩慢飄走。
+        Vector3 horizontalRel = _meleeHovering
+            ? vRel
+            : new Vector3(vRel.x, 0f, vRel.z);
         float vParallelRel = Vector3.Dot(horizontalRel, dashDir);
 
         if (vParallelRel >= dashTargetSpeed) return;
@@ -385,7 +394,11 @@ public class PlayerMovement : MonoBehaviour
         Vector3 vWorld = playerRigidbody.linearVelocity;
         Vector3 vRel = vWorld - platformVel;
 
-        Vector3 horizontalRel = new Vector3(vRel.x, 0f, vRel.z);
+        // 滯空中連垂直速度一起煞掉 —— 沒有重力可以自然衰減它，
+        // 殘留的 Y 會讓角色在空中緩慢飄走。
+        Vector3 horizontalRel = _meleeHovering
+            ? vRel
+            : new Vector3(vRel.x, 0f, vRel.z);
 
         dashDir = dir;
         dashTargetSpeed = stats.dashSpeed;
@@ -410,6 +423,7 @@ public class PlayerMovement : MonoBehaviour
         //   Dash 動畫會被近戰動畫蓋住，看起來像「沒播放」。
         CancelMeleeBrake();
         StopMeleeDash();
+        EndMeleeHover();
 
         if (meleeController != null)
             meleeController.CancelByDash();
@@ -449,6 +463,18 @@ public class PlayerMovement : MonoBehaviour
              "0.08~0.15 通常就很俐落；設 0 = 立即歸零（會有點生硬）。")]
     [SerializeField] private float meleeBrakeDuration = 0.12f;
 
+    [Tooltip("突進期間的最大轉向速率（度/秒）。\n" +
+             "高速戰鬥下一次性攔截幾乎必定落空，所以突進全程持續重算攔截點。\n" +
+             "但轉向有上限 —— 角度太離譜就是追不上，保留「位置沒站好會 miss」的懲罰。\n" +
+             "360 = 每秒一圈，相當靈活；120~180 較誠實。")]
+    [SerializeField] private float meleeDashTurnRate = 270f;
+
+    [Tooltip("近戰滯空期間抵銷多少比例的重力。\n" +
+             "從突進開始，一直到這一段攻擊完全結束（StepEnd / 取消）為止。\n" +
+             "1 = 完全無重力（打飛行敵人時軌跡筆直），0 = 照常掉落。")]
+    [Range(0f, 1f)]
+    [SerializeField] private float meleeDashGravityCancel = 1f;
+
     private bool _meleeDashing;
     private Vector3 _meleeDashDir;
     private float _meleeDashSpeed;        // 這次突進的最大速度
@@ -458,11 +484,19 @@ public class PlayerMovement : MonoBehaviour
     private Rigidbody _meleeDashTarget;   // null = Forward 模式。用 Rigidbody 才讀得到速度做攔截預判
     private AnimationCurve _meleeDashCurve;
 
+    // 滯空跟突進是「不同長度」的兩件事：突進在距離走完就停，
+    // 但滯空要持續到整段攻擊結束，否則刀還沒揮完人已經開始掉了。
+    private bool _meleeHovering;
+    private bool _meleeDashPrevGravity = true;
+
     private bool _meleeBraking;
     private float _meleeBrakeUntil;
 
     public bool IsMeleeDashing => _meleeDashing;
     public bool IsMeleeBraking => _meleeBraking;
+
+    /// <summary>近戰滯空中（從突進開始到整段攻擊結束）。給後處理 / VFX 判斷用。</summary>
+    public bool IsMeleeHovering => _meleeHovering;
 
     /// <summary>
     /// 收招煞車。由 MeleeAttackController 在 AnimEvent_MeleeStepEnd 時呼叫。
@@ -489,6 +523,22 @@ public class PlayerMovement : MonoBehaviour
         _meleeBrakeUntil = 0f;
     }
 
+    // 滯空期間的殘留重力。
+    //
+    // useGravity 在 BeginMeleeHover 就關掉了，所以這裡是「加回沒被抵銷的那部分」，
+    // 而不是「抵銷掉一部分」—— 方向搞反的話角色會被往上推飛。
+    //   meleeDashGravityCancel = 1 → 完全無重力，什麼都不加
+    //   meleeDashGravityCancel = 0 → 加回全部重力，等同沒有滯空
+    private void ApplyMeleeHoverFixed(float dt)
+    {
+        if (!_meleeHovering || playerRigidbody == null) return;
+
+        float residual = 1f - Mathf.Clamp01(meleeDashGravityCancel);
+        if (residual <= 0f) return;
+
+        playerRigidbody.AddForce(Physics.gravity * residual, ForceMode.Acceleration);
+    }
+
     private void ApplyMeleeBrakeFixed(float dt)
     {
         // ★ 用 bool 當閘門，不要用「時間 + duration」組合條件。
@@ -508,23 +558,23 @@ public class PlayerMovement : MonoBehaviour
         Vector3 platformVel = GetMobilePlatformVelocity();
         Vector3 vRel = playerRigidbody.linearVelocity - platformVel;
 
-        Vector3 horizontalRel = new Vector3(vRel.x, 0f, vRel.z);
-
-        // 指數衰減：每幀砍掉固定比例，時間到之前會非常接近 0
+        // 三維煞車：垂直分量也要煞。
+        // 向上突進 25 m/s 打空中目標之後若保留 Y，角色會繼續往上飛。
+        // 歸零 Y 之後重力接手，角色停在半空再落下 —— 空中攻擊的標準收尾。
+        // 落地狀態下 vRel.y 本來就接近 0，所以不影響地面戰鬥。
         float k = (meleeBrakeDuration > 0f)
             ? Mathf.Clamp01(dt / meleeBrakeDuration * 3f)
             : 1f;
 
-        horizontalRel = Vector3.Lerp(horizontalRel, Vector3.zero, k);
+        vRel = Vector3.Lerp(vRel, Vector3.zero, k);
 
-        if (horizontalRel.sqrMagnitude < 0.01f || meleeBrakeDuration <= 0f)
+        if (vRel.sqrMagnitude < 0.01f || meleeBrakeDuration <= 0f)
         {
-            horizontalRel = Vector3.zero;
+            vRel = Vector3.zero;
             CancelMeleeBrake();
         }
 
-        playerRigidbody.linearVelocity =
-            new Vector3(horizontalRel.x, vRel.y, horizontalRel.z) + platformVel;
+        playerRigidbody.linearVelocity = vRel + platformVel;
     }
 
     /// <summary>
@@ -534,7 +584,7 @@ public class PlayerMovement : MonoBehaviour
     public void BeginMeleeDash(Vector3 direction, float speed, float distance,
                                AnimationCurve curve, Rigidbody target, float stopDistance)
     {
-        direction.y = 0f;
+        // 三維：不再壓平 Y。飛行敵人在水平突進下是打不到的。
         if (direction.sqrMagnitude < 0.0001f || distance <= 0f || speed <= 0f)
         {
             StopMeleeDash();
@@ -549,11 +599,41 @@ public class PlayerMovement : MonoBehaviour
         _meleeDashTarget = target;
         _meleeDashStopDistance = Mathf.Max(0f, stopDistance);
         _meleeDashing = true;
+
+        BeginMeleeHover();
+    }
+
+    /// <summary>
+    /// 開始滯空。關掉重力，讓突進與後續揮擊維持在同一個高度。
+    /// 由 BeginMeleeDash 自動呼叫，持續到 EndMeleeHover。
+    /// </summary>
+    private void BeginMeleeHover()
+    {
+        if (_meleeHovering || playerRigidbody == null) return;
+
+        _meleeHovering = true;
+        _meleeDashPrevGravity = playerRigidbody.useGravity;
+        playerRigidbody.useGravity = false;
+    }
+
+    /// <summary>
+    /// 結束滯空、恢復重力。由 MeleeAttackController 在整段攻擊結束
+    /// （StepEnd / Dash 取消）時呼叫 —— 不是突進結束時。
+    /// </summary>
+    public void EndMeleeHover()
+    {
+        if (!_meleeHovering) return;
+
+        _meleeHovering = false;
+        if (playerRigidbody != null)
+            playerRigidbody.useGravity = _meleeDashPrevGravity;
     }
 
     /// <summary>停止突進。距離走完、撞到停止距離、StepEnd、或被 Dash 取消時呼叫。</summary>
     public void StopMeleeDash()
     {
+        // 註：這裡刻意不恢復重力。滯空要撐到整段攻擊結束（EndMeleeHover），
+        //     否則突進一停人就開始掉，刀還沒揮完就離開目標高度了。
         _meleeDashing = false;
         _meleeDashTarget = null;
         _meleeDashCurve = null;
@@ -566,20 +646,22 @@ public class PlayerMovement : MonoBehaviour
 
         Vector3 platformVel = GetMobilePlatformVelocity();
         Vector3 vRel = playerRigidbody.linearVelocity - platformVel;
-        Vector3 horizontalRel = new Vector3(vRel.x, 0f, vRel.z);
 
         // ToTarget：每幀重算方向，並且朝「攔截點」而不是目標當前位置。
         //
         // 朝當前位置衝是純追尾 —— 你永遠跑向敵人剛剛在的地方，形成尾隨曲線，
         // 橫向移動的敵人幾乎打不到。攔截解算出「我用這個速度前進，會在哪裡跟它相遇」，
         // 效果等同子彈的提前量。
+        //
+        // 【方向 A】方向修正是「持續」的，但有轉向速率上限（meleeDashTurnRate）。
+        // 系統只幫忙修掉高速造成的小誤差，角度偏太多還是追不上 —— 玩家仍然要
+        // 負責把自己送到大致正確的位置。
         if (_meleeDashTarget != null)
         {
             Vector3 selfPos = playerRigidbody.position;
             Vector3 targetPos = _meleeDashTarget.position;
 
-            Vector3 toTarget = targetPos - selfPos;
-            toTarget.y = 0f;
+            Vector3 toTarget = targetPos - selfPos;   // 三維，不壓平
 
             if (toTarget.magnitude <= _meleeDashStopDistance)
             {
@@ -590,7 +672,6 @@ public class PlayerMovement : MonoBehaviour
             // 目標速度也要扣掉平台速度：兩者都站在同一艘船上時，
             // 共同的船速不該被算成需要提前量的相對運動。
             Vector3 targetVelRel = _meleeDashTarget.linearVelocity - platformVel;
-            targetVelRel.y = 0f;
 
             Vector3 aimPoint = targetPos;
 
@@ -598,12 +679,9 @@ public class PlayerMovement : MonoBehaviour
                 MathToolKit.InterceptionPoint(targetPos, selfPos, targetVelRel,
                                               Mathf.Max(0.01f, _meleeDashSpeed), out var intercept))
             {
-                intercept.y = targetPos.y;
-
                 // 目標比我快時解可能無效（跑到背後去）。
                 // 攔截方向跟目標方向反了就退回純追蹤。
                 Vector3 toIntercept = intercept - selfPos;
-                toIntercept.y = 0f;
 
                 if (toIntercept.sqrMagnitude > 0.0001f &&
                     Vector3.Dot(toIntercept.normalized, toTarget.normalized) > 0f)
@@ -612,15 +690,31 @@ public class PlayerMovement : MonoBehaviour
                 }
             }
 
-            Vector3 dir = aimPoint - selfPos;
-            dir.y = 0f;
+            Vector3 desiredDir = aimPoint - selfPos;
 
-            if (dir.sqrMagnitude > 0.0001f)
-                _meleeDashDir = dir.normalized;
+            if (desiredDir.sqrMagnitude > 0.0001f)
+            {
+                desiredDir.Normalize();
+
+                // 轉向速率上限：保留「角度太離譜就打不中」的懲罰
+                float maxRadians = meleeDashTurnRate * Mathf.Deg2Rad * dt;
+                _meleeDashDir = Vector3.RotateTowards(_meleeDashDir, desiredDir, maxRadians, 0f).normalized;
+
+                // ★ 角色朝向也要跟著轉。
+                //   attackDesiredForward 是攻擊當下設定一次就不動的，只改移動方向
+                //   會讓角色橫著飄、刀刃卻朝原方向揮 —— 追到了也砍不到。
+                //   RotateCharacter 只處理水平朝向，所以這裡壓平。
+                if (attackFacingActive)
+                {
+                    Vector3 flatAim = new Vector3(_meleeDashDir.x, 0f, _meleeDashDir.z);
+                    if (flatAim.sqrMagnitude > 0.0001f)
+                        attackDesiredForward = flatAim.normalized;
+                }
+            }
         }
 
         // 進度用「相對平台」的累積位移，不能用世界座標距離
-        float vParallelRel = Vector3.Dot(horizontalRel, _meleeDashDir);
+        float vParallelRel = Vector3.Dot(vRel, _meleeDashDir);
         if (vParallelRel > 0f)
             _meleeDashTravelled += vParallelRel * dt;
 
@@ -638,6 +732,9 @@ public class PlayerMovement : MonoBehaviour
         factor = Mathf.Max(meleeDashMinSpeedFactor, factor);
 
         float targetSpeed = _meleeDashSpeed * factor;
+
+        // 重力由 ApplyMeleeHoverFixed 統一處理（滯空期間 useGravity 已關閉），
+        // 這裡不要再加任何垂直補償，否則會變成向上推力。
 
         // 已經達到這一刻的目標速度就不再推（跟 ApplyDashFixed 同邏輯）
         if (vParallelRel >= targetSpeed) return;

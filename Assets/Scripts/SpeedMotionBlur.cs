@@ -16,6 +16,17 @@ public class SpeedMotionBlur : MonoBehaviour
     [Tooltip("退出模糊的速度（越小尾巴拖越長）")]
     [SerializeField] private float blurOutLerp = 8f;
 
+    [Header("Melee Dash Motion Blur")]
+    [Tooltip("近戰突進也套用模糊")]
+    [SerializeField] private bool includeMeleeDash = true;
+
+    [Tooltip("近戰突進的模糊強度。突進比 dash 短很多，稍微調低一點比較不會太搶眼。")]
+    [Range(0f, 1f)][SerializeField] private float meleeDashIntensity = 0.6f;
+
+    [Tooltip("模糊延續到整段攻擊結束（滯空期間），而不是只有突進那 0.1~0.2 秒。\n" +
+             "突進很短，只跟突進的話模糊會一閃就沒了。")]
+    [SerializeField] private bool holdThroughMeleeHover = false;
+
     private MotionBlur _mb;
 
     void Start()
@@ -28,12 +39,30 @@ public class SpeedMotionBlur : MonoBehaviour
     {
         if (_mb == null || playerMovement == null) return;
 
-        // dash 期間 = 目標強度，其餘 = 0
-        bool dashing = playerMovement.IsDashActive;
-        float target = dashing ? dashIntensity : 0f;
+        float target = 0f;
+        bool active = false;
+
+        // 一般 dash 優先：兩者同時發生時（dash 取消近戰）以 dash 的強度為準
+        if (playerMovement.IsDashActive)
+        {
+            target = dashIntensity;
+            active = true;
+        }
+        else if (includeMeleeDash && IsMeleeBlurActive())
+        {
+            target = meleeDashIntensity;
+            active = true;
+        }
 
         // 進場快、退場慢，尾巴比較好看
-        float lerp = dashing ? blurInLerp : blurOutLerp;
+        float lerp = active ? blurInLerp : blurOutLerp;
         _mb.intensity.value = Mathf.Lerp(_mb.intensity.value, target, lerp * Time.deltaTime);
+    }
+
+    private bool IsMeleeBlurActive()
+    {
+        if (playerMovement.IsMeleeDashing) return true;
+
+        return holdThroughMeleeHover && playerMovement.IsMeleeHovering;
     }
 }

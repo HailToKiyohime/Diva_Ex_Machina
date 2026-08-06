@@ -392,7 +392,13 @@ public class MeleeAttackController : MonoBehaviour
         CloseAllHitboxes();
 
         if (playerMovement != null)
+        {
             playerMovement.StopMeleeDash();
+
+            // 滯空撐到這裡才解除 —— 突進停了刀還在揮，中途恢復重力
+            // 會讓角色從空中目標旁邊掉下去。
+            playerMovement.EndMeleeHover();
+        }
 
         BeginCooldown(_activeIsLeft);
         ResetCombo();
