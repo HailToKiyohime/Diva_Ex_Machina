@@ -193,10 +193,13 @@ public class MeleeAttackController : MonoBehaviour
         // 上一段的突進也要停 —— 新的一段有自己的 DashStart
         if (playerMovement != null)
             playerMovement.StopMeleeDash();
-
         float speed = Mathf.Max(0.01f, w.melee.meleeSpeed);
+
+        // 註：meleeSpeed 目前還沒套用到 Animator（見 PlayAnimation），動畫仍以
+        // 1 倍速播放。這裡若照 speed 縮放，保險絲會比實際動畫早燒斷。
+        // 等 State 上綁好 Speed Multiplier 之後，再把 / speed 加回來。
         _stepDeadline = (step.maxStepDuration > 0f)
-            ? Time.time + (step.maxStepDuration / speed)
+            ? Time.time + step.maxStepDuration
             : 0f;
 
         PlayAnimation(step, isLeft, speed);
@@ -258,6 +261,16 @@ public class MeleeAttackController : MonoBehaviour
         });
 
         hitbox.Open();
+
+        // 方案 B：命中判定開始時錨定到目標，繼承其部分速度。
+        // 高速交戰下，不錨定的話 dashStopDistance 只夠撐不到一個物理幀，
+        // 打中了也會立刻滑開、接不上下一段。
+        if (playerMovement != null && PlayerAiming.Instance != null)
+        {
+            var targetRb = PlayerAiming.Instance.GetTargetRigidbody();
+            if (targetRb != null)
+                playerMovement.BeginMeleeAnchor(targetRb);
+        }
     }
 
     /// <summary>
@@ -415,6 +428,11 @@ public class MeleeAttackController : MonoBehaviour
             _activeWeapon.meleeRuntime.attacking = false;
             _activeWeapon.meleeRuntime.comboIndex = -1;
         }
+
+        // 錨定跨越整串連段 —— 每一段結束就解除的話，段與段之間會滑開，
+        // 正好破壞它要解決的問題。
+        if (playerMovement != null)
+            playerMovement.EndMeleeAnchor();
 
         _comboIndex = -1;
         _attacking = false;
