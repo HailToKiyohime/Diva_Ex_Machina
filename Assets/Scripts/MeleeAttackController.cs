@@ -198,10 +198,13 @@ public class MeleeAttackController : MonoBehaviour
         // 上一段的突進也要停 —— 新的一段有自己的 DashStart
         if (playerMovement != null)
             playerMovement.StopMeleeDash();
-
         float speed = Mathf.Max(0.01f, w.melee.meleeSpeed);
+
+        // 註：meleeSpeed 目前還沒套用到 Animator（見 PlayAnimation），動畫仍以
+        // 1 倍速播放。這裡若照 speed 縮放，保險絲會比實際動畫早燒斷。
+        // 等 State 上綁好 Speed Multiplier 之後，再把 / speed 加回來。
         _stepDeadline = (step.maxStepDuration > 0f)
-            ? Time.time + (step.maxStepDuration / speed)
+            ? Time.time + step.maxStepDuration
             : 0f;
 
         PlayAnimation(step, isLeft, speed);
