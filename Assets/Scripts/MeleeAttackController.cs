@@ -49,6 +49,11 @@ public class MeleeAttackController : MonoBehaviour
     [Tooltip("Animator 裡近戰動畫所在的層名稱")]
     [SerializeField] private string meleeLayerName = "One_Hand_Melee_Attack";
 
+    [Header("Hit Feedback")]
+    [Tooltip("命中回饋播在命中點（勾選）還是玩家身上（取消）。\n" +
+             "命中點通常比較好 —— 火花會出現在刀刃碰到敵人的位置。")]
+    [SerializeField] private bool feedbackAtHitPoint = true;
+
     [Header("Debug")]
     [SerializeField] private bool logStateChanges = false;
 
@@ -257,7 +262,22 @@ public class MeleeAttackController : MonoBehaviour
             hittableLayers = hittableLayers,
         });
 
+        // 訂閱命中事件。先退訂再訂閱，避免同一個 hitbox 被重複掛上
+        // （連段每一段都會走這裡，武器 instance 是同一個）。
+        hitbox.OnHitTarget -= HandleMeleeHit;
+        hitbox.OnHitTarget += HandleMeleeHit;
+
         hitbox.Open();
+
+        // 方案 B：命中判定開始時錨定到目標，繼承其部分速度。
+        // 高速交戰下，不錨定的話 dashStopDistance 只夠撐不到一個物理幀，
+        // 打中了也會立刻滑開、接不上下一段。
+        if (playerMovement != null && PlayerAiming.Instance != null)
+        {
+            var targetRb = PlayerAiming.Instance.GetTargetRigidbody();
+            if (targetRb != null)
+                playerMovement.BeginMeleeAnchor(targetRb);
+        }
     }
 
     /// <summary>
@@ -364,6 +384,20 @@ public class MeleeAttackController : MonoBehaviour
             Debug.Log("[Melee] brake", this);
     }
 
+    /// <summary>
+    /// 實際造成傷害時的回饋。由 MeleeHitbox.OnHitTarget 觸發，
+    /// 所以揮空不會播 —— 這是它跟 Animation Event 的差別。
+    ///
+    /// 同一刀掃到多個敵人會觸發多次（hitbox 對每個目標各結算一次）。
+    /// </summary>
+    private void HandleMeleeHit(MeleeHitResult result)
+    {
+        if (playerAnimation == null) return;
+
+        Vector3 pos = feedbackAtHitPoint ? result.point : playerAnimation.transform.position;
+        playerAnimation.PlayMeleeHitFeedback(pos);
+    }
+
     /// <summary>刀刃結束傷害判定。</summary>
     public void OnHitboxOff()
     {
@@ -416,6 +450,11 @@ public class MeleeAttackController : MonoBehaviour
             _activeWeapon.meleeRuntime.comboIndex = -1;
         }
 
+        // 錨定跨越整串連段 —— 每一段結束就解除的話，段與段之間會滑開，
+        // 正好破壞它要解決的問題。
+        if (playerMovement != null)
+            playerMovement.EndMeleeAnchor();
+
         _comboIndex = -1;
         _attacking = false;
         _windowOpen = false;
@@ -460,12 +499,20 @@ public class MeleeAttackController : MonoBehaviour
 
     private void CloseAllHitboxes()
     {
-        var l = attackManager.leftHandWeapon;
-        var r = attackManager.rightHandWeapon;
-
-        if (l != null && l.melee.hitbox != null) l.melee.hitbox.Close();
-        if (r != null && r.melee.hitbox != null) r.melee.hitbox.Close();
+        CloseHitbox(attackManager.leftHandWeapon);
+        CloseHitbox(attackManager.rightHandWeapon);
     }
+
+    private void CloseHitbox(Weapon w)
+    {
+        if (w == null || w.melee.hitbox == null) return;
+
+        // 退訂避免武器換掉後事件還掛在舊實例上
+        w.melee.hitbox.OnHitTarget -= HandleMeleeHit;
+        w.melee.hitbox.Close();
+    }
+
+    private void OnDisable() => CloseAllHitboxes();
 
     // 把冷卻進度餵給彈藥環（CalcAmmoBarFill 會讀 cooldownNormalized）
     private void PushCooldownToUI()

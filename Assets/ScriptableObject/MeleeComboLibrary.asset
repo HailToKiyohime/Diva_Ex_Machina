@@ -26,31 +26,22 @@ MonoBehaviour:
           serializedVersion: 2
           m_Curve:
           - serializedVersion: 3
-            time: -0.017345428
-            value: 0.8980408
-            inSlope: 0.11418128
-            outSlope: 0.11418128
-            tangentMode: 0
+            time: 0
+            value: 1
+            inSlope: 0
+            outSlope: 0
+            tangentMode: 34
             weightedMode: 0
             inWeight: 0
-            outWeight: 0.23582406
+            outWeight: 0
           - serializedVersion: 3
-            time: 0.9839003
-            value: 1.0032873
-            inSlope: -0.07956378
-            outSlope: -0.07956378
-            tangentMode: 0
+            time: 1
+            value: 1
+            inSlope: 0
+            outSlope: 0
+            tangentMode: 34
             weightedMode: 0
-            inWeight: 0.17611095
-            outWeight: 1
-          - serializedVersion: 3
-            time: 1.1859131
-            value: 0
-            inSlope: -1.476192
-            outSlope: -1.476192
-            tangentMode: 0
-            weightedMode: 0
-            inWeight: 0.0419575
+            inWeight: 0
             outWeight: 0
           m_PreInfinity: 2
           m_PostInfinity: 2
@@ -59,7 +50,7 @@ MonoBehaviour:
         cancellableByDash: 1
         slashVfxOverride: {fileID: 0}
         hitStopDuration: 1
-        maxStepDuration: 1
+        maxStepDuration: 3
       - animStateNameLeft: LongSword_1H_L_02
         animStateNameRight: LongSword_1H_R_02
         crossFadeTime: 0.08
@@ -70,20 +61,20 @@ MonoBehaviour:
           serializedVersion: 2
           m_Curve:
           - serializedVersion: 3
-            time: -0.0000033974648
-            value: 1.0017433
+            time: 0
+            value: 1
             inSlope: 0
             outSlope: 0
-            tangentMode: 0
+            tangentMode: 34
             weightedMode: 0
             inWeight: 0
             outWeight: 0
           - serializedVersion: 3
-            time: 1.4836121
-            value: 0.7743225
+            time: 1
+            value: 1
             inSlope: 0
             outSlope: 0
-            tangentMode: 0
+            tangentMode: 34
             weightedMode: 0
             inWeight: 0
             outWeight: 0
@@ -94,7 +85,7 @@ MonoBehaviour:
         cancellableByDash: 0
         slashVfxOverride: {fileID: 0}
         hitStopDuration: 0
-        maxStepDuration: 1
+        maxStepDuration: 3
       - animStateNameLeft: LongSword_1H_L_03
         animStateNameRight: LongSword_1H_R_03
         crossFadeTime: 0.04
@@ -106,21 +97,21 @@ MonoBehaviour:
           m_Curve:
           - serializedVersion: 3
             time: 0
-            value: 0.9976196
+            value: 1
             inSlope: 0
             outSlope: 0
-            tangentMode: 0
+            tangentMode: 34
             weightedMode: 0
             inWeight: 0
             outWeight: 0
           - serializedVersion: 3
-            time: 1.1916809
-            value: 0
-            inSlope: -1.476192
-            outSlope: -1.476192
-            tangentMode: 0
+            time: 1
+            value: 1
+            inSlope: 0
+            outSlope: 0
+            tangentMode: 34
             weightedMode: 0
-            inWeight: 0.0419575
+            inWeight: 0
             outWeight: 0
           m_PreInfinity: 2
           m_PostInfinity: 2
@@ -129,7 +120,7 @@ MonoBehaviour:
         cancellableByDash: 1
         slashVfxOverride: {fileID: 0}
         hitStopDuration: 0
-        maxStepDuration: 1
+        maxStepDuration: 10
       loopCombo: 0
     twoHanded:
       steps:

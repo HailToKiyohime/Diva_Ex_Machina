@@ -4,7 +4,7 @@ public class ShipPassenger : MonoBehaviour
 {
     public bool isOnShip { get; private set; }
 
-    private void OnTriggerEnter(Collider other)
+    private void OnTriggerStay(Collider other)
     {
         if (other.CompareTag("Mobile Platform")) isOnShip = true;
     }

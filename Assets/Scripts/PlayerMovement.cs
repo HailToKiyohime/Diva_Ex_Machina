@@ -87,6 +87,7 @@ public class PlayerMovement : MonoBehaviour
         ApplyFlyFixed(Time.fixedDeltaTime); // 新增
         ApplyDashFixed(Time.fixedDeltaTime); // 新增
         ApplyMeleeDashFixed(Time.fixedDeltaTime);
+        ApplyMeleeAnchorFixed(Time.fixedDeltaTime);
         ApplyMeleeHoverFixed(Time.fixedDeltaTime);
         ApplyMeleeBrakeFixed(Time.fixedDeltaTime);
 
@@ -424,6 +425,7 @@ public class PlayerMovement : MonoBehaviour
         CancelMeleeBrake();
         StopMeleeDash();
         EndMeleeHover();
+        EndMeleeAnchor();
 
         if (meleeController != null)
             meleeController.CancelByDash();
@@ -469,6 +471,23 @@ public class PlayerMovement : MonoBehaviour
              "360 = 每秒一圈，相當靈活；120~180 較誠實。")]
     [SerializeField] private float meleeDashTurnRate = 270f;
 
+    [Tooltip("命中後繼承目標速度的比例（0~1）。\n\n" +
+             "0 = 完全不繼承，雙方高速時會立刻滑開（AC6 式，只重視第一下）。\n" +
+             "1 = 完全貼住目標（DMC5 式，會失去駕駛機體的感覺）。\n" +
+             "0.6~0.8 = 相對漂移大幅降低但仍存在，玩家還是要自己補位。\n\n" +
+             "從 hitbox 開啟（命中判定開始）起算，維持到整串連段結束。")]
+    [Range(0f, 1f)]
+    [SerializeField] private float meleeAnchorFactor = 0.7f;
+
+    [Header("Melee Pitch")]
+    [Tooltip("近戰攻擊時，角色朝目標俯仰的最大角度。0 = 停用。\n" +
+             "三維突進衝向空中目標時，角色若維持水平會很不協調。")]
+    [Range(0f, 80f)]
+    [SerializeField] private float meleeMaxPitch = 30f;
+
+    [Tooltip("俯仰角的轉動速度。攻擊結束後也用這個速度轉回 0。")]
+    [SerializeField] private float meleePitchSpeed = 8f;
+
     [Tooltip("近戰滯空期間抵銷多少比例的重力。\n" +
              "從突進開始，一直到這一段攻擊完全結束（StepEnd / 取消）為止。\n" +
              "1 = 完全無重力（打飛行敵人時軌跡筆直），0 = 照常掉落。")]
@@ -497,6 +516,9 @@ public class PlayerMovement : MonoBehaviour
 
     /// <summary>近戰滯空中（從突進開始到整段攻擊結束）。給後處理 / VFX 判斷用。</summary>
     public bool IsMeleeHovering => _meleeHovering;
+
+    /// <summary>目前是否錨定在某個近戰目標上。</summary>
+    public bool IsMeleeAnchored => _meleeAnchorTarget != null;
 
     /// <summary>
     /// 收招煞車。由 MeleeAttackController 在 AnimEvent_MeleeStepEnd 時呼叫。
@@ -529,6 +551,138 @@ public class PlayerMovement : MonoBehaviour
     // 而不是「抵銷掉一部分」—— 方向搞反的話角色會被往上推飛。
     //   meleeDashGravityCancel = 1 → 完全無重力，什麼都不加
     //   meleeDashGravityCancel = 0 → 加回全部重力，等同沒有滯空
+    // ────────────────────────────────────────────────
+    //  近戰錨定（部分速度繼承）
+    //
+    //  高速戰鬥的核心問題：所有近戰數值都在世界空間定義，但交戰發生在一個
+    //  高速移動的參考系裡。相對速度 8 m/s 時，dashStopDistance = 0.2 只夠撐
+    //  0.025 秒 —— 一個物理幀都不到就滑開了。
+    //
+    //  錨定把目標速度的一部分注入玩家，讓相對速度降下來，數值才回到「雙方
+    //  靜止」的前提。factor 不設 1 是刻意的：保留一點漂移，玩家仍要自己補位，
+    //  不會變成貼在敵人身上。
+    //
+    //  作法是「增量注入」：每幀只補上與上次注入量的差額，不去覆寫速度，
+    //  所以突進、煞車、一般移動都能照常運作，互不干擾。
+    // ────────────────────────────────────────────────
+
+    private Rigidbody _meleeAnchorTarget;
+    private Vector3 _appliedAnchorVel;
+
+    // 目前的俯仰角（度，正值 = 低頭 / 往下看，Unity 的 X 軸旋轉方向）
+    private float _meleePitchCurrent;
+
+    /// <summary>
+    /// 更新近戰俯仰角。
+    ///
+    /// 只在近戰攻擊進行中朝目標俯仰，攻擊結束就平滑回 0 —— 不然角色會維持
+    /// 斜著跑步。整段攻擊都有角度（不只突進），因為近戰在這遊戲是主武器，
+    /// 揮刀時對著目標比只在突進時對著更一致。
+    /// </summary>
+    private void UpdateMeleePitch()
+    {
+        float desired = 0f;
+
+        bool attacking = (meleeController != null) && meleeController.IsAttacking;
+
+        if (attacking && meleeMaxPitch > 0f && characterModel != null)
+        {
+            Transform target = GetMeleePitchTarget();
+            if (target != null)
+            {
+                Vector3 dir = target.position - characterModel.position;
+
+                if (dir.sqrMagnitude > 0.0001f)
+                {
+                    // asin(y) 得到與水平面的夾角。取負是因為 Unity 的 X 軸正旋轉是低頭。
+                    float angle = Mathf.Asin(Mathf.Clamp(dir.normalized.y, -1f, 1f)) * Mathf.Rad2Deg;
+                    desired = Mathf.Clamp(-angle, -meleeMaxPitch, meleeMaxPitch);
+                }
+            }
+        }
+
+        _meleePitchCurrent = Mathf.Lerp(
+            _meleePitchCurrent, desired, Time.deltaTime * Mathf.Max(0.01f, meleePitchSpeed));
+
+        if (Mathf.Abs(_meleePitchCurrent) < 0.01f) _meleePitchCurrent = 0f;
+    }
+
+    // 錨定中的目標優先（那是真正在打的對象），否則用鎖定目標
+    private Transform GetMeleePitchTarget()
+    {
+        if (_meleeAnchorTarget != null && _meleeAnchorTarget.gameObject.activeInHierarchy)
+            return _meleeAnchorTarget.transform;
+
+        if (PlayerAiming.Instance != null)
+        {
+            var rb = PlayerAiming.Instance.GetTargetRigidbody();
+            if (rb != null) return rb.transform;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 開始錨定。由 MeleeAttackController 在 hitbox 開啟時呼叫 ——
+    /// 從命中判定開始才跟上，感覺是「砍中了所以跟著走」，
+    /// 而不是突進階段就被吸過去。
+    /// </summary>
+    public void BeginMeleeAnchor(Rigidbody target)
+    {
+        if (target == null || meleeAnchorFactor <= 0f) return;
+        if (_meleeAnchorTarget == target) return;
+
+        // 換目標時先把舊的注入量退掉，避免速度累加
+        ReleaseAnchorVelocity();
+        _meleeAnchorTarget = target;
+    }
+
+    /// <summary>結束錨定。連段整串結束或被取消時呼叫。</summary>
+    public void EndMeleeAnchor()
+    {
+        ReleaseAnchorVelocity();
+        _meleeAnchorTarget = null;
+    }
+
+    // 把先前注入的速度收回。不收的話玩家會永久保留敵人的速度。
+    private void ReleaseAnchorVelocity()
+    {
+        if (_appliedAnchorVel.sqrMagnitude > 0f && playerRigidbody != null)
+            playerRigidbody.linearVelocity -= _appliedAnchorVel;
+
+        _appliedAnchorVel = Vector3.zero;
+    }
+
+    private void ApplyMeleeAnchorFixed(float dt)
+    {
+        if (_meleeAnchorTarget == null)
+        {
+            if (_appliedAnchorVel.sqrMagnitude > 0f) ReleaseAnchorVelocity();
+            return;
+        }
+
+        if (playerRigidbody == null) { EndMeleeAnchor(); return; }
+
+        // 目標被銷毀（打死了）→ 解除錨定
+        if (!_meleeAnchorTarget.gameObject.activeInHierarchy)
+        {
+            EndMeleeAnchor();
+            return;
+        }
+
+        // 目標速度要扣掉平台速度：雙方都站在 Landship 上時，
+        // 共同的船速不該被當成需要跟隨的相對運動。
+        Vector3 platformVel = GetMobilePlatformVelocity();
+        Vector3 targetVelRel = _meleeAnchorTarget.linearVelocity - platformVel;
+
+        Vector3 desired = targetVelRel * Mathf.Clamp01(meleeAnchorFactor);
+
+        // 增量注入：只補差額，不覆寫既有速度
+        Vector3 delta = desired - _appliedAnchorVel;
+        playerRigidbody.linearVelocity += delta;
+        _appliedAnchorVel = desired;
+    }
+
     private void ApplyMeleeHoverFixed(float dt)
     {
         if (!_meleeHovering || playerRigidbody == null) return;
@@ -862,13 +1016,40 @@ public class PlayerMovement : MonoBehaviour
             }
         }
 
+        // 俯仰角：只在近戰攻擊期間朝目標抬頭 / 低頭，其餘時間平滑回 0。
+        // 注意膠囊碰撞體不會跟著轉 —— 視覺斜著、碰撞維持直立是標準作法。
+        UpdateMeleePitch();
+
         if (desiredForward.HasValue)
         {
-            characterModel.forward = Vector3.Slerp(
-                characterModel.forward,
-                desiredForward.Value,
+            // 用 Quaternion 而不是直接寫 forward：forward 只能表達方向，
+            // 要把 pitch 疊在 yaw 之上必須走旋轉組合。
+            Quaternion yawRot = Quaternion.LookRotation(desiredForward.Value, Vector3.up);
+            Quaternion targetRot = yawRot * Quaternion.Euler(_meleePitchCurrent, 0f, 0f);
+
+            characterModel.rotation = Quaternion.Slerp(
+                characterModel.rotation,
+                targetRot,
                 Time.deltaTime * attackRotateSpeed
             );
+        }
+        else if (Mathf.Abs(_meleePitchCurrent) > 0.01f)
+        {
+            // 沒有轉向需求但 pitch 還沒歸零時，維持當前 yaw 只轉 pitch
+            Vector3 flatForward = characterModel.forward;
+            flatForward.y = 0f;
+
+            if (flatForward.sqrMagnitude > 0.001f)
+            {
+                Quaternion yawRot = Quaternion.LookRotation(flatForward.normalized, Vector3.up);
+                Quaternion targetRot = yawRot * Quaternion.Euler(_meleePitchCurrent, 0f, 0f);
+
+                characterModel.rotation = Quaternion.Slerp(
+                    characterModel.rotation,
+                    targetRot,
+                    Time.deltaTime * attackRotateSpeed
+                );
+            }
         }
         // 把世界空間的 moveDirection 轉成「角色本地」方向
         Vector3 localMove = Vector3.zero;

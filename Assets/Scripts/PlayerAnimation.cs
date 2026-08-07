@@ -675,7 +675,16 @@ public class PlayerAnimation : MonoBehaviour
     }
     public void AnimEvent_MeleeImpact()
     {
-        meleeAttackFeedback?.PlayFeedbacks(this.transform.position);
+        PlayMeleeHitFeedback(transform.position);
+    }
+
+    /// <summary>
+    /// 近戰命中的打擊回饋。由 MeleeAttackController 在 hitbox 實際造成傷害時呼叫，
+    /// 所以只有真的打到才會播 —— 揮空不會。
+    /// </summary>
+    public void PlayMeleeHitFeedback(Vector3 position)
+    {
+        meleeAttackFeedback?.PlayFeedbacks(position);
     }
 
     // ────────────────────────────────────────────────
