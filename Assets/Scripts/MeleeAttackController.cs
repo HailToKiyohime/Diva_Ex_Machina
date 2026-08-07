@@ -72,6 +72,11 @@ public class MeleeAttackController : MonoBehaviour
     private bool _dashEnergyResolved;
     private bool _dashEmpowered;           // true = 有能量的強化模式
 
+    // 彈藥條：這一段開始與結束時的 fill 值，段內依動畫進度插值
+    private float _barFillFrom = 1f;
+    private float _barFillTo = 1f;
+    private int _activeStateHash;
+
     private float _stepDeadline;           // maxStepDuration 保險絲的到期時刻
     private float _leftCooldownUntil;      // 左手冷卻到什麼時候
     private float _rightCooldownUntil;
@@ -118,7 +123,10 @@ public class MeleeAttackController : MonoBehaviour
             OnStepEnd();
         }
 
+        UpdateActiveBarFill();
         PushCooldownToUI();
+
+        if (attackManager != null) attackManager.PushAmmoUI();
     }
 
     // ────────────────────────────────────────────────
@@ -192,19 +200,23 @@ public class MeleeAttackController : MonoBehaviour
         w.meleeRuntime.attacking = true;
         w.meleeRuntime.comboIndex = playedIndex;
 
+        // 彈藥條：剩餘段數 / 總段數。
+        // 接手的瞬間直接跳到 From —— 換手時共用計數器已經走了很遠，
+        // 這個跳動正是在告訴玩家「你接的是第幾段」。
+        _barFillFrom = (float)(stepCount - playedIndex) / stepCount;
+        _barFillTo = (float)(stepCount - playedIndex - 1) / stepCount;
+        w.meleeRuntime.barFill = _barFillFrom;
+
         // 上一段的 hitbox 可能還開著（連段接得很快時），先關掉
         CloseAllHitboxes();
 
         // 上一段的突進也要停 —— 新的一段有自己的 DashStart
         if (playerMovement != null)
             playerMovement.StopMeleeDash();
-        float speed = Mathf.Max(0.01f, w.melee.meleeSpeed);
 
-        // 註：meleeSpeed 目前還沒套用到 Animator（見 PlayAnimation），動畫仍以
-        // 1 倍速播放。這裡若照 speed 縮放，保險絲會比實際動畫早燒斷。
-        // 等 State 上綁好 Speed Multiplier 之後，再把 / speed 加回來。
+        float speed = Mathf.Max(0.01f, w.melee.meleeSpeed);
         _stepDeadline = (step.maxStepDuration > 0f)
-            ? Time.time + step.maxStepDuration
+            ? Time.time + (step.maxStepDuration / speed)
             : 0f;
 
         PlayAnimation(step, isLeft, speed);
@@ -229,6 +241,7 @@ public class MeleeAttackController : MonoBehaviour
         // （Animator State Inspector → Speed → Multiplier 勾選 Parameter）。
         // 等基本連段跑通再處理。
         string stateName = step.GetStateName(isLeft);
+        _activeStateHash = Animator.StringToHash(stateName);
         playerAnimation.anim.CrossFade(stateName, step.crossFadeTime, _meleeLayerIndex, 0f);
     }
 
@@ -491,6 +504,10 @@ public class MeleeAttackController : MonoBehaviour
         w.meleeRuntime.reloading = duration > 0f;
         w.meleeRuntime.cooldownNormalized = 0f;
 
+        // 掉到 0 再填回 —— 中斷跟打完終結技的硬直一樣長，所以視覺上一致。
+        w.meleeRuntime.barFill = 0f;
+        if (duration <= 0f) w.meleeRuntime.barFill = 1f;
+
         if (logStateChanges)
             Debug.Log($"[Melee] {(isLeft ? "L" : "R")} cooldown {duration:F2}s", this);
     }
@@ -517,6 +534,23 @@ public class MeleeAttackController : MonoBehaviour
 
     private void OnDisable() => CloseAllHitboxes();
 
+    // 正在揮的那隻手：在這一段內平滑下降。
+    // 進度取自 Animator 的 normalizedTime，所以之後把 meleeSpeed 接到
+    // Speed Multiplier 之後，條的下降速度會自動跟著動畫同步。
+    private void UpdateActiveBarFill()
+    {
+        if (!_attacking || _activeWeapon == null) return;
+        if (playerAnimation == null || playerAnimation.anim == null || _meleeLayerIndex < 0) return;
+
+        var st = playerAnimation.anim.GetCurrentAnimatorStateInfo(_meleeLayerIndex);
+
+        // CrossFade 期間可能還回傳上一個 State，那幾幀維持現值不動
+        if (st.shortNameHash != _activeStateHash) return;
+
+        float p = Mathf.Clamp01(st.normalizedTime);
+        _activeWeapon.meleeRuntime.barFill = Mathf.Lerp(_barFillFrom, _barFillTo, p);
+    }
+
     // 把冷卻進度餵給彈藥環（CalcAmmoBarFill 會讀 cooldownNormalized）
     private void PushCooldownToUI()
     {
@@ -534,11 +568,15 @@ public class MeleeAttackController : MonoBehaviour
         {
             w.meleeRuntime.reloading = false;
             w.meleeRuntime.cooldownNormalized = 1f;
+            w.meleeRuntime.barFill = 1f;      // 冷卻完成 = 滿格，隨時可起手
             return;
         }
 
         float total = Mathf.Max(0.0001f, w.melee.reloadTime);
-        w.meleeRuntime.cooldownNormalized = Mathf.Clamp01(1f - (remaining / total));
+        float progress = Mathf.Clamp01(1f - (remaining / total));
+
+        w.meleeRuntime.cooldownNormalized = progress;
+        w.meleeRuntime.barFill = progress;    // 冷卻中，條從 0 填回 1
     }
 
     private string GetActiveStateName()

@@ -346,9 +346,8 @@ public class AttackManager : MonoBehaviour
         float leftFill = CalcAmmoBarFill(leftHandWeapon);
         float rightFill = CalcAmmoBarFill(rightHandWeapon);
 
-        bool leftReloading = leftHandWeapon != null && leftHandWeapon.rangeRuntime.reloading;
-
-        bool rightReloading = rightHandWeapon != null && rightHandWeapon.rangeRuntime.reloading;
+        bool leftReloading = IsReloadingForUI(leftHandWeapon);
+        bool rightReloading = IsReloadingForUI(rightHandWeapon);
 
         // ✅ Shoulder fill (shoulder is range-only in current design)
         float leftShoulderFill = CalcAmmoBarFill(leftShoulderWeapon);
@@ -364,12 +363,24 @@ public class AttackManager : MonoBehaviour
             rightShoulderFill, rightShoulderReloading);
     }
 
+    // 換彈 / 冷卻都讓彈藥條閃紅，近戰跟遠程共用同一個視覺語言
+    private static bool IsReloadingForUI(Weapon w)
+    {
+        if (w == null) return false;
+
+        return (w.kind == HandWeaponKind.Melee)
+            ? w.meleeRuntime.reloading
+            : w.rangeRuntime.reloading;
+    }
+
     private static float CalcAmmoBarFill(Weapon w)
     {
         if (w == null) return 0f;
 
+        // 近戰：冷卻中顯示填回進度，其餘顯示剩餘連段數。
+        // 兩者都由 MeleeAttackController 寫進 barFill。
         if (w.kind == HandWeaponKind.Melee)
-            return w.meleeRuntime.reloading ? Mathf.Clamp01(w.meleeRuntime.cooldownNormalized) : 1f;
+            return Mathf.Clamp01(w.meleeRuntime.barFill);
 
         // Reload mode: fillAmount means reload progress
         if (w.rangeRuntime.reloading)

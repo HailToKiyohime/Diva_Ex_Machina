@@ -54,8 +54,15 @@ public class MeleeWeaponRuntimeState
 {
     public bool reloading;              // 冷卻中
     public bool attacking;              // 揮擊中
-    public int comboIndex = -1;        // 目前第幾段，-1 = 不在連段
-    public float cooldownNormalized;    // 0~1，給 UI 用
+    public int comboIndex = -1;         // 目前第幾段，-1 = 不在連段
+    public float cooldownNormalized;    // 0~1，冷卻進度
+
+    // 彈藥條的顯示值（0~1）。語意是「這隻手還剩幾段可打 / 總段數」。
+    //
+    // 這隻手沒在揮時維持不動 —— 另一隻手在打不會影響它。
+    // 接手的瞬間才依當下的共用 comboIndex 一次跳到對應值，
+    // 所以「跳到 1 格」本身就是在告訴玩家：你接的是最後一段。
+    public float barFill = 1f;
 }
 
 [System.Serializable]
