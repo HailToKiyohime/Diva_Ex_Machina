@@ -212,7 +212,7 @@ public class MeleeAttackController : MonoBehaviour
 
         // 上一段的突進也要停 —— 新的一段有自己的 DashStart
         if (playerMovement != null)
-            playerMovement.StopMeleeDash();
+            playerMovement.StopMeleeDash("NextComboStep");
 
         float speed = Mathf.Max(0.01f, w.melee.meleeSpeed);
         _stepDeadline = (step.maxStepDuration > 0f)
@@ -393,7 +393,7 @@ public class MeleeAttackController : MonoBehaviour
 
         if (playerMovement == null) return;
 
-        playerMovement.StopMeleeDash();
+        playerMovement.StopMeleeDash("AnimEvent_MeleeBrake");
         playerMovement.BeginMeleeBrake();
 
         if (logStateChanges)
@@ -443,7 +443,7 @@ public class MeleeAttackController : MonoBehaviour
 
         if (playerMovement != null)
         {
-            playerMovement.StopMeleeDash();
+            playerMovement.StopMeleeDash("AnimEvent_MeleeStepEnd");
 
             // 滯空撐到這裡才解除 —— 突進停了刀還在揮，中途恢復重力
             // 會讓角色從空中目標旁邊掉下去。
