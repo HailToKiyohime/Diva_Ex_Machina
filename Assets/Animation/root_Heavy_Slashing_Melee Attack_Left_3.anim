@@ -184448,13 +184448,6 @@ AnimationClip:
   m_HasMotionFloatCurves: 0
   m_Events:
   - time: 0
-    functionName: AnimEvent_MeleeBrake
-    data: 
-    objectReferenceParameter: {fileID: 0}
-    floatParameter: 0
-    intParameter: 0
-    messageOptions: 0
-  - time: 0.033333335
     functionName: AnimEvent_MeleeDashStart
     data: 
     objectReferenceParameter: {fileID: 0}
@@ -184468,15 +184461,15 @@ AnimationClip:
     floatParameter: 0
     intParameter: 0
     messageOptions: 0
-  - time: 0.33333334
-    functionName: AnimEvent_MeleeComboWindow
+  - time: 0.06666667
+    functionName: AnimEvent_SwordSwing
     data: 
     objectReferenceParameter: {fileID: 0}
     floatParameter: 0
     intParameter: 0
     messageOptions: 0
   - time: 0.33333334
-    functionName: AnimEvent_MeleeImpact
+    functionName: AnimEvent_MeleeComboWindow
     data: 
     objectReferenceParameter: {fileID: 0}
     floatParameter: 0

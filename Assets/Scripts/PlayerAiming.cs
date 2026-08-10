@@ -57,6 +57,21 @@ public class PlayerAiming : MonoBehaviour
     [Tooltip("Exponential follow strength. Larger = snappier. (Used for AutoAim + locked follow)")]
     [SerializeField] private float lockRotateSpeed = 12f;
 
+    [Header("Melee Focus")]
+    [Tooltip("近戰期間的鎖定跟隨係數。\n\n" +
+             "平時用 lockRotateSpeed 的滯後是刻意的 —— 目標比較容易跑出鎖定圈，\n" +
+             "手動瞄準才有意義。但近戰需要目標穩定在畫面中央，所以攻擊期間\n" +
+             "大幅提高這個係數，讓穩定誤差趨近 0。\n\n" +
+             "只影響指數跟隨的收斂速度；最大轉速仍然由 AutoAimSpeed 決定。")]
+    [SerializeField] private float meleeLockRotateSpeed = 45f;
+
+    [Tooltip("進入 / 離開近戰對焦的過渡時間（秒）。\n" +
+             "直接切換會讓鏡頭一頓，0.1~0.2 之間比較順。")]
+    [SerializeField] private float meleeFocusBlendTime = 0.15f;
+
+    private bool _meleeFocus;
+    private float _meleeFocusWeight;
+
     // =========================
     // Auto Aim (Middle Mouse Toggle)
     // =========================
@@ -646,8 +661,17 @@ public class PlayerAiming : MonoBehaviour
         if (angle < 0.0001f)
             return;
 
+        // 近戰對焦的權重過渡。放在這裡而不是 Update，是因為它只影響這段運算。
+        float focusTarget = _meleeFocus ? 1f : 0f;
+        _meleeFocusWeight = Mathf.MoveTowards(
+            _meleeFocusWeight, focusTarget, dt / Mathf.Max(0.01f, meleeFocusBlendTime));
+
         // 指數式跟隨：stepWanted = angle * (1 - exp(-k * dt))
-        float k = Mathf.Max(0f, lockRotateSpeed);
+        //
+        // 這個 k 決定「穩定誤差」有多大 —— 每幀只走剩餘角度的固定比例，
+        // 所以目標移動時鏡頭會停在一個平衡點而非完全對準。
+        // 近戰期間把 k 拉高，平衡點就會逼近畫面中央。
+        float k = Mathf.Max(0f, Mathf.Lerp(lockRotateSpeed, meleeLockRotateSpeed, _meleeFocusWeight));
         float expT = 1f - Mathf.Exp(-k * dt);
         float stepWanted = angle * expT;
 
@@ -730,6 +754,15 @@ public class PlayerAiming : MonoBehaviour
     public Ray GetRay() => ray;
 
     public void SetLockOnDistance(float newLockOnDistance) => lockOnDistance = newLockOnDistance;
+
+    /// <summary>
+    /// 近戰對焦。開啟時大幅降低鎖定滯後，讓目標穩定在畫面中央。
+    /// 由 MeleeAttackController 在連段開始 / 結束時呼叫。
+    ///
+    /// 只改變收斂速度，最大轉速仍受 AutoAimSpeed 限制 ——
+    /// 所以高速目標還是有可能甩開鏡頭，手動瞄準的價值不會完全消失。
+    /// </summary>
+    public void SetMeleeFocus(bool active) => _meleeFocus = active;
 
     // pitch 0..360 -> -180..180
     private static float NormalizePitch(float xDeg)

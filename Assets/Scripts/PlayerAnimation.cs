@@ -56,6 +56,7 @@ public class PlayerAnimation : MonoBehaviour
     public MMF_Player leftAttackFeedback;//Range
     public MMF_Player rightAttackFeedback;//Range
     public MMF_Player meleeAttackFeedback;
+    public MMF_Player swordSwingFeedback;
     public MMF_Player reloadFeedback;
     public MMF_Player walkFeedback;
 
@@ -676,6 +677,11 @@ public class PlayerAnimation : MonoBehaviour
     public void AnimEvent_MeleeImpact()
     {
         PlayMeleeHitFeedback(transform.position);
+    }
+
+    public void AnimEvent_SwordSwing()
+    {
+        swordSwingFeedback?.PlayFeedbacks(this.transform.position);
     }
 
     /// <summary>

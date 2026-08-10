@@ -461,6 +461,30 @@ public class PlayerMovement : MonoBehaviour
     [Tooltip("dashCurve 末端趨近 0 時的速度下限倍率，避免永遠走不完全程。")]
     [SerializeField] private float meleeDashMinSpeedFactor = 0.08f;
 
+    [Tooltip("突進開始時保留多少比例的既有速度（0~1）。\n\n" +
+             "★ 這個歸零是必要的，不是手感選項。攔截解算假設你會從當前位置以\n" +
+             "  dashSpeed 朝攔截點前進；若帶著既有速度進入，實際速度會是\n" +
+             "  「原速度 + 突進加速」，方向與大小雙雙偏離解算前提。\n" +
+             "  更糟的是 ApplyMeleeDashFixed 只在「未達目標速度」時加力 ——\n" +
+             "  初速夠高時一次力都不會加，整段突進純靠殘餘動量滑行。\n\n" +
+             "0.1 保留一點慣性，讓起手不會像撞到牆一樣硬停。")]
+    [Range(0f, 1f)]
+    [SerializeField] private float meleeDashEntrySpeedFactor = 0.1f;
+
+    [Tooltip("攔截解算的速度比上限。目標速度 / 突進速度 超過這個值就不解，直接純追蹤。\n" +
+             "接近 1 時二次方程趨於退化，會解出極遠或負的根 —— 那些解看起來合法\n" +
+             "（方向也對），實際上是朝一個永遠追不到的幻影衝過去。")]
+    [Range(0.3f, 0.99f)]
+    [SerializeField] private float interceptMaxSpeedRatio = 0.85f;
+
+    [Tooltip("攔截點距離的上限倍率，相對於「目標當前距離」。\n" +
+             "解出的攔截點比目標遠這麼多倍就拒絕 —— 合理的提前量不會離譜到那種程度。")]
+    [SerializeField] private float interceptMaxLeadMultiplier = 2.5f;
+
+    [Tooltip("攔截解對應的預估抵達時間上限（秒）。超過就拒絕。\n" +
+             "太遠的解在抵達前戰況早就變了，追它不如純追蹤。")]
+    [SerializeField] private float interceptMaxSolveTime = 1.0f;
+
     [Tooltip("突進結束時在 Console 輸出診斷：預測 vs 實際、結束原因、最終偏差分解。")]
     [SerializeField] private bool logMeleeDashDiagnostics = false;
 
@@ -791,6 +815,8 @@ public class PlayerMovement : MonoBehaviour
         _meleeDashStopDistance = Mathf.Max(0f, stopDistance);
         _meleeDashing = true;
 
+        ApplyDashEntryBraking();
+
         _dbgStartTime = Time.time;
         _dbgStartPos = (playerRigidbody != null) ? playerRigidbody.position : transform.position;
         _dbgTargetStartPos = (target != null) ? target.position : Vector3.zero;
@@ -799,6 +825,31 @@ public class PlayerMovement : MonoBehaviour
         _dbgHasIntercept = false;
 
         BeginMeleeHover();
+    }
+
+    // 突進起手的速度歸零。
+    //
+    // 這不是手感選項，是正確性需求：攔截解算假設你從當前位置以 dashSpeed
+    // 朝攔截點前進。帶著既有速度進入的話，實際速度變成「原速度 + 突進加速」，
+    // 方向與大小雙雙偏離解算前提。
+    //
+    // 更糟的是 ApplyMeleeDashFixed 只在「未達目標速度」時加力 —— 初速夠高時
+    // 一次力都不會加，整段突進純靠殘餘動量往原方向滑行。
+    //
+    // 相對平台計算：在移動的 Landship 上歸零世界速度會讓角色被船甩到船尾。
+    // 三維歸零（含 Y）：突進本身是三維的，殘留的垂直速度同樣會污染解算。
+    private void ApplyDashEntryBraking()
+    {
+        if (playerRigidbody == null) return;
+
+        Vector3 platformVel = GetMobilePlatformVelocity();
+        Vector3 vRel = playerRigidbody.linearVelocity - platformVel;
+
+        playerRigidbody.linearVelocity =
+            vRel * Mathf.Clamp01(meleeDashEntrySpeedFactor) + platformVel;
+
+        // 起手歸零後，先前的煞車視窗已無意義 —— 留著會把突進的第一波加速吃掉
+        CancelMeleeBrake();
     }
 
     /// <summary>
@@ -828,6 +879,51 @@ public class PlayerMovement : MonoBehaviour
     }
 
     /// <summary>停止突進。距離走完、撞到停止距離、StepEnd、或被 Dash 取消時呼叫。</summary>
+    // 攔截解算 + 防呆。
+    //
+    // MathToolKit.InterceptionPoint 解的是二次方程，在「目標速度接近或超過自身速度」時
+    // 會退化：解出的根可能在極遠處或負的。那些解通過方向檢查（Dot > 0）卻完全不可用 ——
+    // 實測見過解出 229 公尺外的攔截點，玩家朝幻影衝過去，最後差了 49 公尺。
+    //
+    // 三道防呆，任一不過就退回純追蹤（朝目標當前位置，仍然每幀重算）：
+    //   1) 速度比太高 → 根本不解
+    //   2) 攔截點比目標遠太多倍 → 拒絕
+    //   3) 預估抵達時間太長 → 拒絕（那麼久之後戰況早變了）
+    private bool TrySolveIntercept(Vector3 selfPos, Vector3 targetPos,
+                                   Vector3 toTarget, Vector3 targetVelRel,
+                                   out Vector3 intercept)
+    {
+        intercept = targetPos;
+
+        if (targetVelRel.sqrMagnitude <= 0.01f) return false;
+
+        float dashSpeed = Mathf.Max(0.01f, _meleeDashSpeed);
+
+        // 1) 速度比：接近 1 時方程退化
+        if (targetVelRel.magnitude / dashSpeed >= interceptMaxSpeedRatio) return false;
+
+        if (!MathToolKit.InterceptionPoint(targetPos, selfPos, targetVelRel, dashSpeed, out var solved))
+            return false;
+
+        Vector3 toIntercept = solved - selfPos;
+        if (toIntercept.sqrMagnitude <= 0.0001f) return false;
+
+        // 解在背後
+        if (Vector3.Dot(toIntercept.normalized, toTarget.normalized) <= 0f) return false;
+
+        float interceptDist = toIntercept.magnitude;
+        float targetDist = toTarget.magnitude;
+
+        // 2) 提前量離譜
+        if (interceptDist > targetDist * Mathf.Max(1f, interceptMaxLeadMultiplier)) return false;
+
+        // 3) 抵達時間太長
+        if (interceptDist / dashSpeed > Mathf.Max(0.05f, interceptMaxSolveTime)) return false;
+
+        intercept = solved;
+        return true;
+    }
+
     // 突進結束診斷。回答三個問題：
     //   1) 我到得夠快嗎？      預測時間 vs 實際時間、峰值 / 平均速度 vs 解算假設速度
     //   2) 我的距離預算夠嗎？  已走距離 vs 預算、攔截點距離 vs 預算
@@ -944,24 +1040,14 @@ public class PlayerMovement : MonoBehaviour
 
             Vector3 aimPoint = targetPos;
 
-            if (targetVelRel.sqrMagnitude > 0.01f &&
-                MathToolKit.InterceptionPoint(targetPos, selfPos, targetVelRel,
-                                              Mathf.Max(0.01f, _meleeDashSpeed), out var intercept))
+            if (TrySolveIntercept(selfPos, targetPos, toTarget, targetVelRel, out var intercept))
             {
-                // 目標比我快時解可能無效（跑到背後去）。
-                // 攔截方向跟目標方向反了就退回純追蹤。
-                Vector3 toIntercept = intercept - selfPos;
+                aimPoint = intercept;
 
-                if (toIntercept.sqrMagnitude > 0.0001f &&
-                    Vector3.Dot(toIntercept.normalized, toTarget.normalized) > 0f)
+                if (!_dbgCaptured)
                 {
-                    aimPoint = intercept;
-
-                    if (!_dbgCaptured)
-                    {
-                        _dbgHasIntercept = true;
-                        _dbgInterceptPoint = intercept;
-                    }
+                    _dbgHasIntercept = true;
+                    _dbgInterceptPoint = intercept;
                 }
             }
 

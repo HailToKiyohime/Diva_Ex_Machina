@@ -197,6 +197,12 @@ public class MeleeAttackController : MonoBehaviour
         _attacking = true;
         _windowOpen = false;
 
+        // 近戰對焦：降低鎖定滯後，讓目標穩定在畫面中央。
+        // 平時的滯後是刻意設計（目標容易跑出鎖定圈，手動瞄準才有意義），
+        // 但近戰需要精準對位，攻擊期間才臨時取消。
+        if (PlayerAiming.Instance != null)
+            PlayerAiming.Instance.SetMeleeFocus(true);
+
         w.meleeRuntime.attacking = true;
         w.meleeRuntime.comboIndex = playedIndex;
 
@@ -470,6 +476,9 @@ public class MeleeAttackController : MonoBehaviour
         // 正好破壞它要解決的問題。
         if (playerMovement != null)
             playerMovement.EndMeleeAnchor();
+
+        if (PlayerAiming.Instance != null)
+            PlayerAiming.Instance.SetMeleeFocus(false);
 
         _comboIndex = -1;
         _attacking = false;

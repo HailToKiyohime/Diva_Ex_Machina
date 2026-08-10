@@ -29,7 +29,7 @@ MonoBehaviour:
     value: 1
   - attribute: 36
     mode: 1
-    value: 30
+    value: 5
   - attribute: 8
     mode: 0
     value: 1
