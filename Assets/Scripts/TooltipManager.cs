@@ -21,9 +21,31 @@ public class TooltipManager : MonoBehaviour
     private void Update()
     {
         if (tooltipRoot != null && tooltipRoot.activeSelf)
-        {
-            tooltipPanel.position = (Vector2)Input.mousePosition + offset;
-        }
+            UpdateTooltipPosition();
+    }
+
+    // 依游標在螢幕上的位置自動選邊，讓面板永遠往有空間的方向展開。
+    //
+    // 作法是切換 pivot 而不是計算位移：pivot 決定「position 對應到面板的哪個角」，
+    // 所以 pivot.x = 1 時面板整個往左長，不需要知道面板寬度。
+    // 面板尺寸會隨 buff 數量變動，用 pivot 就不必每幀量它。
+    // 固定往左下展開。
+    //
+    // pivot.x = 1 表示 position 對應到面板的右緣，所以面板整個長在游標左側 ——
+    // 不需要事先知道面板寬度。面板高度會隨 buff 數量變動，用 pivot 就不必每幀去量它。
+    private void UpdateTooltipPosition()
+    {
+        if (tooltipPanel == null) return;
+
+        tooltipPanel.pivot = new Vector2(1f, 1f);
+
+        // offset 取絕對值再固定為負，方向由這裡決定。
+        // Inspector 上的 offset 填正填負都不影響結果。
+        Vector2 finalOffset = new Vector2(
+            -Mathf.Abs(offset.x),
+            -Mathf.Abs(offset.y));
+
+        tooltipPanel.position = (Vector2)Input.mousePosition + finalOffset;
     }
 
     public void ShowTooltip(ItemInstance itemInstance, RectTransform sourceRect = null)
@@ -37,6 +59,8 @@ public class TooltipManager : MonoBehaviour
         tooltipRoot.SetActive(true);
         equipmentText.text = GetDisplayName(itemInstance);
         statText.text = BuildStatText(itemInstance);
+
+
     }
 
     public void HideTooltip()

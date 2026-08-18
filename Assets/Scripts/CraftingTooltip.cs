@@ -117,15 +117,21 @@ public class CraftingTooltip : MonoBehaviour
         if (canvas.renderMode != RenderMode.ScreenSpaceOverlay)
             uiCam = canvas.worldCamera;
 
-        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, mouseScreenPos, uiCam, out var localPos))
-        {
-            // 基本位置：滑鼠 + 偏移
-            var target = localPos + tooltipOffset;
-            tooltipPanel.anchoredPosition = target;
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                canvasRect, mouseScreenPos, uiCam, out var localPos))
+            return;
 
-            // 邊界修正：避免 Tooltip 出畫面
-            ClampTooltipToCanvas(canvasRect);
-        }
+        // 固定往左下展開，理由同 TooltipManager
+        tooltipPanel.pivot = new Vector2(1f, 1f);
+
+        Vector2 finalOffset = new Vector2(
+            -Mathf.Abs(tooltipOffset.x),
+            -Mathf.Abs(tooltipOffset.y));
+
+        tooltipPanel.anchoredPosition = localPos + finalOffset;
+
+        // 靠近螢幕左緣 / 下緣時把面板推回畫面內
+        ClampTooltipToCanvas(canvasRect);
     }
 
     private void ClampTooltipToCanvas(RectTransform canvasRect)
