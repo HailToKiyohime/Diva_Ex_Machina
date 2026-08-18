@@ -19,6 +19,13 @@ public class RangeAttackController : MonoBehaviour
     [Tooltip("武器沒有指定 bullet 時的後備彈藥 prefab")]
     [SerializeField] private GameObject testBulletPrefab;
 
+    [Header("Recoil")]
+    [Tooltip("判定「停火」的門檻，單位是該武器 timeBetweenShooting 的倍數。\n" +
+             "超過這個時間沒開火才開始衰減。\n\n" +
+             "用倍數而非固定秒數，門檻才會自動隨武器射速縮放 ——\n" +
+             "衝鋒槍約 0.1 秒、火砲約 3 秒，不需要各自調參數。")]
+    [SerializeField] private float ceaseFireIntervalMultiplier = 1.5f;
+
     [Header("Debug")]
     [Tooltip("開火時在 Scene 視圖畫出：黃 = 準星 ray（相機出發）、紅 = 子彈實際方向（槍口出發），持續 1 秒。")]
     [SerializeField] private bool debugDrawFireRay = false;
@@ -32,6 +39,33 @@ public class RangeAttackController : MonoBehaviour
     private void Reset()
     {
         attackManager = GetComponent<AttackManager>();
+    }
+
+    private void Update()
+    {
+        // 偏移持續衰減 —— 開火期間也在扣。
+        float dt = Time.deltaTime;
+
+        DecayDeviation(attackManager.leftHandWeapon, dt);
+        DecayDeviation(attackManager.rightHandWeapon, dt);
+        DecayDeviation(attackManager.leftShoulderWeapon, dt);
+        DecayDeviation(attackManager.rightShoulderWeapon, dt);
+    }
+
+    private void DecayDeviation(Weapon w, float dt)
+    {
+        if (w == null) return;
+        if (w.rangeRuntime.accumulatedDeviation <= 0f) return;
+
+        // 只在停火後衰減。射擊期間偏移只會往天花板爬，不會被自己的射擊間隔
+        // 抵銷掉一部分 —— 那會讓射速慢的武器變相獲得優勢。
+        float interval = Mathf.Max(0.01f, w.range.timeBetweenShooting);
+        float ceaseFireDelay = interval * Mathf.Max(1f, ceaseFireIntervalMultiplier);
+
+        if (Time.time < w.rangeRuntime.lastShotTime + ceaseFireDelay) return;
+
+        w.rangeRuntime.accumulatedDeviation = Mathf.Max(
+            0f, w.rangeRuntime.accumulatedDeviation - w.range.deviationDecayPerSecond * dt);
     }
 
     public bool TryStartShoot(Weapon w)
@@ -64,6 +98,25 @@ public class RangeAttackController : MonoBehaviour
         var muzzle = w.muzzle;
         if (bulletPrefab == null || muzzle == null)
             yield break;
+
+        // ★ 偏移累加：每呼叫一次 Shoot() 加一次，刻意放在所有迴圈之外。
+        //   霰彈槍（bulletPerShot = 8）和點射步槍（roundPerTap = 3）不會一次跳好幾級 ——
+        //   一次扣扳機就是一次後座。
+        //
+        //   天花板由 maxDeviation（ratio 查曲線）決定，所以射速快只是更快到頂，
+        //   到不了更高的地方。火砲一發就能打滿，這是刻意的。
+        //   肩武器是固定式武裝，recoilPerShooting 恆為 0，這段對它無作用。
+        w.rangeRuntime.lastShotTime = Time.time;
+
+        if (!w.isShoulder && w.range.recoilPerShooting > 0f)
+        {
+            w.rangeRuntime.accumulatedDeviation = Mathf.Min(
+                w.range.maxDeviation,
+                w.rangeRuntime.accumulatedDeviation + w.range.recoilPerShooting);
+        }
+
+        // 這一次射擊共用同一個偏移角（圖上的一個紫點對應一個紅圈）
+        float deviationDeg = w.isShoulder ? 0f : w.rangeRuntime.accumulatedDeviation;
 
         for (int i = 0; i < shotsToFire; i++)
         {
@@ -142,21 +195,16 @@ public class RangeAttackController : MonoBehaviour
 
                 Vector3 dirNoSpread = (targetPoint - muzzle.position).normalized;
 
-                Vector3 right = Vector3.Cross(dirNoSpread, Vector3.up);
-                if (right.sqrMagnitude < 0.0001f)
-                    right = Vector3.Cross(dirNoSpread, Vector3.right);
-                right.Normalize();
-                Vector3 up = Vector3.Cross(right, dirNoSpread);
-
-                float maxRad = w.range.spread * Mathf.Deg2Rad;
-                float cosMax = Mathf.Cos(maxRad);
-
-                float cosAlpha = Mathf.Lerp(1f, cosMax, Random.value);
-                float sinAlpha = Mathf.Sqrt(1f - cosAlpha * cosAlpha);
-                float phi = Random.Range(0f, Mathf.PI * 2f);
-
-                Vector3 lateral = right * Mathf.Cos(phi) + up * Mathf.Sin(phi);
-                Vector3 dirWithSpread = dirNoSpread * cosAlpha + lateral * sinAlpha;
+                // 兩層獨立的圓錐取樣：
+                //   綠錐（deviation）擾動出「本次的瞄準方向」= 圖上的紫點
+                //   紅錐（spread）  再從紫點往外散開          = 圖上的藍點
+                // 關鍵是紅錐疊在紫方向上而不是原始方向上 —— 後座把準星推開之後，
+                // 散佈是從被推開的位置再往外擴，兩者是累加的。
+                //
+                // 鎖定時 dirNoSpread 是攔截預測方向，deviation 照樣生效 ——
+                // 後座力對自動鎖定同樣有懲罰，這是 RecoilControl 的價值所在。
+                Vector3 dirAfterDeviation = ApplyConeSpread(dirNoSpread, deviationDeg);
+                Vector3 dirWithSpread = ApplyConeSpread(dirAfterDeviation, w.range.spread);
 
                 if (debugDrawFireRay)
                 {
@@ -238,6 +286,30 @@ public class RangeAttackController : MonoBehaviour
         yield return new WaitForSeconds(w.range.timeBetweenShooting);
         w.rangeRuntime.readyToShoot = true;
         w.rangeRuntime.allowInvoke = true;
+    }
+
+    // 在以 dir 為軸、半角 halfAngleDeg 的圓錐內均勻取一個方向。
+    //
+    // cosAlpha 用 Lerp(1, cosMax, random) 而非直接對角度取樣 —— 那樣會讓
+    // 靠近中心的區域過度密集。這是球冠上的均勻分佈。
+    private static Vector3 ApplyConeSpread(Vector3 dir, float halfAngleDeg)
+    {
+        if (halfAngleDeg <= 0f) return dir;
+
+        Vector3 right = Vector3.Cross(dir, Vector3.up);
+        if (right.sqrMagnitude < 0.0001f)
+            right = Vector3.Cross(dir, Vector3.right);
+        right.Normalize();
+
+        Vector3 up = Vector3.Cross(right, dir);
+
+        float cosMax = Mathf.Cos(halfAngleDeg * Mathf.Deg2Rad);
+        float cosAlpha = Mathf.Lerp(1f, cosMax, Random.value);
+        float sinAlpha = Mathf.Sqrt(Mathf.Max(0f, 1f - cosAlpha * cosAlpha));
+        float phi = Random.Range(0f, Mathf.PI * 2f);
+
+        Vector3 lateral = right * Mathf.Cos(phi) + up * Mathf.Sin(phi);
+        return (dir * cosAlpha + lateral * sinAlpha).normalized;
     }
 
     private bool TrySampleTarget(Rigidbody rb, out Vector3 pos, out Vector3 vel)

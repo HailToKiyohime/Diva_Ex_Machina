@@ -15,57 +15,82 @@ public enum FiringMode
 }
 public enum Attributes
 {
+    // ★ 每個成員都明確指定數值，不要依賴宣告順序。
+    //
+    //   Unity 序列化 enum 用的是「數值」而不是名字，所以在中間插入一個沒有
+    //   指定值的成員，會讓它後面所有成員的值 +1 —— 已存檔的資產上寫著 13，
+    //   意思就從 Spread 變成別的東西，而且不會有任何錯誤提示。
+    //
+    //   指定數值之後，宣告順序（決定 Inspector 下拉選單的排列）就跟序列化值
+    //   脫鉤了：想插在哪裡就插在哪裡，只要給一個沒用過的新號碼。
+    //
+    //   新增時：放在語意上合適的位置，號碼取「目前最大值 + 1」。
+    //   刪除時：不要重用舊號碼，留著當墓碑，避免舊資產指到新意思。
+
     //Damage Type
-    PhysicalDamage,
-    ExplosionDamage,
-    EnergyDamage,
-    ColdDamage,
+    PhysicalDamage = 0,
+    ExplosionDamage = 1,
+    EnergyDamage = 2,
+    ColdDamage = 3,
+
     //Defence Type
-    PhysicalDefense,
-    ExplosionDefense,
-    EnergyDefense,
-    ColdDefense,
+    PhysicalDefense = 4,
+    ExplosionDefense = 5,
+    EnergyDefense = 6,
+    ColdDefense = 7,
+
     //Range Weapon Specific
-    ReloadTime,
-    BulletPerShot,
-    RoundPerPull,
-    TimeBetweenShooting,
-    TimeBetweenShots,
-    Spread,
-    MagazineSize,
-    BulletSpeed,
-    FiringMode,//0:Single, 1:Auto, 2:Charge
+    ReloadTime = 8,
+    BulletPerShot = 9,
+    RoundPerPull = 10,
+    TimeBetweenShooting = 11,
+    TimeBetweenShots = 12,
+    Spread = 13,
+    RecoilPerShooting = 39,   // 每次扣扳機造成的偏移角度（度）。本身就是角度，不需換算
+    RecoilControl = 40,       // 後座力控制。只出現在手甲 / 頭盔上，不會出現在武器上
+    MagazineSize = 14,
+    BulletSpeed = 15,
+    FiringMode = 16,          //0:Single, 1:Auto, 2:Charge
+
     //Energy
-    MaxEnergy,
-    EnergyRegen,
-    DashEnergyCost,
-    FlyEnergyCost,
+    MaxEnergy = 17,
+    EnergyRegen = 18,
+    DashEnergyCost = 19,
+    FlyEnergyCost = 20,
+
     //Critical Attack
-    CriticalChance,
-    CriticalMultiplier,
+    CriticalChance = 21,
+    CriticalMultiplier = 22,
+
     //Movement
-    SprintSpeed,
-    AccelerationSpeed,
-    DecelerationSpeed,
-    DashSpeed,
+    SprintSpeed = 23,
+    AccelerationSpeed = 24,
+    DecelerationSpeed = 25,
+    DashSpeed = 26,
+
     //Jump/Fly
-    JumpHeight,
-    FlySpeed,
-    FlyAcceleration,
+    JumpHeight = 27,
+    FlySpeed = 28,
+    FlyAcceleration = 29,
+
     //Health
-    MaxHealth,
+    MaxHealth = 30,
+
     //Aiming
-    LockOnRange,
-    AimingDistance,
-    //Weight,
-    Weight,
+    LockOnRange = 31,
+    AimingDistance = 32,
+
+    //Weight
+    Weight = 33,
+
     //Melee Weapon Specific
-    MeleeOutput,
-    MeleeSpeed,
-    MeleeDashDistance,
-    MeleeReloadTime,
+    MeleeOutput = 34,
+    MeleeSpeed = 35,
+    MeleeDashDistance = 36,
+    MeleeReloadTime = 37,
+
     //Auto Aim Speed
-    AutoAimSpeed,// The speed of auto-aiming towards the target, degrees per second
+    AutoAimSpeed = 38,        // The speed of auto-aiming towards the target, degrees per second
 }
 
 public enum AnimationType
@@ -216,6 +241,15 @@ public class BaseStats
     public float lockOnRange = 300f;
     public float aimingDistance = 50f;
     public float autoAimSpeed = 60f; // The speed of auto-aiming towards the target, degrees per second
+
+    [Header("Base Recoil")]
+    // 玩家不穿任何防具時也有的基礎後座力控制。
+    //
+    // RecoilControl 只出現在防具上，所以基礎值一定要在這裡 —— 否則裸裝時
+    // GetRecoilControlForHand 會回傳 0，ratio 變成無限大，任何槍都打不中。
+    //
+    // 量級要跟 Recoil 對齊（AttackManager 把 Recoil 乘了 1000，落在數百~數千）。
+    public float recoilControl = 400f;
 }
 
 
@@ -723,6 +757,10 @@ public class PlayerStats : MonoBehaviour, IDamageable
             case Attributes.TimeBetweenShooting:
             case Attributes.TimeBetweenShots:
             case Attributes.Spread:
+            case Attributes.RecoilPerShooting:
+            // RecoilControl 概念上是角色能力，但走武器側管線 ——
+            // 左右手要獨立計算（手甲各加各的），頭盔則兩手都吃。
+            case Attributes.RecoilControl:
             case Attributes.MagazineSize:
             case Attributes.BulletSpeed:
             case Attributes.FiringMode:
@@ -799,6 +837,16 @@ public class PlayerStats : MonoBehaviour, IDamageable
     {
         var hand = isLeftHand ? leftHand : rightHand;
         return ApplyBuffListToValue(hand.buffs, Attributes.MeleeDashDistance, baseStats.meleeDashDistance);
+    }
+
+    // 這隻手的最終後座力控制：baseStats.recoilControl 再吃該手的武器側 buff。
+    //
+    // 必須走 ApplyBuffListToValue 而不是 GetAttribute —— 後者在沒有任何 buff 時
+    // 回傳 0（add=0 × mul=1），玩家裸裝就會失去基礎控制力。
+    public float GetRecoilControlForHand(bool isLeftHand)
+    {
+        var hand = isLeftHand ? leftHand : rightHand;
+        return Mathf.Max(1f, ApplyBuffListToValue(hand.buffs, Attributes.RecoilControl, baseStats.recoilControl));
     }
 
     // 這隻手的最終近戰輸出倍率：baseStats.meleeOutput 再吃該手的武器側 buff

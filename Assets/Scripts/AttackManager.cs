@@ -2,6 +2,51 @@
 
 public class AttackManager : MonoBehaviour
 {
+    // ───── 後座力 ─────
+    //
+    // 設計師只設定 RecoilPerShooting —— 每次扣扳機造成的偏移角度（度）。
+    // 它本身就是角度，不需要任何換算係數。
+    //
+    // 玩家看到的 Recoil 是
+    //     Recoil = RecoilPerShooting / TimeBetweenShooting × 1000
+    // 也就是每秒偏移量再放大 1000 倍。射速已經吃進去，衝鋒槍（0.1 度/發 × 14 發/秒）和
+    // 火砲（4 度/發 × 0.5 發/秒）可以直接對比，玩家不必在腦中乘一次射速。
+    //
+    // ×1000 純粹是為了讓 Recoil 與防具上的 RecoilControl 落在同一個量級
+    // （數百 ~ 數千）。ratio 是兩者相除，所以這個縮放對比值沒有影響 ——
+    // 只是讓玩家看到 1429 而不是 1.429。
+    //
+    // 玩家的判讀基準（ratio = Recoil / RecoilControl）：
+    //     ratio ≈ 0.5 → 精準
+    //     ratio ≈ 1.0 → 可用
+    //     ratio ≈ 2.0 → 打不中
+    //
+    // 用曲線而不是公式：ratio ≤ 1 的區段是線性的（控制力足夠時線性回報），
+    // 超過 1 之後才變陡（不足時懲罰加速）。單一公式表達不了這個轉折，
+    // 而且曲線可以直接在 Inspector 拉，不用改程式碼。
+
+    [Header("Recoil Curves")]
+    [Tooltip("X = ratio (Recoil / RecoilControl)，Y = 偏移天花板（度）。\n" +
+             "錨點：0.1→0.2  0.5→1  1.0→2  2.0→5")]
+    [SerializeField]
+    private AnimationCurve maxDeviationByRatio = new AnimationCurve(
+        new Keyframe(0.1f, 0.2f), new Keyframe(0.5f, 1f),
+        new Keyframe(1f, 2f), new Keyframe(2f, 5f));
+
+    [Tooltip("X = ratio，Y = 從天花板恢復到 0 所需秒數。\n" +
+             "錨點：0.1→0.3s  0.5→0.6s  1.0→1.0s  2.0→2.0s")]
+    [SerializeField]
+    private AnimationCurve recoveryTimeByRatio = new AnimationCurve(
+        new Keyframe(0.1f, 0.3f), new Keyframe(0.5f, 0.6f),
+        new Keyframe(1f, 1f), new Keyframe(2f, 2f));
+
+    [Tooltip("timeBetweenShooting 的下限，避免除零讓 Recoil 變成無限大")]
+    [SerializeField] private float minShotInterval = 0.01f;
+
+    // Recoil 的顯示縮放。只影響顯示數字與 RecoilControl 的量級對齊，
+    // 不影響 ratio（兩者相除時約掉）。
+    private const float RecoilDisplayScale = 1000f;
+
     public Rigidbody shipRB;
     public bool onShip;
 
@@ -102,6 +147,14 @@ public class AttackManager : MonoBehaviour
         outWeapon.range.timeBetweenShooting = 0f;
         outWeapon.range.timeBetweenShots = 0f;
         outWeapon.range.spread = 0f;
+        outWeapon.range.recoilPerShooting = 0f;
+        outWeapon.range.recoil = 0f;
+        outWeapon.range.recoilControl = 0f;
+        outWeapon.range.recoilRatio = 0f;
+        outWeapon.range.maxDeviation = 0f;
+        outWeapon.range.deviationDecayPerSecond = 0f;
+        outWeapon.rangeRuntime.accumulatedDeviation = 0f;
+        outWeapon.rangeRuntime.accumulatedDeviation = 0f;
         outWeapon.range.magazineSize = 0;
         outWeapon.range.bulletSpeed = 0f;
         outWeapon.range.firingMode = 0;
@@ -151,6 +204,14 @@ public class AttackManager : MonoBehaviour
         outWeapon.range.timeBetweenShooting = 0f;
         outWeapon.range.timeBetweenShots = 0f;
         outWeapon.range.spread = 0f;
+        outWeapon.range.recoilPerShooting = 0f;
+        outWeapon.range.recoil = 0f;
+        outWeapon.range.recoilControl = 0f;
+        outWeapon.range.recoilRatio = 0f;
+        outWeapon.range.maxDeviation = 0f;
+        outWeapon.range.deviationDecayPerSecond = 0f;
+        outWeapon.rangeRuntime.accumulatedDeviation = 0f;
+        outWeapon.rangeRuntime.accumulatedDeviation = 0f;
         outWeapon.range.magazineSize = 0;
         outWeapon.range.bulletSpeed = 0f;
         outWeapon.range.firingMode = 0;
@@ -162,7 +223,7 @@ public class AttackManager : MonoBehaviour
         outWeapon.rangeRuntime.readyToShoot = false;
         outWeapon.rangeRuntime.allowInvoke = false;
     }
-    private static void ApplyHand(WeaponStats hand, Weapon outWeapon, bool isLeftHand,
+    private void ApplyHand(WeaponStats hand, Weapon outWeapon, bool isLeftHand,
                                   MeleeStanceRules stanceRules,
                                   ref RangeWeaponInstance cachedRange,
                                   ref MeleeWeaponInstance cachedMelee)
@@ -179,6 +240,7 @@ public class AttackManager : MonoBehaviour
         }
 
         outWeapon.kind = hand.weaponKind;
+        outWeapon.isShoulder = false;
 
         // 分流：遠程 / 近戰
         if (hand.weaponKind == HandWeaponKind.Range)
@@ -212,6 +274,13 @@ public class AttackManager : MonoBehaviour
             outWeapon.range.timeBetweenShooting = hand.GetAttribute(Attributes.TimeBetweenShooting);
             outWeapon.range.timeBetweenShots = hand.GetAttribute(Attributes.TimeBetweenShots);
             outWeapon.range.spread = hand.GetAttribute(Attributes.Spread);
+            outWeapon.range.recoilPerShooting = hand.GetAttribute(Attributes.RecoilPerShooting);
+            outWeapon.range.recoilControl = (PlayerStats.Instance != null)
+                ? PlayerStats.Instance.GetRecoilControlForHand(isLeftHand)
+                : 0f;
+
+            // 衍生值：在裝備變動時算一次即可，開火時直接讀
+            ApplyRecoilDerivedValues(outWeapon.range);
             outWeapon.range.magazineSize = Mathf.Max(1, Mathf.RoundToInt(hand.GetAttribute(Attributes.MagazineSize)));
             outWeapon.range.bulletSpeed = hand.GetAttribute(Attributes.BulletSpeed);
             outWeapon.range.firingMode = Mathf.RoundToInt(hand.GetAttribute(Attributes.FiringMode));
@@ -279,9 +348,49 @@ public class AttackManager : MonoBehaviour
             return;
         }
     }
-    private static void ApplyShoulder(ShoulderWeaponStats shoulder, Weapon outWeapon, ref ShoulderWeaponInstance cachedSource)
+    // 由「每秒後座力」推導出每發偏移與每秒衰減。
+    // 由 recoilPerShooting + 射速 + recoilControl 推導出所有後座力衍生值。
+    //
+    //   recoil       = recoilPerShooting / timeBetweenShooting × 1000   ← 顯示給玩家
+    //   ratio        = recoil / recoilControl
+    //   maxDeviation = 曲線A(ratio)                              ← 天花板
+    //   decayPerSec  = maxDeviation / 曲線B(ratio)               ← 停火後的恢復
+    //
+    // 每發累加量不在這裡算 —— recoilPerShooting 本身就是角度，開火時直接用。
+    //
+    // recoilControl 因此同時控制天花板高度與恢復速度，玩家只要看一個比值就懂。
+    // 點射武器一次扣扳機只累加一次，roundPerTap 不參與計算。
+    private void ApplyRecoilDerivedValues(RangeWeaponSettings range)
+    {
+        float perShooting = Mathf.Max(0f, range.recoilPerShooting);
+        float interval = Mathf.Max(minShotInterval, range.timeBetweenShooting);
+
+        // ×1000 讓 Recoil 與防具上的 RecoilControl 同量級（數百 ~ 數千）
+        range.recoil = perShooting / interval * RecoilDisplayScale;
+
+        if (perShooting <= 0f)
+        {
+            range.recoilRatio = 0f;
+            range.maxDeviation = 0f;
+            range.deviationDecayPerSecond = 0f;
+            return;
+        }
+
+        float control = Mathf.Max(1f, range.recoilControl);
+        float ratio = range.recoil / control;
+
+        range.recoilRatio = ratio;
+        range.maxDeviation = Mathf.Max(0f, maxDeviationByRatio.Evaluate(ratio));
+
+        float recovery = Mathf.Max(0.01f, recoveryTimeByRatio.Evaluate(ratio));
+        range.deviationDecayPerSecond = range.maxDeviation / recovery;
+    }
+
+    private void ApplyShoulder(ShoulderWeaponStats shoulder, Weapon outWeapon, ref ShoulderWeaponInstance cachedSource)
     {
         if (outWeapon == null) return;
+
+        outWeapon.isShoulder = true;
         // 沒武器：清空輸出（也可以改成 disable 該手射擊）
         if (shoulder == null || shoulder.weaponKind == ShoulderWeaponKind.None || (!shoulder.HasWeapon))
         {
@@ -318,6 +427,13 @@ public class AttackManager : MonoBehaviour
             outWeapon.range.timeBetweenShooting = shoulder.GetAttribute(Attributes.TimeBetweenShooting);
             outWeapon.range.timeBetweenShots = shoulder.GetAttribute(Attributes.TimeBetweenShots);
             outWeapon.range.spread = shoulder.GetAttribute(Attributes.Spread);
+            // 肩武器是固定式武裝：只有 spread，沒有後座力累積
+            outWeapon.range.recoilPerShooting = 0f;
+            outWeapon.range.recoil = 0f;
+            outWeapon.range.recoilControl = 0f;
+            outWeapon.range.recoilRatio = 0f;
+            outWeapon.range.maxDeviation = 0f;
+            outWeapon.range.deviationDecayPerSecond = 0f;
             outWeapon.range.magazineSize = Mathf.Max(1, Mathf.RoundToInt(shoulder.GetAttribute(Attributes.MagazineSize)));
             outWeapon.range.bulletSpeed = shoulder.GetAttribute(Attributes.BulletSpeed);
             outWeapon.range.firingMode = Mathf.RoundToInt(shoulder.GetAttribute(Attributes.FiringMode));
