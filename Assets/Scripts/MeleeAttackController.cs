@@ -54,6 +54,12 @@ public class MeleeAttackController : MonoBehaviour
              "命中點通常比較好 —— 火花會出現在刀刃碰到敵人的位置。")]
     [SerializeField] private bool feedbackAtHitPoint = true;
 
+    [Header("Input Buffer")]
+    [Tooltip("終結技播放中按下的鍵是否丟掉。\n" +
+             "勾選（建議）＝丟掉：冷卻結束後不會自動冒出一刀玩家早就不想要的揮擊。\n" +
+             "取消＝保留：冷卻一結束立刻開新的一串連段，攻擊壓力更大但比較難停手。")]
+    [SerializeField] private bool dropBufferDuringFinisher = true;
+
     [Header("Debug")]
     [SerializeField] private bool logStateChanges = false;
 
@@ -85,6 +91,31 @@ public class MeleeAttackController : MonoBehaviour
 
     public bool IsAttacking => _attacking;
     public int ComboIndex => _comboIndex;
+
+    /// <summary>
+    /// 這個緩衝中的輸入在當前狀態下是否「永遠等不到」被消耗的機會。
+    ///
+    /// 給 PlayerMovement 用來提早丟掉沒救的緩衝。沒有這道判斷的話，
+    /// 玩家在終結技期間亂按，冷卻一結束就會自動冒出一刀他早就不想要的揮擊 ——
+    /// 那是輸入緩衝最典型的失敗模式（「幽靈揮擊」）。
+    ///
+    /// 注意：手在冷卻中「不算」沒救。冷卻結束的瞬間把緩衝揮出來，
+    /// 正是輸入緩衝要達成的手感，不能丟。
+    /// </summary>
+    public bool IsInputHopeless(Weapon w)
+    {
+        if (w == null || w.kind != HandWeaponKind.Melee) return true;
+        if (attackManager == null) return true;
+
+        bool isLeft = (w == attackManager.leftHandWeapon);
+        bool isRight = (w == attackManager.rightHandWeapon);
+        if (!isLeft && !isRight) return true;
+
+        // 終結技是連段最後一段，後面沒有窗口會開。
+        if (dropBufferDuringFinisher && _attacking && _activeIsFinisher) return true;
+
+        return false;
+    }
 
     private void Awake()
     {

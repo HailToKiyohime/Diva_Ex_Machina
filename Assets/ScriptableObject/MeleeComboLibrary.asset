@@ -22,52 +22,10 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 1
         dashMode: 2
-        dashCurve:
-          serializedVersion: 2
-          m_Curve:
-          - serializedVersion: 3
-            time: 0
-            value: -0.0038795471
-            inSlope: 26.721245
-            outSlope: 26.721245
-            tangentMode: 0
-            weightedMode: 0
-            inWeight: 0
-            outWeight: 0.0232378
-          - serializedVersion: 3
-            time: 0.005
-            value: 0.9961052
-            inSlope: 0
-            outSlope: 0
-            tangentMode: 0
-            weightedMode: 0
-            inWeight: 0.33333334
-            outWeight: 0.33333334
-          - serializedVersion: 3
-            time: 0.8
-            value: 1
-            inSlope: 0.00038130928
-            outSlope: 0.00038130928
-            tangentMode: 0
-            weightedMode: 0
-            inWeight: 0.24326637
-            outWeight: 0.33333334
-          - serializedVersion: 3
-            time: 1
-            value: 0
-            inSlope: -5.0000005
-            outSlope: -5.0000005
-            tangentMode: 34
-            weightedMode: 0
-            inWeight: 0.33333334
-            outWeight: 0
-          m_PreInfinity: 2
-          m_PostInfinity: 2
-          m_RotationOrder: 0
         dashStopDistance: 1.5
         cancellableByDash: 1
         slashVfxOverride: {fileID: 0}
-        hitStopDuration: 1
+        hitStopDuration: 0.05
         maxStepDuration: 3
       - animStateNameLeft: LongSword_1H_L_02
         animStateNameRight: LongSword_1H_R_02
@@ -75,87 +33,21 @@ MonoBehaviour:
         damageMultiplier: 1.2
         knockback: 1
         dashMode: 2
-        dashCurve:
-          serializedVersion: 2
-          m_Curve:
-          - serializedVersion: 3
-            time: 0
-            value: 1
-            inSlope: 0
-            outSlope: 0
-            tangentMode: 34
-            weightedMode: 0
-            inWeight: 0
-            outWeight: 0.33333334
-          - serializedVersion: 3
-            time: 0.8
-            value: 1
-            inSlope: 0.00038130928
-            outSlope: 0.00038130928
-            tangentMode: 0
-            weightedMode: 0
-            inWeight: 0.24326637
-            outWeight: 0.33333334
-          - serializedVersion: 3
-            time: 1
-            value: 0
-            inSlope: -5.0000005
-            outSlope: -5.0000005
-            tangentMode: 34
-            weightedMode: 0
-            inWeight: 0.33333334
-            outWeight: 0
-          m_PreInfinity: 2
-          m_PostInfinity: 2
-          m_RotationOrder: 0
         dashStopDistance: 1.5
-        cancellableByDash: 0
+        cancellableByDash: 1
         slashVfxOverride: {fileID: 0}
-        hitStopDuration: 0
+        hitStopDuration: 0.05
         maxStepDuration: 3
       - animStateNameLeft: LongSword_1H_L_03
         animStateNameRight: LongSword_1H_R_03
         crossFadeTime: 0.04
         damageMultiplier: 1.5
         knockback: 0
-        dashMode: 1
-        dashCurve:
-          serializedVersion: 2
-          m_Curve:
-          - serializedVersion: 3
-            time: 0
-            value: 1
-            inSlope: 0
-            outSlope: 0
-            tangentMode: 34
-            weightedMode: 0
-            inWeight: 0
-            outWeight: 0.33333334
-          - serializedVersion: 3
-            time: 0.8
-            value: 1
-            inSlope: 0.00038130928
-            outSlope: 0.00038130928
-            tangentMode: 0
-            weightedMode: 0
-            inWeight: 0.24326637
-            outWeight: 0.33333334
-          - serializedVersion: 3
-            time: 1
-            value: 0
-            inSlope: -5.0000005
-            outSlope: -5.0000005
-            tangentMode: 34
-            weightedMode: 0
-            inWeight: 0.33333334
-            outWeight: 0
-          m_PreInfinity: 2
-          m_PostInfinity: 2
-          m_RotationOrder: 0
+        dashMode: 2
         dashStopDistance: 0.2
-        cancellableByDash: 0
+        cancellableByDash: 1
         slashVfxOverride: {fileID: 0}
-        hitStopDuration: 0
+        hitStopDuration: 0.05
         maxStepDuration: 10
       loopCombo: 0
     twoHanded:
@@ -166,30 +58,6 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 0
         dashMode: 2
-        dashCurve:
-          serializedVersion: 2
-          m_Curve:
-          - serializedVersion: 3
-            time: 0
-            value: 0.9976196
-            inSlope: 0
-            outSlope: 0
-            tangentMode: 0
-            weightedMode: 0
-            inWeight: 0
-            outWeight: 0
-          - serializedVersion: 3
-            time: 1.1916809
-            value: 0
-            inSlope: -1.476192
-            outSlope: -1.476192
-            tangentMode: 0
-            weightedMode: 0
-            inWeight: 0.0419575
-            outWeight: 0
-          m_PreInfinity: 2
-          m_PostInfinity: 2
-          m_RotationOrder: 0
         dashStopDistance: 0.2
         cancellableByDash: 1
         slashVfxOverride: {fileID: 0}
@@ -201,30 +69,6 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 0
         dashMode: 1
-        dashCurve:
-          serializedVersion: 2
-          m_Curve:
-          - serializedVersion: 3
-            time: 0
-            value: 1
-            inSlope: 0
-            outSlope: 0
-            tangentMode: 34
-            weightedMode: 0
-            inWeight: 0
-            outWeight: 0
-          - serializedVersion: 3
-            time: 1
-            value: 1
-            inSlope: 0
-            outSlope: 0
-            tangentMode: 34
-            weightedMode: 0
-            inWeight: 0
-            outWeight: 0
-          m_PreInfinity: 2
-          m_PostInfinity: 2
-          m_RotationOrder: 0
         dashStopDistance: 0.2
         cancellableByDash: 0
         slashVfxOverride: {fileID: 0}
@@ -236,30 +80,6 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 0
         dashMode: 2
-        dashCurve:
-          serializedVersion: 2
-          m_Curve:
-          - serializedVersion: 3
-            time: 0
-            value: 0.9976196
-            inSlope: 0
-            outSlope: 0
-            tangentMode: 0
-            weightedMode: 0
-            inWeight: 0
-            outWeight: 0
-          - serializedVersion: 3
-            time: 1.1916809
-            value: 0
-            inSlope: -1.476192
-            outSlope: -1.476192
-            tangentMode: 0
-            weightedMode: 0
-            inWeight: 0.0419575
-            outWeight: 0
-          m_PreInfinity: 2
-          m_PostInfinity: 2
-          m_RotationOrder: 0
         dashStopDistance: 0.2
         cancellableByDash: 1
         slashVfxOverride: {fileID: 0}
@@ -275,30 +95,6 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 0
         dashMode: 2
-        dashCurve:
-          serializedVersion: 2
-          m_Curve:
-          - serializedVersion: 3
-            time: 0
-            value: 1
-            inSlope: -0.019480478
-            outSlope: -0.019480478
-            tangentMode: 0
-            weightedMode: 0
-            inWeight: 0
-            outWeight: 0.3682061
-          - serializedVersion: 3
-            time: 0.9958191
-            value: 0.019046783
-            inSlope: -3.0008712
-            outSlope: -3.0008712
-            tangentMode: 0
-            weightedMode: 0
-            inWeight: 0.05019563
-            outWeight: 0
-          m_PreInfinity: 2
-          m_PostInfinity: 2
-          m_RotationOrder: 0
         dashStopDistance: 0.2
         cancellableByDash: 1
         slashVfxOverride: {fileID: 0}
@@ -310,30 +106,6 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 0
         dashMode: 1
-        dashCurve:
-          serializedVersion: 2
-          m_Curve:
-          - serializedVersion: 3
-            time: 0
-            value: 1
-            inSlope: 0
-            outSlope: 0
-            tangentMode: 34
-            weightedMode: 0
-            inWeight: 0
-            outWeight: 0
-          - serializedVersion: 3
-            time: 1
-            value: 1
-            inSlope: 0
-            outSlope: 0
-            tangentMode: 34
-            weightedMode: 0
-            inWeight: 0
-            outWeight: 0
-          m_PreInfinity: 2
-          m_PostInfinity: 2
-          m_RotationOrder: 0
         dashStopDistance: 0.2
         cancellableByDash: 0
         slashVfxOverride: {fileID: 0}
@@ -348,30 +120,6 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 0
         dashMode: 2
-        dashCurve:
-          serializedVersion: 2
-          m_Curve:
-          - serializedVersion: 3
-            time: 0
-            value: 1
-            inSlope: -0.019480478
-            outSlope: -0.019480478
-            tangentMode: 0
-            weightedMode: 0
-            inWeight: 0
-            outWeight: 0.3682061
-          - serializedVersion: 3
-            time: 0.9958191
-            value: 0.019046783
-            inSlope: -3.0008712
-            outSlope: -3.0008712
-            tangentMode: 0
-            weightedMode: 0
-            inWeight: 0.05019563
-            outWeight: 0
-          m_PreInfinity: 2
-          m_PostInfinity: 2
-          m_RotationOrder: 0
         dashStopDistance: 0.2
         cancellableByDash: 1
         slashVfxOverride: {fileID: 0}
@@ -383,30 +131,6 @@ MonoBehaviour:
         damageMultiplier: 1
         knockback: 0
         dashMode: 1
-        dashCurve:
-          serializedVersion: 2
-          m_Curve:
-          - serializedVersion: 3
-            time: 0
-            value: 1
-            inSlope: 0
-            outSlope: 0
-            tangentMode: 34
-            weightedMode: 0
-            inWeight: 0
-            outWeight: 0
-          - serializedVersion: 3
-            time: 1
-            value: 1
-            inSlope: 0
-            outSlope: 0
-            tangentMode: 34
-            weightedMode: 0
-            inWeight: 0
-            outWeight: 0
-          m_PreInfinity: 2
-          m_PostInfinity: 2
-          m_RotationOrder: 0
         dashStopDistance: 0.2
         cancellableByDash: 0
         slashVfxOverride: {fileID: 0}

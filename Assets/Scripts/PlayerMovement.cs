@@ -40,6 +40,12 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float attackAimRayDistance = 100f;     // 非 lockOn 時，用準星 ray 取點距離
     [SerializeField] private float singleShotBufferTime = 0.25f;    // 單發按下後，最多等待多久才消耗掉這次射擊
     [SerializeField] private float maxAlignTime = 0.25f;            // 最多對準多久就強制放行（避免卡死）
+
+    [Tooltip("近戰按鍵的緩衝時間。按在連段窗口打開之前、或手還在冷卻時，\n" +
+             "這次輸入會被保留這麼久，一旦條件成立就立刻揮出。\n" +
+             "跟 singleShotBufferTime 分開是因為兩者要對齊的東西不同 ——\n" +
+             "槍對齊的是轉身時間，刀對齊的是連段窗口。0.2~0.3 通常最舒服。")]
+    [SerializeField] private float meleeInputBufferTime = 0.25f;
     private Weapon attackFacingOwner; // 目前誰在主導 attackFacingActive
     private bool attackFacingActive;
     private Vector3 attackDesiredForward; // XZ 平面朝向
@@ -48,6 +54,12 @@ public class PlayerMovement : MonoBehaviour
     // value = 這次單發請求的失效時間 / 開始對準時間
     private readonly Dictionary<Weapon, float> pendingSingleUntil = new();
     private readonly Dictionary<Weapon, float> alignStartTime = new();
+
+    // 近戰緩衝是「單一插槽」，不是每把武器一格。
+    // 因為 comboIndex 是整串連段共用的計數器 —— 左右手同時掛著緩衝的話，
+    // 窗口一開會有兩隻手搶同一格，落敗的那一隻還會留著去偷下一個窗口，
+    // 玩家會看到一刀他沒按過的揮擊。最新的按鍵直接覆蓋前一個。
+    private Weapon meleeBufferedWeapon;
     [Header("Animation")]
     [SerializeField] private PlayerAnimation playerAnimation;
     [SerializeField] private float movementBlendSpeed = 3f; // 控制 0↔1 的快慢
@@ -182,13 +194,32 @@ public class PlayerMovement : MonoBehaviour
 
 
 
-        bool isSingle = w.range.firingMode == 0;
+        // 近戰一律視為單發：一次按鍵 = 一段揮擊。
+        // 不看 firingMode 是刻意的 —— 近戰武器的 range 欄位是空殼，
+        // 萬一資料上被設成連發，這裡會變成「按住自動連砍」，緩衝也就失去意義。
+        bool isMelee = (w.kind == HandWeaponKind.Melee);
+        bool isSingle = isMelee || w.range.firingMode == 0;
+
+        // 緩衝時間依武器種類分流
+        float bufferTime = isMelee ? meleeInputBufferTime : singleShotBufferTime;
 
         if (isSingle)
         {
             if (attackInput.WasPressedThisFrame())
             {
-                pendingSingleUntil[w] = Time.time + singleShotBufferTime;
+                if (isMelee)
+                {
+                    // 單一插槽：新的近戰按鍵把另一隻手掛著的緩衝清掉
+                    if (meleeBufferedWeapon != null && meleeBufferedWeapon != w)
+                    {
+                        pendingSingleUntil.Remove(meleeBufferedWeapon);
+                        alignStartTime.Remove(meleeBufferedWeapon);
+                        ClearAttackFacingOwnerIfSelf(meleeBufferedWeapon);
+                    }
+                    meleeBufferedWeapon = w;
+                }
+
+                pendingSingleUntil[w] = Time.time + bufferTime;
                 alignStartTime[w] = Time.time;
                 if (isLeftShoulderAttack)
                 {
@@ -200,11 +231,18 @@ public class PlayerMovement : MonoBehaviour
                 }
             }
 
-            if (!pendingSingleUntil.TryGetValue(w, out float until) || Time.time > until)
+            // 提早丟掉沒救的近戰緩衝（例如終結技播放中），
+            // 免得它撐滿整個 bufferTime 之後才在冷卻結束時冒出一刀幽靈揮擊。
+            bool hopeless = isMelee
+                            && attackManager.Melee != null
+                            && attackManager.Melee.IsInputHopeless(w);
+
+            if (hopeless || !pendingSingleUntil.TryGetValue(w, out float until) || Time.time > until)
             {
                 pendingSingleUntil.Remove(w);
                 alignStartTime.Remove(w);
                 ClearAttackFacingOwnerIfSelf(w);
+                ClearMeleeBufferIfSelf(w);
                 return;
             }
         }
@@ -252,7 +290,7 @@ public class PlayerMovement : MonoBehaviour
         float angle = Vector3.Angle(flatForward, attackDesiredForward);
         bool aligned = angle <= attackAngleThreshold;
 
-        float singleAlignDeadline = Mathf.Min(maxAlignTime, singleShotBufferTime * 0.5f);
+        float singleAlignDeadline = Mathf.Min(maxAlignTime, bufferTime * 0.5f);
         bool timedOut = alignStartTime.TryGetValue(w, out float startT)
                         && (Time.time - startT) >= (isSingle ? singleAlignDeadline : maxAlignTime);
 
@@ -286,10 +324,23 @@ public class PlayerMovement : MonoBehaviour
             {
                 pendingSingleUntil.Remove(w);
                 alignStartTime.Remove(w);
+                ClearMeleeBufferIfSelf(w);
             }
 
         }
     }
+    /// <summary>近戰緩衝插槽是這把武器時才清掉，避免誤清掉另一隻手剛按下的輸入。</summary>
+    private void ClearMeleeBufferIfSelf(Weapon w)
+    {
+        if (meleeBufferedWeapon == w) meleeBufferedWeapon = null;
+    }
+
+    /// <summary>目前有沒有近戰輸入正在緩衝中。給 UI / 除錯用。</summary>
+    public bool HasBufferedMeleeInput =>
+        meleeBufferedWeapon != null
+        && pendingSingleUntil.TryGetValue(meleeBufferedWeapon, out float t)
+        && Time.time <= t;
+
     private void SetAttackFacingOwner(Weapon w, Vector3 desiredForward)
     {
         attackFacingOwner = w;

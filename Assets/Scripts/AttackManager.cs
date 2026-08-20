@@ -512,6 +512,9 @@ public class AttackManager : MonoBehaviour
     //  一律呼叫這裡，由武器種類決定交給誰。呼叫端不需要知道是刀還是槍。
     // ────────────────────────────────────────────────
 
+    /// <summary>近戰控制器。給 PlayerMovement 查詢緩衝輸入是否還有救。</summary>
+    public MeleeAttackController Melee => meleeController;
+
     public bool TryAttack(Weapon w)
     {
         if (w == null) return false;
