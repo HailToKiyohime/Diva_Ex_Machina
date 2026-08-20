@@ -175,7 +175,6 @@ public class AttackManager : MonoBehaviour
         outWeapon.melee.grip = default;
         outWeapon.melee.meleeOutput = 1f;
         outWeapon.melee.meleeSpeed = 1f;
-        outWeapon.melee.dashDistance = 0f;
         outWeapon.melee.reloadTime = 0f;
         outWeapon.melee.slashVfx = null;
         outWeapon.melee.hitbox = null;
@@ -334,7 +333,6 @@ public class AttackManager : MonoBehaviour
             {
                 outWeapon.melee.meleeOutput = ps.GetMeleeOutputForHand(isLeftHand);
                 outWeapon.melee.meleeSpeed = Mathf.Max(0.01f, ps.GetMeleeSpeedForHand(isLeftHand));
-                outWeapon.melee.dashDistance = Mathf.Max(0f, ps.GetMeleeDashDistanceForHand(isLeftHand));
                 outWeapon.melee.reloadTime = Mathf.Max(0f, ps.GetMeleeReloadTimeForHand(isLeftHand));
             }
 

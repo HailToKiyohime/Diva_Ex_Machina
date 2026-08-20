@@ -448,8 +448,10 @@ public class PlayerMovement : MonoBehaviour
     //    - 能量由 MeleeAttackController 結算（一串連段只付一次入場費）
     //
     //  跟一般 Dash 相同的地方：全部走「相對平台」的速度判定。
-    //  在移動中的 Landship 上，世界空間的位移會被船速污染，所以進度必須
-    //  用相對平台的累積位移來算。
+    //  在移動中的 Landship 上，共同的船速不應污染突進速度與攔截解算。
+    //
+    //  突進沒有距離上限，也沒有速度曲線：
+    //  AnimEvent_MeleeDashStart 開始，AnimEvent_MeleeBrake 停止。
     // ────────────────────────────────────────────────
 
     [Header("Melee Dash")]
@@ -457,9 +459,6 @@ public class PlayerMovement : MonoBehaviour
 
     [Tooltip("突進的加速度。越大越快貼到目標速度，太小會軟綿綿。")]
     [SerializeField] private float meleeDashAccel = 400f;
-
-    [Tooltip("dashCurve 末端趨近 0 時的速度下限倍率，避免永遠走不完全程。")]
-    [SerializeField] private float meleeDashMinSpeedFactor = 0.08f;
 
     [Tooltip("突進開始時保留多少比例的既有速度（0~1）。\n\n" +
              "★ 這個歸零是必要的，不是手感選項。攔截解算假設你會從當前位置以\n" +
@@ -529,14 +528,11 @@ public class PlayerMovement : MonoBehaviour
 
     private bool _meleeDashing;
     private Vector3 _meleeDashDir;
-    private float _meleeDashSpeed;        // 這次突進的最大速度
-    private float _meleeDashDistance;     // 這次突進的總距離
-    private float _meleeDashTravelled;    // 已走距離（相對平台）
-    private float _meleeDashStopDistance; // ToTarget 用
+    private float _meleeDashSpeed;        // 這次突進的目標速度
+    private float _meleeDashStopDistance; // ToTarget 用；到達目標附近時可早於 Brake 停止
     private Rigidbody _meleeDashTarget;   // null = Forward 模式。用 Rigidbody 才讀得到速度做攔截預判
-    private AnimationCurve _meleeDashCurve;
 
-    // 滯空跟突進是「不同長度」的兩件事：突進在距離走完就停，
+    // 滯空跟突進是「不同長度」的兩件事：Brake 可以先停掉突進，
     // 但滯空要持續到整段攻擊結束，否則刀還沒揮完人已經開始掉了。
     private bool _meleeHovering;
     private bool _meleeDashPrevGravity = true;
@@ -614,9 +610,10 @@ public class PlayerMovement : MonoBehaviour
     private Vector3 _appliedAnchorVel;
 
     // ───── 突進診斷 ─────
-    private enum MeleeDashEndReason { DistanceExhausted, ReachedStopDistance, ExternalStop }
+    private enum MeleeDashEndReason { ReachedStopDistance, ExternalStop }
 
     private float _dbgStartTime;
+    private float _dbgTravelled; // 純診斷：累積相對平台位移，不參與停止判定
     private Vector3 _dbgStartPos;
     private Vector3 _dbgTargetStartPos;
     private Vector3 _dbgTargetVelRel;
@@ -794,13 +791,14 @@ public class PlayerMovement : MonoBehaviour
 
     /// <summary>
     /// 開始一次近戰突進。由 MeleeAttackController 在 AnimEvent_MeleeDashStart 時呼叫。
-    /// speed 與 distance 已經由控制器依能量結算過（強化 / 衰弱模式）。
+    /// 突進會持續到 AnimEvent_MeleeBrake、StepEnd、Dash 取消，或 ToTarget 抵達 stopDistance。
+    /// speed 已由 MeleeAttackController 依能量狀態決定。
     /// </summary>
-    public void BeginMeleeDash(Vector3 direction, float speed, float distance,
-                               AnimationCurve curve, Rigidbody target, float stopDistance)
+    public void BeginMeleeDash(Vector3 direction, float speed,
+                               Rigidbody target, float stopDistance)
     {
-        // 三維：不再壓平 Y。飛行敵人在水平突進下是打不到的。
-        if (direction.sqrMagnitude < 0.0001f || distance <= 0f || speed <= 0f)
+        // 三維：不壓平 Y，才能衝向空中的目標。
+        if (direction.sqrMagnitude < 0.0001f || speed <= 0f)
         {
             StopMeleeDash("invalidDashParams");
             return;
@@ -808,9 +806,6 @@ public class PlayerMovement : MonoBehaviour
 
         _meleeDashDir = direction.normalized;
         _meleeDashSpeed = speed;
-        _meleeDashDistance = distance;
-        _meleeDashTravelled = 0f;
-        _meleeDashCurve = curve;
         _meleeDashTarget = target;
         _meleeDashStopDistance = Mathf.Max(0f, stopDistance);
         _meleeDashing = true;
@@ -818,6 +813,7 @@ public class PlayerMovement : MonoBehaviour
         ApplyDashEntryBraking();
 
         _dbgStartTime = Time.time;
+        _dbgTravelled = 0f;
         _dbgStartPos = (playerRigidbody != null) ? playerRigidbody.position : transform.position;
         _dbgTargetStartPos = (target != null) ? target.position : Vector3.zero;
         _dbgPeakSpeed = 0f;
@@ -878,7 +874,7 @@ public class PlayerMovement : MonoBehaviour
             playerRigidbody.useGravity = _meleeDashPrevGravity;
     }
 
-    /// <summary>停止突進。距離走完、撞到停止距離、StepEnd、或被 Dash 取消時呼叫。</summary>
+    /// <summary>停止突進。Brake、ToTarget 停止距離、StepEnd、或被 Dash 取消時呼叫。</summary>
     // 攔截解算 + 防呆。
     //
     // MathToolKit.InterceptionPoint 解的是二次方程，在「目標速度接近或超過自身速度」時
@@ -924,13 +920,11 @@ public class PlayerMovement : MonoBehaviour
         return true;
     }
 
-    // 突進結束診斷。回答三個問題：
-    //   1) 我到得夠快嗎？      預測時間 vs 實際時間、峰值 / 平均速度 vs 解算假設速度
-    //   2) 我的距離預算夠嗎？  已走距離 vs 預算、攔截點距離 vs 預算
-    //   3) 我最後差在哪？      把最終誤差分解成「沿目標移動方向」與「側向」兩個分量
+    // 突進結束診斷。回答兩個問題：
+    //   1) 我到得夠快嗎？  預測時間 vs 實際時間、峰值 / 平均速度 vs 解算假設速度
+    //   2) 我最後差在哪？  把最終誤差分解成「沿目標移動方向」與「側向」兩個分量
     //
-    // 「落在對方後方」= alongTargetVel 為負值且絕對值大 → 抵達太慢。
-    // 「停在半路」    = travelled 貼齊預算且 finalGap 很大 → 距離不足。
+    // travelled 只用來觀察這次 Animation Dash Window 實際跑了多遠，不再是距離預算。
     private void LogDashDiagnostics(MeleeDashEndReason reason)
     {
         if (!logMeleeDashDiagnostics || !_meleeDashing) return;
@@ -938,7 +932,7 @@ public class PlayerMovement : MonoBehaviour
         float elapsed = Time.time - _dbgStartTime;
         Vector3 endPos = (playerRigidbody != null) ? playerRigidbody.position : transform.position;
 
-        float avgSpeed = (elapsed > 0.0001f) ? (_meleeDashTravelled / elapsed) : 0f;
+        float avgSpeed = (elapsed > 0.0001f) ? (_dbgTravelled / elapsed) : 0f;
 
         string targetPart = "target=none";
 
@@ -979,7 +973,7 @@ public class PlayerMovement : MonoBehaviour
 
         Debug.Log(
             $"[MeleeDash] {reasonText} | {predictPart} | " +
-            $"實際: time={elapsed:F3}s (×{timeRatio:F2}) travelled={_meleeDashTravelled:F2}/{_meleeDashDistance:F2} | " +
+            $"實際: time={elapsed:F3}s (×{timeRatio:F2}) travelled={_dbgTravelled:F2} | " +
             $"speed peak={_dbgPeakSpeed:F1} avg={avgSpeed:F1} | {targetPart}", this);
     }
 
@@ -1001,7 +995,6 @@ public class PlayerMovement : MonoBehaviour
         //     否則突進一停人就開始掉，刀還沒揮完就離開目標高度了。
         _meleeDashing = false;
         _meleeDashTarget = null;
-        _meleeDashCurve = null;
     }
 
     private void ApplyMeleeDashFixed(float dt)
@@ -1085,33 +1078,18 @@ public class PlayerMovement : MonoBehaviour
             }
         }
 
-        // 進度用「相對平台」的累積位移，不能用世界座標距離
+        // 速度與診斷距離都使用「相對平台」數值，共同船速不計入近戰突進。
         float vParallelRel = Vector3.Dot(vRel, _meleeDashDir);
         if (vParallelRel > 0f)
         {
-            _meleeDashTravelled += vParallelRel * dt;
+            _dbgTravelled += vParallelRel * dt;
             if (vParallelRel > _dbgPeakSpeed) _dbgPeakSpeed = vParallelRel;
         }
 
-        if (_meleeDashTravelled >= _meleeDashDistance)
-        {
-            StopMeleeDashInternal(MeleeDashEndReason.DistanceExhausted);
-            return;
-        }
+        // 沒有速度曲線，也沒有距離預算。Dash Window 由動畫事件控制。
+        float targetSpeed = _meleeDashSpeed;
 
-        float progress = Mathf.Clamp01(_meleeDashTravelled / Mathf.Max(0.0001f, _meleeDashDistance));
-
-        float factor = (_meleeDashCurve != null && _meleeDashCurve.length > 0)
-            ? _meleeDashCurve.Evaluate(progress)
-            : 1f;
-        factor = Mathf.Max(meleeDashMinSpeedFactor, factor);
-
-        float targetSpeed = _meleeDashSpeed * factor;
-
-        // 重力由 ApplyMeleeHoverFixed 統一處理（滯空期間 useGravity 已關閉），
-        // 這裡不要再加任何垂直補償，否則會變成向上推力。
-
-        // 已經達到這一刻的目標速度就不再推（跟 ApplyDashFixed 同邏輯）
+        // 重力由 ApplyMeleeHoverFixed 統一處理（滯空期間 useGravity 已關閉）。
         if (vParallelRel >= targetSpeed) return;
 
         playerRigidbody.AddForce(_meleeDashDir * meleeDashAccel, ForceMode.Acceleration);

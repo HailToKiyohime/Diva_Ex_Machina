@@ -51,16 +51,9 @@ public class MeleeAttackStep
     public float knockback = 0f;
 
     [Header("Dash")]
-    [Tooltip("這一段的突進模式。突進由 clip 上的 AnimEvent_MeleeDashStart 觸發，\n" +
-             "所以 None 以外的段記得在動畫上放那個 event（放在舉刀之後、HitboxOn 之前）。")]
+    [Tooltip("這一段的突進模式。AnimEvent_MeleeDashStart 開始突進，AnimEvent_MeleeBrake 停止突進。\n" +
+             "因此每招的基礎突進距離由動畫中的 DashStart → Brake 時間窗決定。")]
     public MeleeDashMode dashMode = MeleeDashMode.None;
-
-    [Tooltip("突進速度曲線。\n" +
-             "X = 0~1 已走完的距離比例，Y = 速度倍率（乘在 dashSpeed 之上）。\n\n" +
-             "由高到低 = 起步快、接近目標時減速（衝刺攻擊的標準手感）。\n" +
-             "由低到高 = 蓄力式加速。\n" +
-             "曲線末端趨近 0 時，控制器會套用速度下限避免永遠走不完。")]
-    public AnimationCurve dashCurve = AnimationCurve.EaseInOut(0f, 1f, 1f, 0.2f);
 
     [Tooltip("ToTarget 模式：距離目標多近就停下，避免穿模")]
     public float dashStopDistance = 1.5f;
@@ -244,8 +237,6 @@ public class MeleeComboLibrary : ScriptableObject
             if (step.damageMultiplier <= 0f)
                 Debug.LogWarning($"[MeleeComboLibrary] {label} 第 {i} 段 damageMultiplier = 0，這一段不會造成傷害。", this);
 
-            if (step.dashMode != MeleeDashMode.None && (step.dashCurve == null || step.dashCurve.length == 0))
-                Debug.LogWarning($"[MeleeComboLibrary] {label} 第 {i} 段的 dashCurve 是空的，突進會用固定速度。", this);
         }
     }
 #endif

@@ -46,11 +46,7 @@ public class PlayerAnimation : MonoBehaviour
     public event Action OnStartAttacking;
     public event Action OnStopAttacking;
     private bool _attackEventFired;
-    // ===== FOV Smooth =====
-    [SerializeField] private float attackFov = 80f;
-    [SerializeField] private float normalFov = 65f;
-    [SerializeField] private float fovBlendInTime = 0.10f;
-    private Coroutine _fovRoutine;
+
     public CinemachineCamera Camera;
 
     public MMF_Player leftAttackFeedback;//Range
@@ -299,12 +295,7 @@ public class PlayerAnimation : MonoBehaviour
         _attackEventFired = true;
         OnStartAttacking?.Invoke();// Trail/粒子等效果靠這個
     }
-    public void ChangeFOVtoAttack()
-    {
-        // 需要「攻擊FOV」才呼叫這個
-        EnsureAttackStartEventFired();
-        SmoothSetFov(attackFov, fovBlendInTime);
-    }
+
     public void StartAttack()
     {
         EnsureAttackStartEventFired();
@@ -330,10 +321,7 @@ public class PlayerAnimation : MonoBehaviour
     {
         anim.SetBool("dashing", false);
     }
-    public void SmoothSetFOV()
-    {
-        SmoothSetFov(normalFov, fovBlendInTime);
-    }
+
     public void InvokeStopAttacking()
     {
         if (!IsInvoking(nameof(StopAttacking)))
@@ -503,43 +491,6 @@ public class PlayerAnimation : MonoBehaviour
         if (Dual_Wielding_Weapon_RightLayer >= 0) anim.SetLayerWeight(Dual_Wielding_Weapon_RightLayer, targetDR);
 
         _weaponHoldBlendRoutine = null;
-    }
-
-    private void SmoothSetFov(float targetFov, float duration)
-    {
-        if (Camera == null) return;
-
-        if (_fovRoutine != null)
-            StopCoroutine(_fovRoutine);
-
-        _fovRoutine = StartCoroutine(SmoothSetFovRoutine(targetFov, duration));
-    }
-
-    private System.Collections.IEnumerator SmoothSetFovRoutine(float targetFov, float duration)
-    {
-        if (Camera == null) yield break;
-
-        float startFov = Camera.Lens.FieldOfView;
-
-        if (duration <= 0f)
-        {
-            Camera.Lens.FieldOfView = targetFov;
-            _fovRoutine = null;
-            yield break;
-        }
-
-        float t = 0f;
-        while (t < duration)
-        {
-            t += Time.deltaTime;
-            float a = Mathf.Clamp01(t / duration);
-
-            Camera.Lens.FieldOfView = Mathf.Lerp(startFov, targetFov, a);
-            yield return null;
-        }
-
-        Camera.Lens.FieldOfView = targetFov;
-        _fovRoutine = null;
     }
 
     public void ShoulderWeaponAttackLeft()

@@ -307,9 +307,10 @@ public class MeleeAttackController : MonoBehaviour
     /// 放在舉刀之後、HitboxOn 之前 —— 先舉刀、再突進、再劈下。
     ///
     /// 能量在「這一串連段第一個真正突進的段」結算一次：
-    ///   夠 → 扣能量，dashSpeed 全速、MeleeDashDistance 全程
-    ///   不夠 → 不扣，退化成 sprintSpeed、距離減半
+    ///   夠 → 扣能量，使用 dashSpeed
+    ///   不夠 → 不扣，退化成 sprintSpeed
     /// 之後同一串的突進段沿用第一次的結果，不再檢查也不再扣。
+    /// 突進距離不再有獨立數值：由 DashStart → Brake 的動畫時間窗 × 實際速度決定。
     /// </summary>
     public void OnDashStart()
     {
@@ -333,9 +334,9 @@ public class MeleeAttackController : MonoBehaviour
                 Debug.Log($"[Melee] dash energy resolved: {(_dashEmpowered ? "EMPOWERED" : "WEAKENED")}", this);
         }
 
-        float baseDistance = _activeWeapon.melee.dashDistance;
+        // 突進距離完全交給動畫時間窗控制。
+        // 有能量時用 dashSpeed；能量不足時用 sprintSpeed，所以同一段動畫自然會衝得較短。
         float speed = _dashEmpowered ? ps.dashSpeed : ps.sprintSpeed;
-        float distance = _dashEmpowered ? baseDistance : (baseDistance * 0.5f);
 
         // ToTarget：用 PlayerAiming 的鎖定目標。它只在 lockOnRange 圈內才會鎖定，
         // 所以「圈外不追」是自動成立的，不需要額外的角度判定。
@@ -349,8 +350,7 @@ public class MeleeAttackController : MonoBehaviour
             ? (target.position - playerMovement.transform.position)
             : GetFacingDirection();
 
-        playerMovement.BeginMeleeDash(dir, speed, distance,
-                                      _activeStep.dashCurve, target, _activeStep.dashStopDistance);
+        playerMovement.BeginMeleeDash(dir, speed, target, _activeStep.dashStopDistance);
     }
 
     private Vector3 GetFacingDirection()
