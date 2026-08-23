@@ -1,8 +1,7 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
-public class Bullet : MonoBehaviour
+public class Bullet : MonoBehaviour, IPooled
 {
     public GameObject attacker;
 
@@ -65,10 +64,15 @@ public class Bullet : MonoBehaviour
     // 1  = pass 1 enemy, destroy after 2nd enemy impact
     // 2  = pass 2 enemies, destroy after 3rd enemy impact
     // -1 = infinite
+    //
+    // ★ 注意：這個欄位是「就地遞減」的 —— 打穿一個目標就 --。
+    //   所以它必須進 prefab 快照，回收重用時還原，否則穿透彈只有第一輪有穿透。
     public int penetration = 0;
     [SerializeField] private PlayerAnimation meleeImpactOwnerAnim;
 
-    private bool _destroyed;
+    // _live：這顆子彈是否「在場上活著」。
+    // 取代原本的 _destroyed —— 池化之後子彈不會真的被銷毀，只會在 live / 待命之間切換。
+    private bool _live;
     private Collider _selfCol;
 
     // Prevent multi-collider enemies from taking damage multiple times per bullet
@@ -88,6 +92,20 @@ public class Bullet : MonoBehaviour
     private float _turnUsed;                // 已經用掉的累積轉向角度（度）
     private bool _homingExhausted;          // 額度用完 → 之後永遠直線
 
+    // 壽命：原本是 Destroy(gameObject, lifespan)，那個排程綁在 GameObject 上、
+    // 回收重用時取消不掉（重生後的子彈可能被上一世的計時器殺掉）。改成自己算。
+    private float _despawnTime;
+
+    // Predict 的待結算命中。原本用 coroutine + yield return null 延一幀，
+    // 那等於每個 physics step、每顆子彈都配置一個 iterator。改成旗標。
+    private Collider _pendingHit;
+    private bool _hasPendingHit;
+
+    // 視覺元件快取（回收時要清乾淨，否則會看到殘留的拖尾與粒子）
+    private TrailRenderer[] _trails;
+    private bool[] _trailEmitDefaults;
+    private ParticleSystem[] _particles;
+
     // 共用暫存 buffer（同一 frame 內同步使用，不會互相干擾）
     private static readonly Collider[] _overlapBuffer = new Collider[64];
 
@@ -97,6 +115,9 @@ public class Bullet : MonoBehaviour
 
     /// <summary>目前鎖定的目標（唯讀）。</summary>
     public Transform HomingTarget => _homingTarget;
+
+    /// <summary>這顆子彈是否在場上飛行中。</summary>
+    public bool IsLive => _live;
 
     // ═══════════════════ 外部指定目標 API ═══════════════════
 
@@ -134,21 +155,276 @@ public class Bullet : MonoBehaviour
     /// <summary>解除指定，退回自己搜尋。</summary>
     public void ClearHomingTarget() => ClearTarget();
 
-    // ═══════════════════════════════════════════════════════
+    // ═══════════════ Prefab 預設值快照 ═══════════════
+    //
+    // 為什麼要整組快照，而不是只重設「看起來像 runtime state」的欄位：
+    //
+    // 兩個 spawn 點寫入的欄位是不重疊的 ——
+    //   RangeAttackController：寫 damage + crit，不寫 enemyLayer / ignoreLayer
+    //   TurretController     ：寫 damage + layer，不寫 crit
+    // 用 Instantiate 時沒寫到的欄位一定是 prefab 值，所以沒事；
+    // 一旦回收重用，沒寫到的欄位會留著上一手的值 ——
+    // 玩家子彈被砲塔用過之後 enemyLayer 會變成玩家層，玩家就會被自己的子彈打到。
+    //
+    // Awake() 在 Instantiate 期間就跑完，早於任何外部寫入，
+    // 所以這裡拍到的必然是 prefab 上的值。
 
-    void Start()
+    private struct Defaults
     {
-        Destroy(gameObject, lifespan);
-        rb = GetComponent<Rigidbody>();
-        _selfCol = GetComponent<Collider>();
-        _homingReadyTime = Time.time + homingStartDelay;
-        StartCoroutine(Predict());
+        public float physicalDamage, explosionDamage, energyDamage, coldDamage;
+        public float criticalChance, criticalMultiplier;
+        public float lifespan;
+        public LayerMask ignoreLayer, enemyLayer;
+        public bool ignoreObstacles;
+
+        public float homingDegreePerSecond, homingRange, homingSearchAngle, homingLoseAngle;
+        public float maxHomingAngle, retargetInterval;
+        public bool homingRequireLineOfSight;
+        public LayerMask homingObstacleLayer;
+        public bool alignToVelocity;
+        public float homingStartDelay;
+        public bool lockAssignedTarget;
+
+        public int penetration;
+        public CollisionDetectionMode collisionDetectionMode;
     }
 
-    protected void FixedUpdate()
+    private Defaults _defaults;
+
+    private void CaptureDefaults()
     {
+        _defaults.physicalDamage = physicalDamage;
+        _defaults.explosionDamage = explosionDamage;
+        _defaults.energyDamage = energyDamage;
+        _defaults.coldDamage = coldDamage;
+
+        _defaults.criticalChance = criticalChance;
+        _defaults.criticalMultiplier = criticalMultiplier;
+
+        _defaults.lifespan = lifespan;
+        _defaults.ignoreLayer = ignoreLayer;
+        _defaults.enemyLayer = enemyLayer;
+        _defaults.ignoreObstacles = ignoreObstacles;
+
+        _defaults.homingDegreePerSecond = homingDegreePerSecond;
+        _defaults.homingRange = homingRange;
+        _defaults.homingSearchAngle = homingSearchAngle;
+        _defaults.homingLoseAngle = homingLoseAngle;
+        _defaults.maxHomingAngle = maxHomingAngle;
+        _defaults.retargetInterval = retargetInterval;
+        _defaults.homingRequireLineOfSight = homingRequireLineOfSight;
+        _defaults.homingObstacleLayer = homingObstacleLayer;
+        _defaults.alignToVelocity = alignToVelocity;
+        _defaults.homingStartDelay = homingStartDelay;
+        _defaults.lockAssignedTarget = lockAssignedTarget;
+
+        _defaults.penetration = penetration;
+
+        // Predict() 命中時會把 CCD 模式改成 ContinuousSpeculative，改了就回不去
+        _defaults.collisionDetectionMode = (rb != null)
+            ? rb.collisionDetectionMode
+            : CollisionDetectionMode.Discrete;
+    }
+
+    private void RestoreDefaults()
+    {
+        attacker = null;   // prefab 上必然是 null；由 spawn 端每次重新指定
+
+        physicalDamage = _defaults.physicalDamage;
+        explosionDamage = _defaults.explosionDamage;
+        energyDamage = _defaults.energyDamage;
+        coldDamage = _defaults.coldDamage;
+
+        criticalChance = _defaults.criticalChance;
+        criticalMultiplier = _defaults.criticalMultiplier;
+
+        lifespan = _defaults.lifespan;
+        ignoreLayer = _defaults.ignoreLayer;
+        enemyLayer = _defaults.enemyLayer;
+        ignoreObstacles = _defaults.ignoreObstacles;
+
+        homingDegreePerSecond = _defaults.homingDegreePerSecond;
+        homingRange = _defaults.homingRange;
+        homingSearchAngle = _defaults.homingSearchAngle;
+        homingLoseAngle = _defaults.homingLoseAngle;
+        maxHomingAngle = _defaults.maxHomingAngle;
+        retargetInterval = _defaults.retargetInterval;
+        homingRequireLineOfSight = _defaults.homingRequireLineOfSight;
+        homingObstacleLayer = _defaults.homingObstacleLayer;
+        alignToVelocity = _defaults.alignToVelocity;
+        homingStartDelay = _defaults.homingStartDelay;
+        lockAssignedTarget = _defaults.lockAssignedTarget;
+
+        penetration = _defaults.penetration;
+
+        if (rb != null)
+        {
+            rb.collisionDetectionMode = _defaults.collisionDetectionMode;
+            rb.angularVelocity = Vector3.zero;
+        }
+    }
+
+    // ═══════════════════════ 生命週期 ═══════════════════════
+
+    private void Awake()
+    {
+        if (rb == null) rb = GetComponent<Rigidbody>();
+        if (_selfCol == null) _selfCol = GetComponent<Collider>();
+
+        _trails = GetComponentsInChildren<TrailRenderer>(true);
+        _trailEmitDefaults = new bool[_trails.Length];
+        for (int i = 0; i < _trails.Length; i++)
+            _trailEmitDefaults[i] = _trails[i].emitting;
+
+        _particles = GetComponentsInChildren<ParticleSystem>(true);
+
+        CaptureDefaults();
+    }
+
+    // Instantiate 時、以及日後物件池 SetActive(true) 時都會走這裡。
+    private void OnEnable() => HandleSpawn();
+
+    // 物件池在 SetActive(true) 之後可以再呼叫這個（OnEnable 已經做過就會被擋掉）。
+    // 接上 PrefabPool 之後，把 IPooled 介面掛到這個類別上即可，簽章已經對上。
+    public void OnSpawned() => HandleSpawn();
+
+    private void HandleSpawn()
+    {
+        if (_live) return;   // 同一次上場只初始化一次，避免蓋掉 spawn 端剛寫入的欄位
+        _live = true;
+
+        // 1) 先把所有設定欄位還原成 prefab 值
+        RestoreDefaults();
+
+        // 2) 再清 runtime state
+        _hitEnemyIds.Clear();          // ★ 不清的話，這顆子彈永遠打不到它前世打過的目標
+        _pendingHit = null;
+        _hasPendingHit = false;
+
+        ClearTarget();
+        _turnUsed = 0f;
+        _homingExhausted = false;
+        _nextRetargetTime = 0f;
+        _homingReadyTime = Time.time + homingStartDelay;
+
+        _despawnTime = Time.time + Mathf.Max(0f, lifespan);
+
+        // Physics.IgnoreCollision 的配對狀態會在 collider disable/enable 時被清掉。
+        // 這裡明確地 enable 一次，確保上一世 IgnoreCollision(self, other, true) 的殘留
+        // 不會讓這顆子彈穿過某個敵人。
+        if (_selfCol != null) _selfCol.enabled = true;
+
+        ResetVisuals();
+    }
+
+    /// <summary>
+    /// 這顆子彈退場。目前直接 Destroy；接上物件池後只要換掉最後那一行。
+    /// </summary>
+    public void Despawn()
+    {
+        if (!_live) return;
+
+        OnDespawned();
+
+        PrefabPool.Despawn(gameObject);
+    }
+
+    // 冪等：物件池直接 SetActive(false) 時 OnDisable 也會呼叫到，重複呼叫無害。
+    public void OnDespawned()
+    {
+        _live = false;
+
+        _pendingHit = null;
+        _hasPendingHit = false;
+        ClearTarget();
+
+        if (_selfCol != null) _selfCol.enabled = false;
+
+        StopVisuals();
+    }
+
+    private void OnDisable() => OnDespawned();
+
+    private void ResetVisuals()
+    {
+        // 順序很重要：transform 已經由 Instantiate / 物件池擺到位了，這時才 Clear，
+        // 否則會看到一條從「上次死亡的位置」拉到槍口的拖尾。
+        if (_trails != null)
+        {
+            for (int i = 0; i < _trails.Length; i++)
+            {
+                if (_trails[i] == null) continue;
+                _trails[i].Clear();
+                _trails[i].emitting = _trailEmitDefaults[i];
+            }
+        }
+
+        if (_particles != null)
+        {
+            for (int i = 0; i < _particles.Length; i++)
+            {
+                if (_particles[i] == null) continue;
+                _particles[i].Clear(true);
+                if (_particles[i].main.playOnAwake) _particles[i].Play(true);
+            }
+        }
+    }
+
+    private void StopVisuals()
+    {
+        if (_trails != null)
+        {
+            for (int i = 0; i < _trails.Length; i++)
+            {
+                if (_trails[i] == null) continue;
+                _trails[i].emitting = false;
+                _trails[i].Clear();
+            }
+        }
+
+        if (_particles != null)
+        {
+            for (int i = 0; i < _particles.Length; i++)
+            {
+                if (_particles[i] == null) continue;
+                _particles[i].Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            }
+        }
+    }
+
+    protected virtual void FixedUpdate()
+    {
+        if (!_live) return;
+
+        // 1) 上一個 physics step 由 Predict() 預測到的命中，延一步後才結算。
+        //    對應原本 Predict() 裡的 yield return null。
+        if (_hasPendingHit)
+        {
+            _hasPendingHit = false;
+            Collider pending = _pendingHit;
+            _pendingHit = null;
+
+            // 目標可能在這一步之間被銷毀了；原本的 coroutine 版在這裡會丟例外
+            if (pending != null)
+            {
+                OnTriggerEnterFixed(pending);
+                if (!_live) return;
+            }
+        }
+
+        // 2) 壽命
+        if (Time.time >= _despawnTime)
+        {
+            Despawn();
+            return;
+        }
+
+        // 3) 追蹤
         UpdateHoming(Time.fixedDeltaTime);
-        StartCoroutine(Predict());
+        if (!_live) return;
+
+        // 4) 下一步的碰撞預測
+        Predict();
     }
 
     private void OnTriggerEnter(Collider collider)
@@ -158,6 +434,7 @@ public class Bullet : MonoBehaviour
 
     private bool IsInEnemyLayer(Collider col)
     {
+        if (col == null) return false;
         int bit = 1 << col.gameObject.layer;
         return (enemyLayer.value & bit) != 0;
     }
@@ -169,21 +446,29 @@ public class Bullet : MonoBehaviour
         return mask & notBullet;
     }
 
-    protected IEnumerator Predict()
+    /// <summary>
+    /// 往前掃一個 physics step 的距離，補上高速子彈的漏判。
+    ///
+    /// 原本是 coroutine，而且每個 FixedUpdate 都 StartCoroutine 一次 ——
+    /// 大部分情況下它根本不會 yield（沒命中就直接結束），等於白白配置一個
+    /// iterator + Coroutine 物件。100 顆子彈 × 50 steps/s 就是每秒五千次配置。
+    /// </summary>
+    protected virtual void Predict()
     {
-        if (rb == null) yield break;
+        if (rb == null) return;
+        if (_hasPendingHit) return;   // 已經有待結算的命中，不要再往前掃、也不要重複貼位置
 
-        Vector3 prediction = transform.position + rb.linearVelocity * Time.fixedDeltaTime;
+        Vector3 from = transform.position;
+        Vector3 to = from + rb.linearVelocity * Time.fixedDeltaTime;
 
-        RaycastHit hit2;
         int layerMask = GetPredictMask() & ~ignoreLayer.value;
-        if (Physics.Linecast(transform.position, prediction, out hit2, layerMask))
+        if (Physics.Linecast(from, to, out RaycastHit hit, layerMask))
         {
-            transform.position = hit2.point;
+            transform.position = hit.point;
             rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
 
-            yield return null;
-            OnTriggerEnterFixed(hit2.collider);
+            _pendingHit = hit.collider;
+            _hasPendingHit = true;
         }
     }
 
@@ -191,7 +476,7 @@ public class Bullet : MonoBehaviour
 
     private void UpdateHoming(float dt)
     {
-        if (_destroyed || _homingExhausted) return;
+        if (!_live || _homingExhausted) return;
         if (homingDegreePerSecond <= 0f) return;
         if (rb == null) return;
 
@@ -410,18 +695,11 @@ public class Bullet : MonoBehaviour
 
     // ══════════════════════════════════════════════════════════════
 
-    private void DestroyBullet()
-    {
-        if (_destroyed) return;
-        _destroyed = true;
-
-        Destroy(gameObject);
-    }
-
     protected virtual void OnTriggerEnterFixed(Collider other)
     {
         //Debug.Log("Bullet hit: " + other.name);
-        if (_destroyed) return;
+        if (!_live) return;
+        if (other == null) return;
 
         // Ignore specified layers
         if (IsInIgnoreLayer(other))
@@ -465,6 +743,7 @@ public class Bullet : MonoBehaviour
             target.TakeDamage(dmg, attacker);
 
             // 避免穿過同一 collider 時重複觸發
+            // （這個配對狀態會在子彈退場時由 _selfCol.enabled = false 清掉）
             if (_selfCol != null && other != null)
                 Physics.IgnoreCollision(_selfCol, other, true);
 
@@ -480,15 +759,15 @@ public class Bullet : MonoBehaviour
             }
             else // penetration == 0
             {
-                DestroyBullet(); // 命中後銷毀
+                Despawn(); // 命中後退場
                 return;
             }
         }
 
         // Not enemy:
         // - if ignoreObstacles was true, we already returned above
-        // - otherwise hit obstacle => destroy
-        DestroyBullet();
+        // - otherwise hit obstacle => despawn
+        Despawn();
     }
 
     private bool IsInIgnoreLayer(Collider col)
@@ -507,7 +786,7 @@ public class Bullet : MonoBehaviour
 
         Vector3 pos = transform.position;
         Vector3 dir = (rb != null && rb.linearVelocity.sqrMagnitude > 0.0001f)
-            ? rb.linearVelocity.normalized  
+            ? rb.linearVelocity.normalized
             : transform.forward;
 
         Gizmos.color = new Color(1f, 0.6f, 0f, 0.5f);

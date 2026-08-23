@@ -40,7 +40,9 @@ public class MissileLauncherController : MonoBehaviour
                 : Vector3.up;
             Quaternion rot = Quaternion.LookRotation(launchDir, rollRef);
 
-            GameObject go = Instantiate(missilePrefab, launcher.position, rot);
+            // 物件池取代 Instantiate。池子缺席時內部會退回 Instantiate，行為不變。
+            GameObject go = PrefabPool.Spawn(missilePrefab, launcher.position, rot);
+            if (go == null) continue;
 
             Rigidbody missileRb = go.GetComponent<Rigidbody>();
             if (missileRb != null)
@@ -51,6 +53,8 @@ public class MissileLauncherController : MonoBehaviour
             Bullet bullet = go.GetComponent<Bullet>();
             if (bullet != null)
             {
+                // 這兩行必須在 Spawn 之後 —— Bullet 在被啟用時會把所有欄位還原成 prefab 值，
+                // 先寫會被蓋掉。順序跟原本的 Instantiate 版本一致，不用調整。
                 bullet.attacker = owner;
                 bullet.SetHomingTarget(target);
             }

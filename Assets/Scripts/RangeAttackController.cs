@@ -134,13 +134,23 @@ public class RangeAttackController : MonoBehaviour
                     attackManager.playerAnimation.RightWeaponMuzzleFlash();
                 }
 
-                var currentBullet = Instantiate(bulletPrefab, muzzle.position, Quaternion.identity);
+                // 物件池取代 Instantiate。池子缺席時內部會退回 Instantiate，行為不變。
+                var currentBullet = PrefabPool.Spawn(bulletPrefab, muzzle.position, Quaternion.identity);
+                if (currentBullet == null) continue;
+
                 var bulletComp = currentBullet.GetComponent<Bullet>();
 
-                bulletComp.attacker = attackManager.playerRb.gameObject;
-
+                // ★ 以下的欄位寫入必須在 Spawn 之後 —— Bullet 在被啟用時會把所有欄位
+                //   還原成 prefab 值，先寫會被蓋掉。順序跟原本的 Instantiate 版本一致。
+                //
+                //   注意這裡不寫 enemyLayer / ignoreLayer，吃的是 prefab 上的值。
+                //   池化之後這依然成立，靠的正是 Bullet 會還原預設值 ——
+                //   否則回收自砲塔的子彈會帶著「敵人視角的敵我層」過來，玩家會被自己的子彈打到。
                 if (bulletComp != null)
                 {
+                    // 原本 attacker 這行寫在 null 檢查外面，bulletComp 為 null 時會丟例外。
+                    bulletComp.attacker = attackManager.playerRb.gameObject;
+
                     // 1) 傷害（已由 ApplyHand / ApplyShoulder 同步到 w.damage）
                     bulletComp.physicalDamage = w.damage.physicalDamage;
                     bulletComp.explosionDamage = w.damage.explosionDamage;

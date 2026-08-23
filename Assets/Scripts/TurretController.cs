@@ -147,9 +147,17 @@ public class TurretController : MonoBehaviour
         );
         Vector3 dir = spreadRot * muzzle.forward;
 
-        GameObject go = Instantiate(bulletPrefab, muzzle.position, Quaternion.LookRotation(dir));
+        // 物件池取代 Instantiate。池子缺席時內部會退回 Instantiate，行為不變。
+        GameObject go = PrefabPool.Spawn(bulletPrefab, muzzle.position, Quaternion.LookRotation(dir));
+        if (go == null) return;
 
-        // Bullet 的欄位是 public、直接賦值（它沒有 Initialize 方法）
+        // ★ 以下的欄位寫入必須在 Spawn 之後。
+        //   Bullet 在被啟用時會把所有欄位還原成 prefab 值（含 penetration、
+        //   collisionDetectionMode），先寫會被蓋掉。順序跟原本的 Instantiate 版本一致。
+        //
+        //   順帶一提：這裡不寫 criticalChance / criticalMultiplier，所以砲塔子彈吃的是
+        //   prefab 上的暴擊值。在池化之前這是理所當然的；池化之後是因為 Bullet 會還原
+        //   預設值才依然成立 —— 否則回收自玩家的子彈會帶著玩家的暴擊率過來。
         Bullet bullet = go.GetComponent<Bullet>();
         if (bullet != null)
         {
