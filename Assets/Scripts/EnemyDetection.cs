@@ -12,7 +12,7 @@ public class EnemyDetection : MonoBehaviour
     }
     public void OnTriggerEnter(Collider other)
     {
-        Debug.Log("tag == " + other.tag);
+        //Debug.Log("tag == " + other.tag);
         for (int x = enemyBrain.targets.Count - 1; x >= 0; x--)
         {
             if (enemyBrain.targets[x].targetTransform == other.transform)

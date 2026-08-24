@@ -108,15 +108,46 @@ public class ModularEntityMovement : MonoBehaviour
         grounded = didHit;
     }
 
-    // Mobile Platform carry (velocity-based)
-    protected  bool _onMobilePlatform = false;
-    protected Rigidbody _mobilePlatformRb = null;
+    // ── Mobile Platform carry (velocity-based) ────────────────────────────
+    //
+    // 原本這裡有一組自己的 _onMobilePlatform / _mobilePlatformRb，靠本檔的
+    // OnTriggerStay 設成 true —— 但沒有 OnTriggerExit，所以它永遠不會變回 false。
+    // 實體踏上船一次之後，就算走回地面、走到地圖另一頭，ApplyHorizontalMovementFixed
+    // 還是會一直把船速加進去，表現成「被一股看不見的力往船的方向拖著跑」。
+    //
+    // 現在改成讀 ShipPassenger。專案裡本來就有兩套獨立的「在不在船上」狀態
+    // （這一套給移動速度用，ShipPassenger 那套給 PathFinder 用），
+    // 收斂成一個真相來源就不會再有兩邊不一致的問題。
+    [Header("Mobile Platform")]
+    [Tooltip("留空會自動在自己或父物件上找。ShipPassenger 必須跟實體的 collider 在同一個 GameObject 上，才收得到 trigger 訊息。")]
+    [SerializeField] protected ShipPassenger shipPassenger;
+    private bool _passengerResolved;
 
+    /// <summary>
+    /// 延遲解析，不用 Awake —— 子類別（例如 FalconMovement）如果自己宣告了 Awake，
+    /// 會蓋掉基底的 Awake，那樣 shipPassenger 就永遠是 null 而且很難查。
+    /// </summary>
+    protected ShipPassenger Passenger
+    {
+        get
+        {
+            if (!_passengerResolved)
+            {
+                _passengerResolved = true;
+                if (shipPassenger == null) shipPassenger = GetComponent<ShipPassenger>();
+                if (shipPassenger == null) shipPassenger = GetComponentInParent<ShipPassenger>();
+            }
+            return shipPassenger;
+        }
+    }
 
     protected virtual Vector3 GetMobilePlatformVelocity()
     {
-        if (!_onMobilePlatform || _mobilePlatformRb == null) return Vector3.zero;
-        return _mobilePlatformRb.linearVelocity; // Unity 6
+        ShipPassenger p = Passenger;
+        if (p == null || !p.isOnShip) return Vector3.zero;
+
+        Rigidbody platformRb = p.PlatformRigidbody;
+        return (platformRb != null) ? platformRb.linearVelocity : Vector3.zero;   // Unity 6
     }
 
     public virtual void RotateMesh(float direction, float maxDegrees = -1f)
@@ -127,20 +158,9 @@ public class ModularEntityMovement : MonoBehaviour
         entityMesh.Rotate(Vector3.up, direction * step);
     }
 
-    public void OnTriggerStay(Collider other)
-    {
-        if (!other.CompareTag("Mobile Platform")) return;
-
-        var rb = other.GetComponentInParent<Rigidbody>();
-        if (rb == null) return;
-
-        if (_mobilePlatformRb != rb)
-        {
-            _mobilePlatformRb = rb;
-        }
-
-        _onMobilePlatform = true;
-    }
+    // OnTriggerStay 已移除 —— 平台偵測統一由 ShipPassenger 負責。
+    // 舊版本在這裡每個 physics step 對每個重疊 collider 呼叫一次
+    // GetComponentInParent<Rigidbody>()，那本身也是不必要的開銷。
 
     public Vector3 MeshForward
     {

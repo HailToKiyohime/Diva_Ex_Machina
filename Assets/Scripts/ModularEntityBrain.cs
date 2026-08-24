@@ -116,6 +116,22 @@ public class ModularEntityBrain : MonoBehaviour
     protected void PriorityUpdate()
     {
         float dt = Time.fixedDeltaTime;
+
+        // ★ 第一步：無條件剔除已被銷毀的目標。
+        //
+        //   這一段刻意放在 targets.Count > 1 的閘門「外面」。
+        //   優先度衰減只在多目標時進行是刻意的設計（最後一個目標不衰減 =
+        //   敵人不會忘記自己正在戰鬥中），但那個設計有一個前提：卡住的那個目標
+        //   必須是活著的。
+        //
+        //   目標被 Destroy 之後 targetTransform 會變成 Unity 的假 null，
+        //   優先度又最高 → FindTarget() 每幀都回傳它 → 各狀態判定「目標消失」
+        //   → 切回 Patrolling。實體從此變成植物人。
+        //
+        //   在這裡剔除，就不需要任何跨物件的死亡通知機制 ——
+        //   目標死掉後最多一個 physics step 就會被清掉。
+        PruneDestroyedTargets();
+
         if (targets.Count > 1)
         {
             for (int x = targets.Count - 1; x >= 0; x--)
@@ -131,6 +147,17 @@ public class ModularEntityBrain : MonoBehaviour
                 if (t.targetPriority <= 0f)
                     targets.RemoveAt(x);
             }
+        }
+    }
+
+    /// <summary>剔除 targetTransform 已被銷毀的項目。倒著走，RemoveAt 才不會跳過元素。</summary>
+    protected void PruneDestroyedTargets()
+    {
+        for (int x = targets.Count - 1; x >= 0; x--)
+        {
+            Target t = targets[x];
+            if (t == null || t.targetTransform == null)
+                targets.RemoveAt(x);
         }
     }
     protected virtual void RebuildPreferenceCache()
@@ -239,14 +266,36 @@ public class ModularEntityBrain : MonoBehaviour
 
     public Transform FindTarget()
     {
-        if (targets.Count == 0) return null;
-        Target bestTarget = targets[0];
-        for (int i = 1; i < targets.Count; i++)
+        // 原本直接拿 targets[0] 當起始最佳解，不檢查有效性 ——
+        // 只要它是假 null，整個迴圈比出來的贏家就可能是一個不存在的東西。
+        Target bestTarget = null;
+
+        for (int i = 0; i < targets.Count; i++)
         {
-            if (targets[i].targetPriority > bestTarget.targetPriority)
-                bestTarget = targets[i];
+            Target t = targets[i];
+            if (!IsTargetUsable(t)) continue;
+
+            if (bestTarget == null || t.targetPriority > bestTarget.targetPriority)
+                bestTarget = t;
         }
-        return bestTarget.targetTransform;
+
+        return (bestTarget != null) ? bestTarget.targetTransform : null;
+    }
+
+    /// <summary>
+    /// 這個目標現在能不能當作交戰對象。
+    ///
+    /// 已銷毀 → 不能用（而且 PruneDestroyedTargets 會在下一個 physics step 清掉它）。
+    /// 停用中 → 不能用，但「保留在清單裡」——
+    ///   物件被 SetActive(false) 通常是暫時的（物件池、隱藏、過場），
+    ///   直接移除會讓敵人在目標回來時失憶。銷毀才是永久的。
+    /// </summary>
+    protected virtual bool IsTargetUsable(Target t)
+    {
+        if (t == null) return false;
+        if (t.targetTransform == null) return false;
+        if (!t.targetTransform.gameObject.activeInHierarchy) return false;
+        return true;
     }
     protected void SetPath(Vector3[] newPath)
     {
@@ -505,8 +554,28 @@ public class ModularEntityBrain : MonoBehaviour
     public virtual void AddTarget(Transform targetTransform, TargetType type, float priority, float priorityDecreaseMultiplier)
     {
         if (targetTransform == null) return;
-        // 沒有就新增
-        targets.Add(new Target(targetTransform, priority, priorityDecreaseMultiplier));
+
+        // 去重移到這裡。EnemyDetection 呼叫前本來就有檢查，但那個檢查在呼叫端 ——
+        // 之後把 TakeDamage 的仇恨接上來時（那是每次中彈都會觸發的高頻呼叫），
+        // 沒有這道防線就會瞬間產生大量重複項目。
+        //
+        // 已存在時取較高的優先度，而不是再加一筆：
+        // 重複偵測到同一個目標的語意是「重新確認威脅」，不是「多了一個威脅」。
+        for (int i = 0; i < targets.Count; i++)
+        {
+            Target existing = targets[i];
+            if (existing == null || existing.targetTransform != targetTransform) continue;
+
+            existing.type = type;
+            existing.priorityDecreaseMultiplier = priorityDecreaseMultiplier;
+            existing.targetPriority = Mathf.Max(existing.targetPriority, priority);
+            return;
+        }
+
+        // 原本沒有設定 type —— Target 的建構子不收它，所以每一筆的 type 都停在
+        // 預設值 Player。decayMultiplierByType 是用 type 查表的，等於
+        // targetPreferences 對非玩家目標從來沒生效過。
+        targets.Add(new Target(targetTransform, priority, priorityDecreaseMultiplier) { type = type });
     }
 
     protected virtual float DistanceToPoint(Vector3 point)

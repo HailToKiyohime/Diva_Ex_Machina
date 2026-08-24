@@ -11,8 +11,8 @@ public class BuildingGrid : MonoBehaviour
         public float gridHeight = 0f;
 
         // offset in "cell size"
-        public int centreOffsetX = 0;
-        public int centreOffsetY = 0;
+        public float centreOffsetX = 0;
+        public float centreOffsetY = 0;
 
         // occupancy, true = occupied (unusable)
         public BoolMatrix occupied;
