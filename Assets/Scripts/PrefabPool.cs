@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// ¦À¤Æª«¥ó¥i¥H¹ê§@³o­Ó¤¶­±¡A¦b³Q¨ú¥X / ÂkÁÙ®É¦¬¨ì³qª¾¡C
+/// æ± åŒ–ç‰©ä»¶å¯ä»¥å¯¦ä½œé€™å€‹ä»‹é¢ï¼Œåœ¨è¢«å–å‡º / æ­¸é‚„æ™‚æ”¶åˆ°é€šçŸ¥ã€‚
 ///
-/// Bullet ¤w¸g¦³Ã±³¹¤@­Pªº OnSpawned() / OnDespawned()¡A¥u­n¦bÃş§O«Å§i«á­±¥[¤W
-/// ", IPooled" ´N·|¦Û°Ê±µ¤W¡C
+/// Bullet å·²ç¶“æœ‰ç°½ç« ä¸€è‡´çš„ OnSpawned() / OnDespawned()ï¼Œåªè¦åœ¨é¡åˆ¥å®£å‘Šå¾Œé¢åŠ ä¸Š
+/// ", IPooled" å°±æœƒè‡ªå‹•æ¥ä¸Šã€‚
 ///
-/// ª`·N¡GSpawn ·|¥ı SetActive(true) ¦A©I¥s OnSpawned()¡A©Ò¥H OnEnable ¤@©w¤ñ¥¦¦­¶]¡C
-/// Bullet ¥Î _live ºX¼ĞÅı¨â±ø¸ô®|¥u·|¯u¥¿ªì©l¤Æ¤@¦¸¡C
+/// æ³¨æ„ï¼šSpawn æœƒå…ˆ SetActive(true) å†å‘¼å« OnSpawned()ï¼Œæ‰€ä»¥ OnEnable ä¸€å®šæ¯”å®ƒæ—©è·‘ã€‚
+/// Bullet ç”¨ _live æ——æ¨™è®“å…©æ¢è·¯å¾‘åªæœƒçœŸæ­£åˆå§‹åŒ–ä¸€æ¬¡ã€‚
 /// </summary>
 public interface IPooled
 {
@@ -18,13 +18,13 @@ public interface IPooled
 }
 
 /// <summary>
-/// ¥H prefab ¬° key ªº³q¥Îª«¥ó¦À¡C
+/// ä»¥ prefab ç‚º key çš„é€šç”¨ç‰©ä»¶æ± ã€‚
 ///
-/// ¤â°Ê©ñ¨ì³õ´º¤¤ªº¤@­Ó GameObject ¤W¡]©ñ­ş¸Ì³£¦æ¡A³q±`¸ò GameManager ¦P¤@­Óª«¥ó¡^¡C
-/// ¤£¬O DontDestroyOnLoad ¡X¡X ¦À¤l¸òµÛ³õ´º¤@°_¦º¡A´«³õ´º¤£·|¦³¤W¤@§½ªº¤l¼u­¸¹L¨Ó¡C
+/// æ‰‹å‹•æ”¾åˆ°å ´æ™¯ä¸­çš„ä¸€å€‹ GameObject ä¸Šï¼ˆæ”¾å“ªè£¡éƒ½è¡Œï¼Œé€šå¸¸è·Ÿ GameManager åŒä¸€å€‹ç‰©ä»¶ï¼‰ã€‚
+/// ä¸æ˜¯ DontDestroyOnLoad â€”â€” æ± å­è·Ÿè‘—å ´æ™¯ä¸€èµ·æ­»ï¼Œæ›å ´æ™¯ä¸æœƒæœ‰ä¸Šä¸€å±€çš„å­å½ˆé£›éä¾†ã€‚
 ///
-/// ¨S©ñ¶i³õ´º®É¡ASpawn / Despawn ·|°h¦^ Instantiate / Destroy ¨ÃÄµ§i¤@¦¸¡A
-/// ©Ò¥H´ú¸Õ³õ´º§Ñ¤F©ñ¥u¬O¥¢¥h¦À¤Æ¡A¤£·|Ãa±¼¡C
+/// æ²’æ”¾é€²å ´æ™¯æ™‚ï¼ŒSpawn / Despawn æœƒé€€å› Instantiate / Destroy ä¸¦è­¦å‘Šä¸€æ¬¡ï¼Œ
+/// æ‰€ä»¥æ¸¬è©¦å ´æ™¯å¿˜äº†æ”¾åªæ˜¯å¤±å»æ± åŒ–ï¼Œä¸æœƒå£æ‰ã€‚
 /// </summary>
 [DisallowMultipleComponent]
 public class PrefabPool : MonoBehaviour
@@ -37,22 +37,22 @@ public class PrefabPool : MonoBehaviour
     }
 
     [Header("Prewarm")]
-    [Tooltip("¶i³õ´º®É¹w¥ı¥Í¦¨¡C©ñ¤l¼u¡B­¸¼u¡B©R¤¤¯S®Ä³oÃş·|¤j¶q¥Í·Àªº prefab¡C\n" +
-             "¼Æ¶q§ì¡u¦P®É¦b³õ¤Wªº¦y®p­È¡v§Y¥i¡A¤£°÷®É¦À¤l·|¦Û¤vªø¤j¡C")]
+    [Tooltip("é€²å ´æ™¯æ™‚é å…ˆç”Ÿæˆã€‚æ”¾å­å½ˆã€é£›å½ˆã€å‘½ä¸­ç‰¹æ•ˆé€™é¡æœƒå¤§é‡ç”Ÿæ»…çš„ prefabã€‚\n" +
+             "æ•¸é‡æŠ“ã€ŒåŒæ™‚åœ¨å ´ä¸Šçš„å°–å³°å€¼ã€å³å¯ï¼Œä¸å¤ æ™‚æ± å­æœƒè‡ªå·±é•·å¤§ã€‚")]
     [SerializeField] private List<PrewarmEntry> prewarm = new List<PrewarmEntry>();
 
-    [Tooltip("¨C´V³Ì¦h«Ø¥ß´X­Ó¡AÁ×§K¹w¼ö¥»¨­ÅÜ¦¨¤@¦¸¥d¹y¡C\n³]¦¨«Ü¤jªº¼Æ¦r = ¦b Start ·í´V¤@¦¸°µ§¹¡C")]
+    [Tooltip("æ¯å¹€æœ€å¤šå»ºç«‹å¹¾å€‹ï¼Œé¿å…é ç†±æœ¬èº«è®Šæˆä¸€æ¬¡å¡é “ã€‚\nè¨­æˆå¾ˆå¤§çš„æ•¸å­— = åœ¨ Start ç•¶å¹€ä¸€æ¬¡åšå®Œã€‚")]
     [SerializeField] private int prewarmPerFrame = 20;
 
     [Header("Limits")]
-    [Tooltip("¨C­Ó prefab ³Ì¦h«O¯d´X­Ó¶¢¸m¹ê¨Ò¡C¶W¹Lªº¦b Despawn ®Éª½±µ¾P·´¡C\n" +
-             "0 = ¤£­­¨î¡]µL­­¬ï³z + ªø¹Ø©Rªº¤l¼u¦³¾÷·|Åı¦À¤lµL­­ªø¤j¡A«ØÄ³¯dµÛ¡^")]
+    [Tooltip("æ¯å€‹ prefab æœ€å¤šä¿ç•™å¹¾å€‹é–’ç½®å¯¦ä¾‹ã€‚è¶…éçš„åœ¨ Despawn æ™‚ç›´æ¥éŠ·æ¯€ã€‚\n" +
+             "0 = ä¸é™åˆ¶ï¼ˆç„¡é™ç©¿é€ + é•·å£½å‘½çš„å­å½ˆæœ‰æ©Ÿæœƒè®“æ± å­ç„¡é™é•·å¤§ï¼Œå»ºè­°ç•™è‘—ï¼‰")]
     [SerializeField] private int maxIdlePerPrefab = 256;
 
     [Header("Debug")]
     [SerializeField] private bool logPrewarmResult = false;
 
-    // ¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w¢w
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private static PrefabPool _instance;
     private static bool _missingWarned;
@@ -62,27 +62,27 @@ public class PrefabPool : MonoBehaviour
 
     private Transform _root;
 
-    /// <summary>³õ´º¤¤¬O§_¦³¥i¥Îªº¦À¤l¡C</summary>
+    /// <summary>å ´æ™¯ä¸­æ˜¯å¦æœ‰å¯ç”¨çš„æ± å­ã€‚</summary>
     public static bool IsAvailable => _instance != null;
 
-    // ùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùù ¥Í©R¶g´Á ùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùù
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• ç”Ÿå‘½é€±æœŸ â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     private void Awake()
     {
         if (_instance != null && _instance != this)
         {
-            Debug.LogWarning($"[PrefabPool] ³õ´º¸Ì¤w¸g¦³¤@­Ó PrefabPool ¤F¡A²¾°£³o­Ó­«½Æªº¡C", this);
-            Destroy(this);   // ¥u²¾°£¤¸¥ó¡A¤£°Ê GameObject¡]¥¦¥i¯àÁÙ±¾µÛ§OªºªF¦è¡^
+            Debug.LogWarning($"[PrefabPool] å ´æ™¯è£¡å·²ç¶“æœ‰ä¸€å€‹ PrefabPool äº†ï¼Œç§»é™¤é€™å€‹é‡è¤‡çš„ã€‚", this);
+            Destroy(this);   // åªç§»é™¤å…ƒä»¶ï¼Œä¸å‹• GameObjectï¼ˆå®ƒå¯èƒ½é‚„æ›è‘—åˆ¥çš„æ±è¥¿ï¼‰
             return;
         }
 
         _instance = this;
 
-        // ®e¾¹¿W¥ß¦¨ root ª«¥ó¡A¤£±¾¦b¦Û¤v©³¤U ¡X¡X
-        // PrefabPool ³o­Ó¤¸¥ó¦pªG³Q©ñ¦b¤@­Ó·|²¾°Ê / ÁY©ñªºª«¥ó¤W¡]¨Ò¦p±¾¦b²î¤W¡^¡A
-        // ½ö¦b¦À¤l¸Ìªºª«¥ó·|¸òµÛ³Q©ìµÛ¶]¡C
+        // å®¹å™¨ç¨ç«‹æˆ root ç‰©ä»¶ï¼Œä¸æ›åœ¨è‡ªå·±åº•ä¸‹ â€”â€”
+        // PrefabPool é€™å€‹å…ƒä»¶å¦‚æœè¢«æ”¾åœ¨ä¸€å€‹æœƒç§»å‹• / ç¸®æ”¾çš„ç‰©ä»¶ä¸Šï¼ˆä¾‹å¦‚æ›åœ¨èˆ¹ä¸Šï¼‰ï¼Œ
+        // èººåœ¨æ± å­è£¡çš„ç‰©ä»¶æœƒè·Ÿè‘—è¢«æ‹–è‘—è·‘ã€‚
         var rootGo = new GameObject("[PrefabPool] Idle");
-        rootGo.SetActive(false);   // ¡¹ ®e¾¹«O«ù°±¥Î¡A¨£ CreateInstance ªº»¡©ú
+        rootGo.SetActive(false);   // â˜… å®¹å™¨ä¿æŒåœç”¨ï¼Œè¦‹ CreateInstance çš„èªªæ˜
         _root = rootGo.transform;
         _root.SetParent(null);
         _root.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
@@ -100,12 +100,12 @@ public class PrefabPool : MonoBehaviour
         if (_instance != this) return;
 
         _instance = null;
-        _missingWarned = false;   // ´«³õ´º«á¤¹³\¦AÄµ§i¤@¦¸
+        _missingWarned = false;   // æ›å ´æ™¯å¾Œå…è¨±å†è­¦å‘Šä¸€æ¬¡
 
         if (_root != null) Destroy(_root.gameObject);
     }
 
-    // ùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùù ¹ï¥~ API ùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùù
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• å°å¤– API â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     public static GameObject Spawn(GameObject prefab, Vector3 position, Quaternion rotation)
         => Spawn(prefab, position, rotation, null);
@@ -124,8 +124,8 @@ public class PrefabPool : MonoBehaviour
     }
 
     /// <summary>
-    /// ÂkÁÙ¤@­Ó¹ê¨Ò¡C¦^¶Ç true = ¯uªº¦^¨ì¦À¤l¡Ffalse = ³Qª½±µ¾P·´
-    /// ¡]¨S¦³¦À¤l¡B©Î³o­Óª«¥ó¤£¬O¦À¤l¥Íªº¡^¡C
+    /// æ­¸é‚„ä¸€å€‹å¯¦ä¾‹ã€‚å›å‚³ true = çœŸçš„å›åˆ°æ± å­ï¼›false = è¢«ç›´æ¥éŠ·æ¯€
+    /// ï¼ˆæ²’æœ‰æ± å­ã€æˆ–é€™å€‹ç‰©ä»¶ä¸æ˜¯æ± å­ç”Ÿçš„ï¼‰ã€‚
     /// </summary>
     public static bool Despawn(GameObject instance)
     {
@@ -133,7 +133,7 @@ public class PrefabPool : MonoBehaviour
 
         PooledInstance pooled = instance.GetComponent<PooledInstance>();
 
-        // ¤£¬O¦À¤l¥Íªº¡]¨Ò¦p¦À¤l¯Ê®u®É¥Î Instantiate ¥Íªº°h¸ôª«¥ó¡^¡A©Î¦À¤l¤w¸g¨S¤F
+        // ä¸æ˜¯æ± å­ç”Ÿçš„ï¼ˆä¾‹å¦‚æ± å­ç¼ºå¸­æ™‚ç”¨ Instantiate ç”Ÿçš„é€€è·¯ç‰©ä»¶ï¼‰ï¼Œæˆ–æ± å­å·²ç¶“æ²’äº†
         if (pooled == null || pooled.sourcePrefab == null || _instance == null)
         {
             Destroy(instance);
@@ -143,7 +143,7 @@ public class PrefabPool : MonoBehaviour
         return _instance.DespawnInternal(instance, pooled);
     }
 
-    /// <summary>¤â°Ê¹w¼ö¡C¥i¥H¦b¸ü¤Jµe­±¸Ì°w¹ï³o¤@Ãö·|¥Î¨ìªº prefab ©I¥s¡C</summary>
+    /// <summary>æ‰‹å‹•é ç†±ã€‚å¯ä»¥åœ¨è¼‰å…¥ç•«é¢è£¡é‡å°é€™ä¸€é—œæœƒç”¨åˆ°çš„ prefab å‘¼å«ã€‚</summary>
     public static void Prewarm(GameObject prefab, int count)
     {
         if (prefab == null || count <= 0) return;
@@ -161,12 +161,12 @@ public class PrefabPool : MonoBehaviour
         }
     }
 
-    /// <summary>¦^¦¬³õ¤W©Ò¦³ÁÙ¬¡µÛªº¦À¤Æª«¥ó¡C¤Á´«Ãö¥d / ­«¶}¤@§½®É¥i¥H¥Î¡C</summary>
+    /// <summary>å›æ”¶å ´ä¸Šæ‰€æœ‰é‚„æ´»è‘—çš„æ± åŒ–ç‰©ä»¶ã€‚åˆ‡æ›é—œå¡ / é‡é–‹ä¸€å±€æ™‚å¯ä»¥ç”¨ã€‚</summary>
     public static void DespawnAll()
     {
         if (_instance == null) return;
 
-        // ¤£¬O¼ö¸ô®|¡A¥Î FindObjectsByType ¨SÃö«Y
+        // ä¸æ˜¯ç†±è·¯å¾‘ï¼Œç”¨ FindObjectsByType æ²’é—œä¿‚
         PooledInstance[] all = FindObjectsByType<PooledInstance>(
             FindObjectsInactive.Exclude, FindObjectsSortMode.None);
 
@@ -177,14 +177,14 @@ public class PrefabPool : MonoBehaviour
         }
     }
 
-    /// <summary>¬Y­Ó prefab ¥Ø«e¦³´X­Ó¶¢¸m¹ê¨Ò¡]°£¿ù¥Î¡^¡C</summary>
+    /// <summary>æŸå€‹ prefab ç›®å‰æœ‰å¹¾å€‹é–’ç½®å¯¦ä¾‹ï¼ˆé™¤éŒ¯ç”¨ï¼‰ã€‚</summary>
     public static int IdleCount(GameObject prefab)
     {
         if (_instance == null || prefab == null) return 0;
         return _instance._idle.TryGetValue(prefab, out Stack<GameObject> s) ? s.Count : 0;
     }
 
-    // ùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùù ¤º³¡¹ê§@ ùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùùù
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• å…§éƒ¨å¯¦ä½œ â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     private GameObject SpawnInternal(GameObject prefab, Vector3 position, Quaternion rotation, Transform parent)
     {
@@ -192,8 +192,8 @@ public class PrefabPool : MonoBehaviour
 
         if (_idle.TryGetValue(prefab, out Stack<GameObject> stack))
         {
-            // ¦À¤l¸Ì¥i¯à¦³³Q¥~³¡ Destroy ±¼ªº´İÀe¡]¬Y¬qµ{¦¡½X§Ñ¤F§ï¦¨ Despawn¡^¡A
-            // Unity ªº°² null ·|Åı¥¦­Ì¬İ°_¨ÓÁÙ¦b¡C¤@¸ô pop ¨ì§ä¥X¬¡ªº¬°¤î¡C
+            // æ± å­è£¡å¯èƒ½æœ‰è¢«å¤–éƒ¨ Destroy æ‰çš„æ®˜éª¸ï¼ˆæŸæ®µç¨‹å¼ç¢¼å¿˜äº†æ”¹æˆ Despawnï¼‰ï¼Œ
+            // Unity çš„å‡ null æœƒè®“å®ƒå€‘çœ‹èµ·ä¾†é‚„åœ¨ã€‚ä¸€è·¯ pop åˆ°æ‰¾å‡ºæ´»çš„ç‚ºæ­¢ã€‚
             while (stack.Count > 0 && go == null)
                 go = stack.Pop();
         }
@@ -204,9 +204,9 @@ public class PrefabPool : MonoBehaviour
             if (go == null) return null;
         }
 
-        // ¡¹ ¶¶§Ç¡G¥ıÂ\¦n transform¡A³Ì«á¤~±Ò¥Î¡C
-        //   ¤Ï¹L¨Óªº¸Üª«¥ó·|¦b¡u¤W¦¸¦º¤`ªº¦ì¸m¡v¬¡¹L¨Ó¤@Àş¶¡ ¡X¡X
-        //   ©ì§À·|©Ô¤@±ø½u¾î¸ó¦a¹Ï¡AOnTriggerEnter ¤]¥i¯à¦b¿ùªº¦a¤èÄ²µo¡C
+        // â˜… é †åºï¼šå…ˆæ“ºå¥½ transformï¼Œæœ€å¾Œæ‰å•Ÿç”¨ã€‚
+        //   åéä¾†çš„è©±ç‰©ä»¶æœƒåœ¨ã€Œä¸Šæ¬¡æ­»äº¡çš„ä½ç½®ã€æ´»éä¾†ä¸€ç¬é–“ â€”â€”
+        //   æ‹–å°¾æœƒæ‹‰ä¸€æ¢ç·šæ©«è·¨åœ°åœ–ï¼ŒOnTriggerEnter ä¹Ÿå¯èƒ½åœ¨éŒ¯çš„åœ°æ–¹è§¸ç™¼ã€‚
         Transform t = go.transform;
         t.SetParent(parent, false);
         t.SetPositionAndRotation(position, rotation);
@@ -214,7 +214,7 @@ public class PrefabPool : MonoBehaviour
         PooledInstance pooled = go.GetComponent<PooledInstance>();
         if (pooled != null) pooled.isIdle = false;
 
-        go.SetActive(true);   // ¡÷ Awake¡]²Ä¤@¦¸¡^¡÷ OnEnable
+        go.SetActive(true);   // â†’ Awakeï¼ˆç¬¬ä¸€æ¬¡ï¼‰â†’ OnEnable
 
         if (pooled != null) Notify(pooled.hooks, true);
 
@@ -223,19 +223,19 @@ public class PrefabPool : MonoBehaviour
 
     private bool DespawnInternal(GameObject go, PooledInstance pooled)
     {
-        if (pooled.isIdle) return true;   // ¦P¤@´V³Q Despawn ²Ä¤G¦¸¡A¦wÀR¸õ¹L
+        if (pooled.isIdle) return true;   // åŒä¸€å¹€è¢« Despawn ç¬¬äºŒæ¬¡ï¼Œå®‰éœè·³é
         pooled.isIdle = true;
 
         Notify(pooled.hooks, false);
 
-        go.SetActive(false);              // ¡÷ OnDisable
+        go.SetActive(false);              // â†’ OnDisable
 
-        // °±¥Î¤§«á¦A·h¡Atransform ¶¥¼hªº§ó·s¤ñ¸û«K©y
+        // åœç”¨ä¹‹å¾Œå†æ¬ï¼Œtransform éšå±¤çš„æ›´æ–°æ¯”è¼ƒä¾¿å®œ
         go.transform.SetParent(_root, false);
 
         Stack<GameObject> stack = GetOrCreateStack(pooled.sourcePrefab);
 
-        // ¦À¤l¤w¸g°÷¤j ¡÷ ¦hªºª½±µ¥á±¼¡A¤£­nÅı¥¦µL­­ªø
+        // æ± å­å·²ç¶“å¤ å¤§ â†’ å¤šçš„ç›´æ¥ä¸Ÿæ‰ï¼Œä¸è¦è®“å®ƒç„¡é™é•·
         if (maxIdlePerPrefab > 0 && stack.Count >= maxIdlePerPrefab)
         {
             Destroy(go);
@@ -248,13 +248,13 @@ public class PrefabPool : MonoBehaviour
 
     private GameObject CreateInstance(GameObject prefab)
     {
-        // ¥Í¦b¡u°±¥Îªº®e¾¹¡v©³¤U ¡÷ ³o­Ó¹ê¨Ò±qÀY¨ì§À¨S¦³ active ¹L¡G
-        // Awake / OnEnable ¤£·|¶]¡BplayOnAwake ªº²É¤l¤£·|¦b­ìÂI¼Q¤@¤U¡B
-        // ¤]¤£·|¦³¤@´Vªºª«²z±µÄ²¡C¹w¼ö 200 Áû¤l¼u¤£·|¦bµe­±¤¤¥¡°{¥X¤@¤ù¤õªá¡C
+        // ç”Ÿåœ¨ã€Œåœç”¨çš„å®¹å™¨ã€åº•ä¸‹ â†’ é€™å€‹å¯¦ä¾‹å¾é ­åˆ°å°¾æ²’æœ‰ active éï¼š
+        // Awake / OnEnable ä¸æœƒè·‘ã€playOnAwake çš„ç²’å­ä¸æœƒåœ¨åŸé»å™´ä¸€ä¸‹ã€
+        // ä¹Ÿä¸æœƒæœ‰ä¸€å¹€çš„ç‰©ç†æ¥è§¸ã€‚é ç†± 200 é¡†å­å½ˆä¸æœƒåœ¨ç•«é¢ä¸­å¤®é–ƒå‡ºä¸€ç‰‡ç«èŠ±ã€‚
         GameObject go = Instantiate(prefab, _root);
 
-        // ©ú½TÃö±¼¦Û¤vªº activeSelf¡C¤Ö¤F³o¦æ¡A¤§«á SetParent ²æÂ÷°±¥Î®e¾¹ªºÀş¶¡
-        // ¥¦´N·|¦Û¤v¬¡¹L¨Ó ¡X¡X ¦Ó¥B¬O¦bÁÙ¨SÂ\¦n¦ì¸mªº®É­Ô¡C
+        // æ˜ç¢ºé—œæ‰è‡ªå·±çš„ activeSelfã€‚å°‘äº†é€™è¡Œï¼Œä¹‹å¾Œ SetParent è„«é›¢åœç”¨å®¹å™¨çš„ç¬é–“
+        // å®ƒå°±æœƒè‡ªå·±æ´»éä¾† â€”â€” è€Œä¸”æ˜¯åœ¨é‚„æ²’æ“ºå¥½ä½ç½®çš„æ™‚å€™ã€‚
         go.SetActive(false);
 
         PooledInstance pooled = go.GetComponent<PooledInstance>();
@@ -283,11 +283,11 @@ public class PrefabPool : MonoBehaviour
 
         for (int i = 0; i < hooks.Length; i++)
         {
-            // ¡¹ ¤£¯à¥u¼g hooks[i] != null¡C
-            //   Unity ªº¡u°² null¡v¬O UnityEngine.Object ªº == ¦h¸ü°µ¥X¨Óªº¡F
-            //   ³z¹L interface «¬§O¤ñ¸û·|¨« C# ­ì¥Íªº°Ñ¦Ò¤ñ¸û¡A
-            //   ¤w¸g³Q Destroy ªº MonoBehaviour ¦b³o¸Ì¬İ°_¨Ó¤´µM¡u¤£¬O null¡v¡C
-            //   ¥ıÂà¦^ UnityEngine.Object ¤~·|¨«¨ì¨º­Ó¦h¸ü¡C
+            // â˜… ä¸èƒ½åªå¯« hooks[i] != nullã€‚
+            //   Unity çš„ã€Œå‡ nullã€æ˜¯ UnityEngine.Object çš„ == å¤šè¼‰åšå‡ºä¾†çš„ï¼›
+            //   é€é interface å‹åˆ¥æ¯”è¼ƒæœƒèµ° C# åŸç”Ÿçš„åƒè€ƒæ¯”è¼ƒï¼Œ
+            //   å·²ç¶“è¢« Destroy çš„ MonoBehaviour åœ¨é€™è£¡çœ‹èµ·ä¾†ä»ç„¶ã€Œä¸æ˜¯ nullã€ã€‚
+            //   å…ˆè½‰å› UnityEngine.Object æ‰æœƒèµ°åˆ°é‚£å€‹å¤šè¼‰ã€‚
             var obj = hooks[i] as UnityEngine.Object;
             if (obj == null) continue;
 
@@ -333,14 +333,14 @@ public class PrefabPool : MonoBehaviour
         _missingWarned = true;
 
         Debug.LogWarning(
-            "[PrefabPool] ³õ´º¸Ì§ä¤£¨ì PrefabPool¡A³o¦¸°h¦^ Instantiate / Destroy¡C\n" +
-            "§â PrefabPool ¤¸¥ó±¾¨ì³õ´º¤¤¥ô¤@­Ó GameObject ¤W§Y¥i±Ò¥Î¦À¤Æ¡C¡]¥»°T®§¨C­Ó³õ´º¥u¥X²{¤@¦¸¡^");
+            "[PrefabPool] å ´æ™¯è£¡æ‰¾ä¸åˆ° PrefabPoolï¼Œé€™æ¬¡é€€å› Instantiate / Destroyã€‚\n" +
+            "æŠŠ PrefabPool å…ƒä»¶æ›åˆ°å ´æ™¯ä¸­ä»»ä¸€å€‹ GameObject ä¸Šå³å¯å•Ÿç”¨æ± åŒ–ã€‚ï¼ˆæœ¬è¨Šæ¯æ¯å€‹å ´æ™¯åªå‡ºç¾ä¸€æ¬¡ï¼‰");
     }
 
     [ContextMenu("Log Pool Stats")]
     private void LogStats()
     {
-        var sb = new System.Text.StringBuilder("[PrefabPool] ¶¢¸m¹ê¨Ò¡G\n");
+        var sb = new System.Text.StringBuilder("[PrefabPool] é–’ç½®å¯¦ä¾‹ï¼š\n");
         foreach (KeyValuePair<GameObject, Stack<GameObject>> kv in _idle)
         {
             string prefabName = (kv.Key != null) ? kv.Key.name : "<missing prefab>";

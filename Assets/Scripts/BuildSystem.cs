@@ -13,11 +13,41 @@ public class BuildSystem : MonoBehaviour
     public LayerMask buildableLayers;
     public float maxDistance = 500f;
 
+    [Header("Multi-Layer Deck")]
+    [Tooltip("命中點高度與 GridData.gridHeight 的最大容許誤差（世界單位）。\n\n" +
+             "作用有兩個：\n" +
+             "1. 排除「打到船殼側面 / 甲板之間的斜面」這類不屬於任何一層的命中點\n" +
+             "2. 避免在船外的地面上誤判成某一層\n\n" +
+             "實際選層是取「高度最接近」的候選，不是取第一個符合容差的，\n" +
+             "所以這個值可以放寬一點。目前各層高度是 50 / 62.5 / 75 / 100，\n" +
+             "最小間距 12.5，設 6 以下最安全。")]
+    public float layerHeightTolerance = 6f;
+
+    [Tooltip("只接受朝上的表面。\n\n" +
+             "射線打到艦島側壁或船殼外側時，命中點的高度會落在兩層之間，\n" +
+             "硬選最近的一層會讓建築蓋到牆上。開啟這個可以直接拒絕那類命中。\n\n" +
+             "預設關閉 —— 如果你的甲板 collider 法線不夠標準（例如用了合併 mesh\n" +
+             "或凸包近似），開啟可能會讓某些正常格子點不到。先確認行為再開。")]
+    public bool requireUpwardSurface = false;
+
+    [Range(0f, 89f)]
+    [Tooltip("表面法線與船 up 軸的最大夾角。只在 Require Upward Surface 開啟時生效。")]
+    public float maxSurfaceAngle = 45f;
+
+    [Tooltip("在 Console 印出選層的完整過程：射線打到什麼、命中高度多少、\n" +
+             "每一層是因為水平範圍不符還是高度容差被排除、最後選了哪一層、\n" +
+             "以及那一格是不是已經被佔用。\n\n" +
+             "結果沒有變化時不會重複印，不會洗版。查完記得關掉。")]
+    public bool debugLayerPick = false;
+
+    private readonly System.Text.StringBuilder _dbg = new System.Text.StringBuilder();
+    private string _lastLayerReport;
+
     [Header("TopDown RawImage Input")]
     public bool useRawImageInput = true;
-    public RawImage gridRawImage;         
-    public Camera topDownCamera;        
-    public Canvas uiCanvas;               
+    public RawImage gridRawImage;
+    public Camera topDownCamera;
+    public Canvas uiCanvas;
     [Header("Blueprint")]
     public int currentFootprintIndex = 0;
     public BuildBlueprint[] footprints;
@@ -77,7 +107,7 @@ public class BuildSystem : MonoBehaviour
 
     [SerializeField] NavMeshSurface ghostSurface;
     AsyncOperation _asyncBuild;
-    private void Awake()    
+    private void Awake()
     {
         if (!cam) cam = Camera.main;
     }
@@ -135,7 +165,8 @@ public class BuildSystem : MonoBehaviour
     {
         HandleZoomInput();
         HandlePanInput();
-        if (buildModeOn) {
+        if (buildModeOn)
+        {
             UpdateHitCell();
             HandleRotateInput();
 
@@ -186,14 +217,30 @@ public class BuildSystem : MonoBehaviour
         }
 
         if (!Physics.Raycast(ray, out RaycastHit hit, maxDistance, buildableLayers))
+        {
+            ReportLayerPick("射線沒有打到任何東西（檢查 buildableLayers 有沒有包含甲板的 layer）");
             return;
+        }
 
         var grid = hit.collider.GetComponentInParent<BuildingGrid>();
-        if (!grid) return;
+        if (!grid)
+        {
+            ReportLayerPick($"打到 '{hit.collider.name}'（layer {LayerMask.LayerToName(hit.collider.gameObject.layer)}）" +
+                            "，但它和它的父物件上都沒有 BuildingGrid");
+            return;
+        }
         if (grid.grids == null || grid.grids.Length == 0) return;
 
-        if (!TryGetCellFromHit(grid, hit.point, out int gridIndex, out int cellX, out int cellY))
+        if (!TryGetCellFromHit(grid, hit.point, hit.normal, out int gridIndex, out int cellX, out int cellY))
             return;
+
+        if (debugLayerPick)
+        {
+            _dbg.Append("  → 選中 grid[").Append(gridIndex).Append("] cell (")
+                .Append(cellX).Append(", ").Append(cellY).Append(")   occupied = ")
+                .Append(grid.IsOccupied(gridIndex, cellX, cellY));
+            ReportLayerPick(null);
+        }
 
         _hasHitCell = true;
         _hitGrid = grid;
@@ -294,13 +341,13 @@ public class BuildSystem : MonoBehaviour
             ghost.transform.localPosition = placed.transform.localPosition;
             ghost.transform.localRotation = placed.transform.localRotation;
             ghost.name = placed.name + "_GHOST";
-            
+
             if (duplicateDisableRenderers)
             {
                 foreach (var r in ghost.GetComponentsInChildren<Renderer>())
                     r.enabled = false;   // 只保留 Collider + NavMeshObstacle
             }
-         }
+        }
     }
 
     private void UpdatePreview()
@@ -595,7 +642,7 @@ public class BuildSystem : MonoBehaviour
         }
     }
 
-    private bool TryGetCellFromHit(BuildingGrid gridComp, Vector3 hitPointWorld,
+    private bool TryGetCellFromHit(BuildingGrid gridComp, Vector3 hitPointWorld, Vector3 hitNormalWorld,
         out int gridIndex, out int cellX, out int cellY)
     {
         gridIndex = -1;
@@ -607,6 +654,38 @@ public class BuildSystem : MonoBehaviour
         Vector3 forward = t.forward;
         Vector3 up = t.up;
         Vector3 basePos = t.position;
+
+        // 命中點沿船 up 軸的高度。基準跟 GridData.gridHeight 完全一致 ——
+        // 那個欄位的定義就是「t.position + up * gridHeight」。
+        float hitHeight = Vector3.Dot(hitPointWorld - basePos, up);
+
+        if (debugLayerPick)
+        {
+            _dbg.Clear();
+            _dbg.Append("[BuildSystem] 命中高度 h = ").Append(hitHeight.ToString("F2"))
+                .Append("   (容差 ").Append(layerHeightTolerance).Append(")\n");
+        }
+
+        // 打到側壁 / 斜面時，高度會落在兩層之間，硬選最近的一層會蓋到牆上
+        if (requireUpwardSurface && hitNormalWorld.sqrMagnitude > 0.0001f)
+        {
+            float surfAngle = Vector3.Angle(hitNormalWorld, up);
+            if (surfAngle > maxSurfaceAngle)
+            {
+                if (debugLayerPick)
+                {
+                    _dbg.Append("  法線與船 up 夾角 ").Append(surfAngle.ToString("F1"))
+                        .Append("° > ").Append(maxSurfaceAngle).Append("° → 判定為側壁，拒絕");
+                    ReportLayerPick(null);
+                }
+                return false;
+            }
+        }
+
+        int bestIndex = -1;
+        int bestX = -1;
+        int bestY = -1;
+        float bestHeightDelta = float.PositiveInfinity;
 
         for (int i = 0; i < gridComp.grids.Length; i++)
         {
@@ -626,22 +705,80 @@ public class BuildSystem : MonoBehaviour
 
             Vector3 delta = hitPointWorld - origin;
 
+            // right / forward 都跟 up 垂直，所以格座標的計算本來就不受高度影響 ——
+            // 這正是舊版能完全忽略 gridHeight 的原因，也是它會選錯層的原因。
             float xUnits = Vector3.Dot(delta, right) / g.cellSize;
             float yUnits = Vector3.Dot(delta, forward) / g.cellSize;
 
             int x = Mathf.FloorToInt(xUnits);
             int y = Mathf.FloorToInt(yUnits);
 
-            if (x < 0 || x >= g.gridSizeX || y < 0 || y >= g.gridSizeY)
-                continue;
+            float heightDelta = Mathf.Abs(hitHeight - g.gridHeight);
 
-            gridIndex = i;
-            cellX = x;
-            cellY = y;
-            return true;
+            if (debugLayerPick)
+                _dbg.Append("  grid[").Append(i).Append("] gridHeight=").Append(g.gridHeight)
+                    .Append("  cell=(").Append(x).Append(",").Append(y).Append(")/")
+                    .Append(g.gridSizeX).Append("x").Append(g.gridSizeY)
+                    .Append("  Δh=").Append(heightDelta.ToString("F2"));
+
+            if (x < 0 || x >= g.gridSizeX || y < 0 || y >= g.gridSizeY)
+            {
+                if (debugLayerPick) _dbg.Append("  ✗ 水平範圍外\n");
+                continue;
+            }
+
+            // ★ 修正核心 ────────────────────────────────────────────────
+            //   舊版是「第一個水平範圍包含命中點的 grid 就 return true」。
+            //   Element 2（19×45 主甲板）在水平上罩住了 Element 4 和 5，
+            //   而它的索引比較小，所以點頂層永遠選到主甲板 ——
+            //   然後吃到主甲板的 occupied 狀態，顯示成不能蓋。
+            //
+            //   現在收集所有水平符合的候選，挑高度最接近命中點的那一層。
+            //   金字塔形船體保證同一個 (x,y) 上只有一層外露，所以不會有歧義。
+            if (heightDelta > layerHeightTolerance)
+            {
+                if (debugLayerPick) _dbg.Append("  ✗ 超出高度容差\n");
+                continue;
+            }
+
+            if (debugLayerPick) _dbg.Append("  ✓ 候選\n");
+
+            if (heightDelta < bestHeightDelta)
+            {
+                bestHeightDelta = heightDelta;
+                bestIndex = i;
+                bestX = x;
+                bestY = y;
+            }
         }
 
-        return false;
+        if (bestIndex < 0)
+        {
+            if (debugLayerPick)
+            {
+                _dbg.Append("  → 沒有任何候選層。若各層 Δh 都很大，代表 gridHeight 跟實際甲板高度對不上；\n")
+                    .Append("     若各層都是「水平範圍外」，代表 centreOffset / gridSize 沒有涵蓋到這個位置。");
+                ReportLayerPick(null);
+            }
+            return false;
+        }
+
+        gridIndex = bestIndex;
+        cellX = bestX;
+        cellY = bestY;
+        return true;
+    }
+
+    /// <summary>診斷輸出。內容跟上次相同時不重複印，避免每幀洗版。</summary>
+    private void ReportLayerPick(string overrideMessage)
+    {
+        if (!debugLayerPick) return;
+
+        string msg = overrideMessage ?? _dbg.ToString();
+        if (msg == _lastLayerReport) return;
+
+        _lastLayerReport = msg;
+        Debug.Log(msg);
     }
 
     public void SetBuildingFootprints(int index)
@@ -732,7 +869,7 @@ public class BuildSystem : MonoBehaviour
         Transform t = grid.transform;
         return anchorWorld + (t.right * (centerOffsetX * cellSize)) + (t.forward * (centerOffsetY * cellSize));
     }
-        // -----  GHOST HELPERS  ---------------------------------------------------
+    // -----  GHOST HELPERS  ---------------------------------------------------
     private bool TryGetShipRoots(out Transform realRoot, out Transform ghostRoot)
     {
         realRoot = null; ghostRoot = null;
@@ -740,8 +877,8 @@ public class BuildSystem : MonoBehaviour
         var nav = LandshipNavigation.Instance;
         if (nav == null) return false;
 
-        realRoot  = nav.core? nav.core : null;
-        ghostRoot = nav.ghostShip? nav.ghostShip : null;
+        realRoot = nav.core ? nav.core : null;
+        ghostRoot = nav.ghostShip ? nav.ghostShip : null;
 
         return realRoot && ghostRoot;
     }
