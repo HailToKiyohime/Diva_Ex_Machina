@@ -10,7 +10,7 @@ public class PathFinder : MonoBehaviour
 
     [SerializeField] private Transform realShipRoot;
     [SerializeField] private Transform ghostShipRoot;
-    float navSampleMaxDistance = 50f; // Maximum distance for NavMesh.SamplePosition
+    float navSampleMaxDistance = 100f; // Maximum distance for NavMesh.SamplePosition
 
     [Header("Debug Gizmo")]
     [SerializeField] private bool drawPathGizmo = true;
@@ -31,15 +31,25 @@ public class PathFinder : MonoBehaviour
         path = new NavMeshPath();
     }
 
+    /// <summary>
+    /// 上一次算出來的是不是「保底路徑」（NavMesh 什麼都沒算出來，改用目的地直線）。
+    /// 呼叫端可以用它來縮短重試間隔或做別的降級處理。
+    /// </summary>
+    public bool LastPathIsFallback { get; private set; }
+
     public Vector3[] FindPath(Vector3 targetLocation)
     {
         Vector3[] result;
         lastPathOnShip = false;   // 預設地面；下面命中 ghost 分支才設 true
+        LastPathIsFallback = false;
 
         if (isOnShip && isTargetOnShip)// if both side on ship, convert gobal coordinates to ship local coordinates
         {
             result = ComputeGhostPath(transform.position, targetLocation);
             lastPathOnShip = true;
+
+            if (result.Length == 0)
+                result = BuildFallbackPath(targetLocation, true);
         }
         else if (isOnShip && !isTargetOnShip)// if entity on ship but target not on ship
         {
@@ -66,18 +76,63 @@ public class PathFinder : MonoBehaviour
                     ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, exitPoint);
                 lastPathGhost = extendedGhost;
             }
+            else
+            {
+                result = BuildFallbackPath(dockPos, true);
+            }
         }
         else if (!isOnShip && isTargetOnShip) // if player not on ship but target on ship, find path to ship docking point
         {
-            result = ComputeGroundPath(transform.position, GetClosestDockingLocation());
+            Vector3 dockPos = GetClosestDockingLocation();
+            result = ComputeGroundPath(transform.position, dockPos);
+
+            if (result.Length == 0)
+                result = BuildFallbackPath(dockPos, false);
         }
         else
         {
             result = ComputeGroundPath(transform.position, targetLocation);
+
+            if (result.Length == 0)
+                result = BuildFallbackPath(targetLocation, false);
         }
 
         lastPath = result;
         return result;
+    }
+
+    /// <summary>
+    /// 算不出路徑時的保底：回傳「只有目的地一個點」的路徑，而不是空陣列。
+    ///
+    /// ★ 這是這次修的 bug 的一半。
+    ///   舊版只要 SamplePosition 或 CalculatePath 失敗一次就回傳空陣列，
+    ///   呼叫端（Brain）拿到空路徑就整段 return → 實體停在原地不動。
+    ///   而「原地」正是剛剛 sample 失敗的那個位置，所以下一次 FindPath 的
+    ///   起點還是同一個點 → 再失敗 → 永遠失敗。一次失誤就變成永久死鎖。
+    ///
+    ///   給一個直線保底點，實體至少會離開那個壞位置，
+    ///   移動之後 NavMesh.SamplePosition 才有機會重新成功。
+    /// </summary>
+    private Vector3[] BuildFallbackPath(Vector3 endWorld, bool ghostSpace)
+    {
+        LastPathIsFallback = true;
+
+        if (ghostSpace)
+        {
+            // 船上的保底點也要存 ghost 空間，GetCurrentWorldPath 才會每幀跟著船投影
+            lastPathOnShip = true;
+            lastPathGhost = new Vector3[]
+            {
+                ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, endWorld)
+            };
+        }
+        else
+        {
+            lastPathOnShip = false;
+            lastPathGhost = System.Array.Empty<Vector3>();
+        }
+
+        return new Vector3[] { endWorld };
     }
 
     // ★ 每幀呼叫：船上路徑用「當下船姿態」即時投影 → 不 stale；地面路徑直接回傳

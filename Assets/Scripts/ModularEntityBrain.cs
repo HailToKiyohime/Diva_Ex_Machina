@@ -302,6 +302,37 @@ public class ModularEntityBrain : MonoBehaviour
         path = newPath;
         currentWaypointIndex = 0;
     }
+
+    [Header("Path Failure")]
+    [Tooltip("算不出路徑時多久重試一次（秒）。不要設 0，否則每個 physics step 都會呼叫 NavMesh.CalculatePath。")]
+    [SerializeField] protected float pathRetryInterval = 0.25f;
+
+    /// <summary>
+    /// 現在有沒有可以走的路徑。沒有的話：把移動輸入歸零，並縮短下一次重算的等待時間。
+    ///
+    /// ★ 這是這次修的 bug 的另一半。
+    ///   舊版每個 Behaviour 開頭都是 `if (path == null || path.Length == 0) return;`，
+    ///   一次算不出路徑就把整段行為跳掉，連帶造成三個後果：
+    ///
+    ///   1. HorizontalMovement 沒被呼叫 → ModularEntityMovement.moveDirection 留著上一次的值
+    ///      → 實體以 sprintSpeed 朝著舊方向一直滑，撞牆或滑出 NavMesh。
+    ///   2. 狀態轉換全部被跳過 → Idle 不會轉 Chasing、Chasing 不會轉 Combat、
+    ///      Combat 不會瞄準開火。從外面看就是「AI 整個死掉」。
+    ///   3. 實體因此停在（或滑到）一個 SamplePosition 會失敗的位置，
+    ///      下一次 FindPath 的起點還是那裡 → 永遠算不出路 → 死鎖。
+    ///
+    ///   現在「沒有路徑」是一個明確處理的狀態：停下來、砲塔歸位、盡快重試，
+    ///   而狀態轉換與砲塔邏輯照常執行。
+    /// </summary>
+    protected bool HasUsablePath()
+    {
+        if (path != null && path.Length > 0) return true;
+
+        modularEntityMovement.HorizontalMovement(0f, 0f);   // 清掉殘留的移動輸入，避免無限滑行
+        if (destinationTimer > pathRetryInterval)
+            destinationTimer = pathRetryInterval;
+        return false;
+    }
     public Vector3 FindNextWaypoint()
     {
         // ★ 每幀跟 PathFinder 要「用當下船姿態投影出來的」即時路徑，而不是讀凍結快取
@@ -331,32 +362,40 @@ public class ModularEntityBrain : MonoBehaviour
     }
     protected virtual void IdleBehaviour()
     {
-        if (path == null || path.Length == 0) return;
-        Vector3 nextWaypoint = FindNextWaypoint();
-        Vector3 moveDirection = nextWaypoint - transform.position;
-        moveDirection.y = 0f;
-        float dist = moveDirection.magnitude;
-
-
-        ResetTurretAiming(moveDirection); // 巡邏時砲塔不瞄準，避免亂射
-
-        if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
+        if (HasUsablePath())
         {
-            destinationTimer = 0f;   // 到達巡邏點 → 下一幀重挑新點（留在 Patrolling）
+            Vector3 nextWaypoint = FindNextWaypoint();
+            Vector3 moveDirection = nextWaypoint - transform.position;
+            moveDirection.y = 0f;
+            float dist = moveDirection.magnitude;
+
+
+            ResetTurretAiming(moveDirection); // 巡邏時砲塔不瞄準，避免亂射
+
+            if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
+            {
+                destinationTimer = 0f;   // 到達巡邏點 → 下一幀重挑新點（留在 Patrolling）
+            }
+            else if (dist > 0.0001f)   // dist 為 0 時 moveDirection / dist 會變成 NaN，直接污染 Rigidbody
+            {
+                float throttle = Mathf.Clamp01(dist / slowDownRadius);
+                Vector3 dir = moveDirection / dist * throttle;
+
+                float signedAngle = Vector3.SignedAngle(modularEntityMovement.MeshForward, moveDirection, Vector3.up);
+                if (Mathf.Abs(signedAngle) < 180)
+                {
+                    modularEntityMovement.HorizontalMovement(dir.x, dir.z);
+                }
+                FaceMoveDirection(moveDirection);
+            }
         }
         else
         {
-            float throttle = Mathf.Clamp01(dist / slowDownRadius);
-            Vector3 dir = moveDirection / dist * throttle;
-
-            float signedAngle = Vector3.SignedAngle(modularEntityMovement.MeshForward, moveDirection, Vector3.up);
-            if (Mathf.Abs(signedAngle) < 180)
-            {
-                modularEntityMovement.HorizontalMovement(dir.x, dir.z);
-            }
-            FaceMoveDirection(moveDirection);
+            ResetTurretAiming(Vector3.zero);   // 沒路可走 → 砲塔回中立，不要維持上一幀的朝向
         }
+
         //if there is target in the list, change state to chasing
+        // ★ 移到 path 檢查外面：算不出路徑不代表不該切狀態
         if (targets.Count > 0)
         {
             ChangeState(EntityState.Chasing);
@@ -365,7 +404,12 @@ public class ModularEntityBrain : MonoBehaviour
 
     protected virtual void PatrollingBehaviour()
     {
-        if (path == null || path.Length == 0) return;
+        if (!HasUsablePath())
+        {
+            ResetTurretAiming(Vector3.zero);
+            return;
+        }
+
         Vector3 nextWaypoint = FindNextWaypoint();
         Vector3 moveDirection = nextWaypoint - transform.position;
         moveDirection.y = 0f;
@@ -378,7 +422,7 @@ public class ModularEntityBrain : MonoBehaviour
         {
             destinationTimer = 0f;   // 到達巡邏點 → 下一幀重挑新點（留在 Patrolling）
         }
-        else
+        else if (dist > 0.0001f)   // 防除以 0 → NaN
         {
             float throttle = Mathf.Clamp01(dist / slowDownRadius);
             Vector3 dir = moveDirection / dist * throttle;
@@ -394,7 +438,12 @@ public class ModularEntityBrain : MonoBehaviour
 
     protected virtual void RetreatBehaviour()
     {
-        if (path == null || path.Length == 0) return;
+        if (!HasUsablePath())
+        {
+            ResetTurretAiming(Vector3.zero);
+            return;
+        }
+
         Vector3 nextWaypoint = FindNextWaypoint();
         Vector3 moveDirection = nextWaypoint - transform.position;
         moveDirection.y = 0f;
@@ -418,10 +467,22 @@ public class ModularEntityBrain : MonoBehaviour
 
     protected virtual void ChasingBehaviour()
     {
-        if (path == null || path.Length == 0) return;
-
+        // ★ 目標判定與 Combat 轉換不需要路徑，所以放在 path 檢查前面。
+        //   舊版放在後面 → 一次算不出路就永遠卡在 Chasing，不會進 Combat 也不會回 Patrolling。
         Transform target = FindTarget();
         if (target == null) { ChangeState(EntityState.Patrolling); return; }   // 目標消失 → 回巡邏
+
+        if (DistanceToPoint(target.position) < combatActivityAreaRadius / 2)
+        {
+            ChangeState(EntityState.Combat);   // 進入戰鬥範圍 → 真正切換狀態
+            return;
+        }
+
+        if (!HasUsablePath())
+        {
+            ResetTurretAiming(Vector3.zero);
+            return;
+        }
 
         Vector3 nextWaypoint = FindNextWaypoint();
         Vector3 moveDirection = nextWaypoint - transform.position;
@@ -429,11 +490,7 @@ public class ModularEntityBrain : MonoBehaviour
 
         ResetTurretAiming(moveDirection);   // 追擊時砲塔不瞄準，避免亂射
 
-        if (DistanceToPoint(target.position) < combatActivityAreaRadius / 2)
-        {
-            ChangeState(EntityState.Combat);   // 進入戰鬥範圍 → 真正切換狀態
-        }
-        else if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
+        if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
         {
             destinationTimer = 0f;   // 走完舊路徑但還沒近 → 下一幀用目標當下位置重算（留在 Chasing）
         }
@@ -450,22 +507,26 @@ public class ModularEntityBrain : MonoBehaviour
 
     protected virtual void CombatBehaviour()
     {
-        if (path == null || path.Length == 0) return;
-        Vector3 nextWaypoint = FindNextWaypoint();
-        Vector3 moveDirection = nextWaypoint - transform.position;
-        moveDirection.y = 0f;
-        if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
+        // ★ 移動段可以沒有路徑，但瞄準開火段一定要照跑。
+        //   舊版整段 return → 敵人一旦算不出徘徊路徑就連射擊都停了。
+        if (HasUsablePath())
         {
-            destinationTimer = 0f;   // 到達徘徊點 → 下一幀重挑新徘徊點（留在 Combat）
-        }
-        else
-        {
-            float signedAngle = Vector3.SignedAngle(modularEntityMovement.MeshForward, moveDirection, Vector3.up);
-            if (Mathf.Abs(signedAngle) < 160)
+            Vector3 nextWaypoint = FindNextWaypoint();
+            Vector3 moveDirection = nextWaypoint - transform.position;
+            moveDirection.y = 0f;
+            if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
             {
-                modularEntityMovement.HorizontalMovement(moveDirection.x, moveDirection.z);
+                destinationTimer = 0f;   // 到達徘徊點 → 下一幀重挑新徘徊點（留在 Combat）
             }
-            FaceMoveDirection(moveDirection);
+            else
+            {
+                float signedAngle = Vector3.SignedAngle(modularEntityMovement.MeshForward, moveDirection, Vector3.up);
+                if (Mathf.Abs(signedAngle) < 160)
+                {
+                    modularEntityMovement.HorizontalMovement(moveDirection.x, moveDirection.z);
+                }
+                FaceMoveDirection(moveDirection);
+            }
         }
 
         Transform target = FindTarget();
