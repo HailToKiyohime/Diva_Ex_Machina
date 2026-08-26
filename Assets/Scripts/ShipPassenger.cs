@@ -11,7 +11,7 @@
 /// </summary>
 public class ShipPassenger : MonoBehaviour
 {
-    [SerializeField] private string platformTag = "Mobile Platform";
+    [SerializeField] private string platformTag = "Mobile Platform Hitbox";
 
     /// <summary>目前是否站在移動平台上。</summary>
     public bool isOnShip { get; private set; }
@@ -62,6 +62,7 @@ public class ShipPassenger : MonoBehaviour
 
     private void OnTriggerStay(Collider other)
     {
+        Debug.Log("other: " + other.name + "tag" + other.tag);
         if (other == null) return;
         if (!other.CompareTag(platformTag)) return;
 

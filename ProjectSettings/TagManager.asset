@@ -7,6 +7,7 @@ TagManager:
   - DropItem
   - Enemy
   - Mobile Platform
+  - Mobile Platform Hitbox
   layers:
   - Default
   - TransparentFX

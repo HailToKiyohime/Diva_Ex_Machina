@@ -1393,7 +1393,7 @@ public class PlayerMovement : MonoBehaviour
     public Transform CurrentPlatform => _onMobilePlatform ? _mobilePlatformTf : null;
     public void OnTriggerStay(Collider other)
     {
-        if (!other.CompareTag("Mobile Platform")) return;
+        if (!other.CompareTag("Mobile Platform Hitbox")) return;
 
         var rb = other.GetComponentInParent<Rigidbody>();
         if (rb == null) return;
@@ -1416,7 +1416,7 @@ public class PlayerMovement : MonoBehaviour
     }
     public void OnTriggerExit(Collider other)
     {
-        if (!other.CompareTag("Mobile Platform")) return;
+        if (!other.CompareTag("Mobile Platform Hitbox")) return;
 
         _onMobilePlatform = false;
         _mobilePlatformRb = null;
