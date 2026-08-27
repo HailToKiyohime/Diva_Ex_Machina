@@ -53153,6 +53153,8 @@ MonoBehaviour:
   combatActivityAreaRadius: 50
   reactionCoolDown: 1
   reactionChance: 0.5
+  dockUpdateDistance: 30
+  dockDestinationUpdateRange: {x: 0.1, y: 0.3}
   waypointArriveRadius: 1.5
   slowDownRadius: 10
   waypointSearchLookAhead: 2
@@ -129295,6 +129297,8 @@ MonoBehaviour:
   combatActivityAreaRadius: 50
   reactionCoolDown: 3
   reactionChance: 0.5
+  dockUpdateDistance: 30
+  dockDestinationUpdateRange: {x: 0.1, y: 0.3}
   waypointArriveRadius: 5
   slowDownRadius: 10
   waypointSearchLookAhead: 2

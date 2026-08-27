@@ -84,6 +84,15 @@ public class ModularEntityBrain : MonoBehaviour
     public float reactionCoolDown = 3f;
     public float reactionChance = 0.5f;
 
+    [Header("Docking Proximity Update")]
+    [Tooltip("離最近的停靠點小於這個水平距離時，改用下面的更新間隔。所有狀態都適用。")]
+    public float dockUpdateDistance = 30f;
+
+    [Tooltip("靠近停靠點時的路徑更新間隔（秒）。不要設 0 —— NavMesh.CalculatePath 是主執行緒同步呼叫，" +
+             "每個 physics step 算一次，敵人一多就會卡。0.1~0.3 通常夠了。")]
+    [MinMaxSlider(0f, 15f)]
+    public Vector2 dockDestinationUpdateRange = new Vector2(0.1f, 0.3f);
+
     protected float destinationTimer;
 
     private readonly Dictionary<TargetType, float> decayMultiplierByType = new Dictionary<TargetType, float>();
@@ -503,9 +512,58 @@ public class ModularEntityBrain : MonoBehaviour
         return livePath[currentWaypointIndex];
     }
 
+    /// <summary>
+    /// 滾出下一次路徑更新的間隔。
+    ///
+    /// ★ 靠近停靠點時改用 dockDestinationUpdateRange（更短）。
+    ///
+    ///   為什麼要這樣：地面路徑（!isOnShip && isTargetOnShip）走的是
+    ///   ComputeGroundPath，lastPathOnShip 是 false，所以 GetCurrentWorldPath()
+    ///   直接回傳凍結的世界座標 —— 整條路徑在下一次重算之前完全不會跟著船更新。
+    ///   終點那個 docking point 也一樣是凍結的。
+    ///
+    ///   離得遠的時候這無所謂（船的位移相對於路徑長度可以忽略）；
+    ///   但快登船時，1~3 秒的凍結誤差就等於整個登船口的寬度，
+    ///   敵人會一直撲到船「幾秒前」的位置。靠近時提高更新頻率就能收斂。
+    ///
+    ///   刻意寫在 RollInterval 而不是各個 state 裡：所有狀態自動適用，
+    ///   FalconBrain 覆寫的 PathUpdate 也是呼叫這個方法，一併生效。
+    /// </summary>
     protected float RollInterval(Vector2 range)
     {
+        if (IsNearDockingPoint())
+            range = dockDestinationUpdateRange;
+
         return Random.Range(range.x, range.y);
+    }
+
+    /// <summary>
+    /// 離任何一個停靠點夠近嗎。
+    /// 用水平距離 —— 飛行單位（Falcon）懸停在 10 公尺高空，
+    /// 3D 距離會永遠把飛行高度計進去，等於門檻被墊高。
+    /// </summary>
+    protected virtual bool IsNearDockingPoint()
+    {
+        if (dockUpdateDistance <= 0f) return false;
+
+        LandshipNavigation nav = LandshipNavigation.Instance;
+        if (nav == null || nav.dockingPoints == null) return false;
+
+        float sqrThreshold = dockUpdateDistance * dockUpdateDistance;
+        Vector3 pos = transform.position;
+
+        for (int i = 0; i < nav.dockingPoints.Length; i++)
+        {
+            Transform dock = nav.dockingPoints[i];
+            if (dock == null) continue;
+
+            Vector3 delta = dock.position - pos;
+            delta.y = 0f;
+
+            if (delta.sqrMagnitude < sqrThreshold) return true;
+        }
+
+        return false;
     }
     protected virtual void IdleBehaviour()
     {
