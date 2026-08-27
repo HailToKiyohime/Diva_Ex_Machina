@@ -90,7 +90,22 @@ public class ModularEntityBrain : MonoBehaviour
 
     [SerializeField] protected float waypointArriveRadius = 5f;
     [SerializeField] protected float slowDownRadius = 6f;
+
+    [Tooltip("重新定位航點時，最多往前搜尋幾個線段。太大會在 U 型路徑上抄近路穿牆，太小則在路徑折返時反應遲鈍。2 通常剛好。")]
+    [SerializeField] protected int waypointSearchLookAhead = 2;
+
     protected int currentWaypointIndex = 0;
+
+    /// <summary>
+    /// FindNextWaypoint 這一幀實際使用的路徑長度。
+    ///
+    /// ★ 各 Behaviour 原本用 path.Length 判斷「是不是最後一個航點」，但走的是
+    ///   pathFinder.GetCurrentWorldPath() 回傳的即時投影路徑。兩者理論上等長，
+    ///   但那是兩個不同的陣列，只要哪天長度對不上，抵達判定就會失效
+    ///   （永遠不等於 length-1 → destinationTimer 不歸零 → 卡在原地等 timer）。
+    ///   統一由這裡提供長度，兩邊必定一致。
+    /// </summary>
+    protected int livePathLength = 0;
 
     [SerializeField] protected float facingDeadzone = 1f;   // 角度誤差小於此就不轉，避免抖動
 
@@ -300,7 +315,125 @@ public class ModularEntityBrain : MonoBehaviour
     protected void SetPath(Vector3[] newPath)
     {
         path = newPath;
-        currentWaypointIndex = 0;
+        livePathLength = (newPath != null) ? newPath.Length : 0;
+
+        // ★ 這裡就是「敵人重算路徑後會回頭走第一個點」的根源。
+        //
+        //   舊版：currentWaypointIndex = 0;
+        //
+        //   問題在於 corner[0] 並不是實體的位置，而是
+        //   NavMesh.SamplePosition(transform.position) 吸附之後的起點。
+        //   實體是 Rigidbody 驅動的（不是 NavMeshAgent），隨時可能：
+        //     · 走出 NavMesh 邊緣
+        //     · 站在甲板 / 箱子 / 任何沒烘焙的東西上
+        //     · 被撞飛而暫時離地
+        //     · ghost ↔ real 投影有一點誤差
+        //   這時 sample 會往「最近的合法位置」吸附 —— 而最近的合法位置，
+        //   通常就在它剛剛走過來的那個方向。navSampleMaxDistance 是 100，
+        //   最遠可以吸到 100 公尺外。
+        //
+        //   歸零之後，唯一能跳過這個過期 corner 的機制是 FindNextWaypoint 的
+        //   「距離小於 waypointArriveRadius(5) 就 ++」。corner[0] 在身後 30 公尺
+        //   時這條規則不會成立 → 實體轉頭走回去 → 走進 5 公尺內才前進
+        //   → 1~3 秒後 timer 到期又重算又歸零 → 不斷回頭。
+        //
+        //   路徑短時 corner 間距本來就跟 5 公尺同量級，回頭幅度小看不出來；
+        //   路徑長時 corner 拉開，一次回頭就是一個幾十公尺的大轉彎。
+        //
+        //   改成用投影定位：找出實體現在落在折線的哪一段，直接瞄準那一段的終點。
+        //   corner[0] 在身後時，實體位於 [corner0, corner1] 這一段上
+        //   → 瞄準 corner1 → 結構上不可能再走回頭路。
+        currentWaypointIndex = ResolveWaypointIndex(newPath, 0);
+    }
+
+    /// <summary>
+    /// 把實體投影到路徑折線上，回傳「應該瞄準的 corner index」。
+    ///
+    /// 做法：在 [fromSegment, fromSegment + waypointSearchLookAhead] 這個窗口內
+    /// 找出離實體最近的線段，瞄準該線段的終點；接著再套用抵達半徑推進。
+    ///
+    /// 為什麼要限制搜尋窗口而不是掃整條路徑：
+    /// U 型繞路（例如繞過一面牆）時，歐氏距離上最近的線段可能在牆的另一側。
+    /// 直接跳過去等於叫實體穿牆。限制成只能往前看幾段，就不會抄到那種捷徑。
+    /// </summary>
+    protected int ResolveWaypointIndex(Vector3[] p, int fromSegment)
+    {
+        if (p == null || p.Length == 0) return 0;
+        if (p.Length == 1) return 0;   // 保底路徑（只有目的地一個點）
+
+        Vector3 pos = transform.position;
+
+        int lastSegment = p.Length - 2;                                   // 最後一段的起點 index
+        int start = Mathf.Clamp(fromSegment, 0, lastSegment);
+        int end = Mathf.Min(lastSegment, start + Mathf.Max(0, waypointSearchLookAhead));
+
+        int bestSegment = start;
+        float bestSqr = float.PositiveInfinity;
+
+        for (int i = start; i <= end; i++)
+        {
+            float sqr = SqrDistanceToSegmentXZ(pos, p[i], p[i + 1]);
+            if (sqr < bestSqr)
+            {
+                bestSqr = sqr;
+                bestSegment = i;
+            }
+        }
+
+        int index = bestSegment + 1;   // 瞄準所在線段的「終點」，不是起點
+
+        // 已經站在該 corner 的抵達半徑內 → 繼續往前推進（原本的行為，保留）
+        while (index < p.Length - 1 && DistanceXZ(pos, p[index]) < waypointArriveRadius)
+            index++;
+
+        return index;
+    }
+
+    /// <summary>點到線段的平方距離（只看水平面，Y 忽略）。開平方很貴，比大小不需要開。</summary>
+    protected static float SqrDistanceToSegmentXZ(Vector3 point, Vector3 a, Vector3 b)
+    {
+        Vector2 p = new Vector2(point.x, point.z);
+        Vector2 s = new Vector2(a.x, a.z);
+        Vector2 e = new Vector2(b.x, b.z);
+
+        Vector2 se = e - s;
+        float lenSqr = se.sqrMagnitude;
+        if (lenSqr < 0.000001f) return (p - s).sqrMagnitude;   // 重複 corner
+
+        float t = Mathf.Clamp01(Vector2.Dot(p - s, se) / lenSqr);
+        return (p - (s + se * t)).sqrMagnitude;
+    }
+
+    protected static float DistanceXZ(Vector3 a, Vector3 b)
+    {
+        float dx = a.x - b.x;
+        float dz = a.z - b.z;
+        return Mathf.Sqrt(dx * dx + dz * dz);
+    }
+
+    /// <summary>
+    /// 現在瞄準的是不是最後一個航點，而且已經到了。
+    /// 用 livePathLength 而不是 path.Length —— 跟 FindNextWaypoint 走的是同一條路徑。
+    /// </summary>
+    protected bool IsAtFinalWaypoint(Vector3 waypoint)
+    {
+        return IsAtFinalWaypoint(DistanceToPoint(waypoint));
+    }
+
+    /// <summary>
+    /// 同上，但由呼叫端自己決定「距離」怎麼量。
+    ///
+    /// ★ 飛行單位（FalconBrain）一定要用這個多載。
+    ///   隼懸停在地面航點上方 10 公尺，3D 距離永遠 ≥ 10，
+    ///   而 waypointArriveRadius 預設是 5 —— 吃 Vector3 的版本對隼永遠回傳 false，
+    ///   抵達判定完全失效（destinationTimer 不會歸零、Retreat 不會進 Combat）。
+    ///   隼要傳入把 Y 歸零之後的水平距離。
+    /// </summary>
+    protected bool IsAtFinalWaypoint(float distanceToWaypoint)
+    {
+        if (livePathLength <= 0) return false;
+        return currentWaypointIndex >= livePathLength - 1
+            && distanceToWaypoint < waypointArriveRadius;
     }
 
     [Header("Path Failure")]
@@ -328,6 +461,7 @@ public class ModularEntityBrain : MonoBehaviour
     {
         if (path != null && path.Length > 0) return true;
 
+        livePathLength = 0;
         modularEntityMovement.HorizontalMovement(0f, 0f);   // 清掉殘留的移動輸入，避免無限滑行
         if (destinationTimer > pathRetryInterval)
             destinationTimer = pathRetryInterval;
@@ -340,18 +474,31 @@ public class ModularEntityBrain : MonoBehaviour
         Vector3[] livePath = pathFinder.GetCurrentWorldPath();
 
         if (livePath == null || livePath.Length == 0)
+        {
+            livePathLength = 0;
             return transform.position;
+        }
+
+        livePathLength = livePath.Length;
 
         // path 可能換過、變短，夾住避免越界
         if (currentWaypointIndex > livePath.Length - 1)
             currentWaypointIndex = livePath.Length - 1;
 
-        // 已經抵達的 corner 就往前推進；到最後一個就停在那，不再 +1（自然不會越界）
-        while (currentWaypointIndex < livePath.Length - 1 &&
-               Vector2.Distance(new Vector2(transform.position.x, transform.position.z), new Vector2(livePath[currentWaypointIndex].x, livePath[currentWaypointIndex].z)) < waypointArriveRadius)
-        {
-            currentWaypointIndex++;
-        }
+        // ★ 舊版只有「距離夠近就 ++」這一條規則，代表實體只能跳過它剛好站在
+        //   5 公尺內的 corner。走太快直接掠過、或 corner 落在身後（重算路徑時的
+        //   sample 吸附），這條規則都不會成立 → 實體轉頭回去撿那個點。
+        //
+        //   改成投影定位：找出自己落在折線的哪一段，瞄準那一段的終點。
+        //   從 currentWaypointIndex - 1（也就是目前所在線段）開始往前找。
+        int resolved = ResolveWaypointIndex(livePath, currentWaypointIndex - 1);
+
+        // 只前進不後退。同一條路徑內索引單調遞增 ——
+        // 折返型路徑（例如繞出去又繞回來）上，前後兩段可能貼得很近，
+        // 沒有這道閘門就會在兩段之間來回跳，看起來又是在原地打轉。
+        // 路徑換掉時由 SetPath 重新定位，不受這道閘門影響。
+        if (resolved > currentWaypointIndex)
+            currentWaypointIndex = resolved;
 
         return livePath[currentWaypointIndex];
     }
@@ -372,7 +519,7 @@ public class ModularEntityBrain : MonoBehaviour
 
             ResetTurretAiming(moveDirection); // 巡邏時砲塔不瞄準，避免亂射
 
-            if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
+            if (IsAtFinalWaypoint(nextWaypoint))
             {
                 destinationTimer = 0f;   // 到達巡邏點 → 下一幀重挑新點（留在 Patrolling）
             }
@@ -418,7 +565,7 @@ public class ModularEntityBrain : MonoBehaviour
 
         ResetTurretAiming(moveDirection); // 巡邏時砲塔不瞄準，避免亂射
 
-        if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
+        if (IsAtFinalWaypoint(nextWaypoint))
         {
             destinationTimer = 0f;   // 到達巡邏點 → 下一幀重挑新點（留在 Patrolling）
         }
@@ -450,7 +597,7 @@ public class ModularEntityBrain : MonoBehaviour
 
         ResetTurretAiming(moveDirection); // 撤退時砲塔不瞄準，避免亂射
 
-        if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
+        if (IsAtFinalWaypoint(nextWaypoint))
         {
             ChangeState(EntityState.Patrolling);   // 撤退到位 → 真正切換狀態
         }
@@ -490,7 +637,7 @@ public class ModularEntityBrain : MonoBehaviour
 
         ResetTurretAiming(moveDirection);   // 追擊時砲塔不瞄準，避免亂射
 
-        if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
+        if (IsAtFinalWaypoint(nextWaypoint))
         {
             destinationTimer = 0f;   // 走完舊路徑但還沒近 → 下一幀用目標當下位置重算（留在 Chasing）
         }
@@ -514,7 +661,7 @@ public class ModularEntityBrain : MonoBehaviour
             Vector3 nextWaypoint = FindNextWaypoint();
             Vector3 moveDirection = nextWaypoint - transform.position;
             moveDirection.y = 0f;
-            if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
+            if (IsAtFinalWaypoint(nextWaypoint))
             {
                 destinationTimer = 0f;   // 到達徘徊點 → 下一幀重挑新徘徊點（留在 Combat）
             }

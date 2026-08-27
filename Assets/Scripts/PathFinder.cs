@@ -10,7 +10,26 @@ public class PathFinder : MonoBehaviour
 
     [SerializeField] private Transform realShipRoot;
     [SerializeField] private Transform ghostShipRoot;
-    float navSampleMaxDistance = 100f; // Maximum distance for NavMesh.SamplePosition
+
+    // ── NavMesh 取樣半徑 ────────────────────────────────────────────
+    //
+    // 原本起點跟終點共用 100f。終點用大半徑是合理的（目標可能站在
+    // NavMesh 外面、在半空、在船的另一層），但起點用大半徑會製造
+    // 「敵人回頭」的 bug：
+    //
+    //   實體是 Rigidbody 驅動的，不是 NavMeshAgent，隨時可能站在
+    //   NavMesh 外面。這時 SamplePosition 會把起點吸附到最近的合法
+    //   位置 —— 通常就在它剛剛走過來的方向 —— 而 CalculatePath 的
+    //   corners[0] 就是那個被吸附的點。等於路徑的第一個航點落在實體
+    //   身後幾十公尺。
+    //
+    // 起點用小半徑：吸不到就寧可走保底直線（BuildFallbackPath），
+    // 那至少方向是對的，而且實體一移動就有機會重新吸附成功。
+    [Tooltip("起點取樣半徑。設小一點，避免起點被吸附到很遠的身後。飛行單位（Falcon）離地高，可能要調大。")]
+    [SerializeField] private float navSampleStartMaxDistance = 10f;
+
+    [Tooltip("終點取樣半徑。可以放寬，目標常常不站在 NavMesh 上。")]
+    [SerializeField] private float navSampleMaxDistance = 100f;
 
     [Header("Debug Gizmo")]
     [SerializeField] private bool drawPathGizmo = true;
@@ -187,7 +206,7 @@ public class PathFinder : MonoBehaviour
         Vector3 navStart = ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, startWorld);
         Vector3 navEnd = ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, endWorld);
 
-        if (!NavMesh.SamplePosition(navStart, out NavMeshHit s, navSampleMaxDistance, NavMesh.AllAreas) ||
+        if (!NavMesh.SamplePosition(navStart, out NavMeshHit s, navSampleStartMaxDistance, NavMesh.AllAreas) ||
             !NavMesh.SamplePosition(navEnd, out NavMeshHit e, navSampleMaxDistance, NavMesh.AllAreas))
         {
             lastPathGhost = System.Array.Empty<Vector3>();
@@ -218,7 +237,7 @@ public class PathFinder : MonoBehaviour
         // 地面路徑：清掉 ghost 快取，避免萬一 lastPathOnShip 判斷有誤時投影到舊資料
         lastPathGhost = System.Array.Empty<Vector3>();
 
-        if (!NavMesh.SamplePosition(startWorld, out NavMeshHit s, navSampleMaxDistance, NavMesh.AllAreas) ||
+        if (!NavMesh.SamplePosition(startWorld, out NavMeshHit s, navSampleStartMaxDistance, NavMesh.AllAreas) ||
             !NavMesh.SamplePosition(endWorld, out NavMeshHit e, navSampleMaxDistance, NavMesh.AllAreas))
             return System.Array.Empty<Vector3>();
 

@@ -58,10 +58,11 @@ public class HeightWatchdog : MonoBehaviour
 
         float drift = y - lastLogY;
         lastLogY = y;
-
+        /*
         Debug.Log(
             $"[HeightWatchdog] rb.y = {y:F4}   transform.y = {transform.position.y:F4}\n" +
             $"  本區間漂移 = {drift:F4} / {logInterval}s      累計 = {(y - startY):F4}\n" +
             $"  vel.y = {rb.linearVelocity.y:F4}   （≈0 卻在漂 = 被傳送；≠0 = 凍結沒生效）", this);
+        */
     }
 }
