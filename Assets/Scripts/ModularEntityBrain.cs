@@ -105,17 +105,6 @@ public class ModularEntityBrain : MonoBehaviour
 
     protected int currentWaypointIndex = 0;
 
-    /// <summary>
-    /// FindNextWaypoint 這一幀實際使用的路徑長度。
-    ///
-    /// ★ 各 Behaviour 原本用 path.Length 判斷「是不是最後一個航點」，但走的是
-    ///   pathFinder.GetCurrentWorldPath() 回傳的即時投影路徑。兩者理論上等長，
-    ///   但那是兩個不同的陣列，只要哪天長度對不上，抵達判定就會失效
-    ///   （永遠不等於 length-1 → destinationTimer 不歸零 → 卡在原地等 timer）。
-    ///   統一由這裡提供長度，兩邊必定一致。
-    /// </summary>
-    protected int livePathLength = 0;
-
     [SerializeField] protected float facingDeadzone = 1f;   // 角度誤差小於此就不轉，避免抖動
 
     protected virtual void Start()
@@ -324,7 +313,6 @@ public class ModularEntityBrain : MonoBehaviour
     protected void SetPath(Vector3[] newPath)
     {
         path = newPath;
-        livePathLength = (newPath != null) ? newPath.Length : 0;
 
         // ★ 這裡就是「敵人重算路徑後會回頭走第一個點」的根源。
         //
@@ -420,31 +408,6 @@ public class ModularEntityBrain : MonoBehaviour
         return Mathf.Sqrt(dx * dx + dz * dz);
     }
 
-    /// <summary>
-    /// 現在瞄準的是不是最後一個航點，而且已經到了。
-    /// 用 livePathLength 而不是 path.Length —— 跟 FindNextWaypoint 走的是同一條路徑。
-    /// </summary>
-    protected bool IsAtFinalWaypoint(Vector3 waypoint)
-    {
-        return IsAtFinalWaypoint(DistanceToPoint(waypoint));
-    }
-
-    /// <summary>
-    /// 同上，但由呼叫端自己決定「距離」怎麼量。
-    ///
-    /// ★ 飛行單位（FalconBrain）一定要用這個多載。
-    ///   隼懸停在地面航點上方 10 公尺，3D 距離永遠 ≥ 10，
-    ///   而 waypointArriveRadius 預設是 5 —— 吃 Vector3 的版本對隼永遠回傳 false，
-    ///   抵達判定完全失效（destinationTimer 不會歸零、Retreat 不會進 Combat）。
-    ///   隼要傳入把 Y 歸零之後的水平距離。
-    /// </summary>
-    protected bool IsAtFinalWaypoint(float distanceToWaypoint)
-    {
-        if (livePathLength <= 0) return false;
-        return currentWaypointIndex >= livePathLength - 1
-            && distanceToWaypoint < waypointArriveRadius;
-    }
-
     [Header("Path Failure")]
     [Tooltip("算不出路徑時多久重試一次（秒）。不要設 0，否則每個 physics step 都會呼叫 NavMesh.CalculatePath。")]
     [SerializeField] protected float pathRetryInterval = 0.25f;
@@ -470,7 +433,6 @@ public class ModularEntityBrain : MonoBehaviour
     {
         if (path != null && path.Length > 0) return true;
 
-        livePathLength = 0;
         modularEntityMovement.HorizontalMovement(0f, 0f);   // 清掉殘留的移動輸入，避免無限滑行
         if (destinationTimer > pathRetryInterval)
             destinationTimer = pathRetryInterval;
@@ -483,12 +445,7 @@ public class ModularEntityBrain : MonoBehaviour
         Vector3[] livePath = pathFinder.GetCurrentWorldPath();
 
         if (livePath == null || livePath.Length == 0)
-        {
-            livePathLength = 0;
             return transform.position;
-        }
-
-        livePathLength = livePath.Length;
 
         // path 可能換過、變短，夾住避免越界
         if (currentWaypointIndex > livePath.Length - 1)
@@ -577,7 +534,7 @@ public class ModularEntityBrain : MonoBehaviour
 
             ResetTurretAiming(moveDirection); // 巡邏時砲塔不瞄準，避免亂射
 
-            if (IsAtFinalWaypoint(nextWaypoint))
+            if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
             {
                 destinationTimer = 0f;   // 到達巡邏點 → 下一幀重挑新點（留在 Patrolling）
             }
@@ -623,7 +580,7 @@ public class ModularEntityBrain : MonoBehaviour
 
         ResetTurretAiming(moveDirection); // 巡邏時砲塔不瞄準，避免亂射
 
-        if (IsAtFinalWaypoint(nextWaypoint))
+        if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
         {
             destinationTimer = 0f;   // 到達巡邏點 → 下一幀重挑新點（留在 Patrolling）
         }
@@ -655,7 +612,7 @@ public class ModularEntityBrain : MonoBehaviour
 
         ResetTurretAiming(moveDirection); // 撤退時砲塔不瞄準，避免亂射
 
-        if (IsAtFinalWaypoint(nextWaypoint))
+        if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
         {
             ChangeState(EntityState.Patrolling);   // 撤退到位 → 真正切換狀態
         }
@@ -695,7 +652,7 @@ public class ModularEntityBrain : MonoBehaviour
 
         ResetTurretAiming(moveDirection);   // 追擊時砲塔不瞄準，避免亂射
 
-        if (IsAtFinalWaypoint(nextWaypoint))
+        if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
         {
             destinationTimer = 0f;   // 走完舊路徑但還沒近 → 下一幀用目標當下位置重算（留在 Chasing）
         }
@@ -719,7 +676,7 @@ public class ModularEntityBrain : MonoBehaviour
             Vector3 nextWaypoint = FindNextWaypoint();
             Vector3 moveDirection = nextWaypoint - transform.position;
             moveDirection.y = 0f;
-            if (IsAtFinalWaypoint(nextWaypoint))
+            if (currentWaypointIndex == path.Length - 1 && DistanceToPoint(nextWaypoint) < waypointArriveRadius)
             {
                 destinationTimer = 0f;   // 到達徘徊點 → 下一幀重挑新徘徊點（留在 Combat）
             }
