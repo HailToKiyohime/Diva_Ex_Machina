@@ -6,7 +6,7 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    [Tooltip("³õ¤Wªº¼Ä¤H¡C°õ¦æ´Á¥Ñ AddEnemy / RemoveEnemy ºûÅ@¡A¸ü¤J³õ´º®É·|¸É±½¤@¦¸ tag¡C")]
+    [Tooltip("å ´ä¸Šçš„æ•µäººã€‚åŸ·è¡ŒæœŸç”± AddEnemy / RemoveEnemy ç¶­è­·ï¼Œè¼‰å…¥å ´æ™¯æ™‚æœƒè£œæƒä¸€æ¬¡ tagã€‚")]
     public List<GameObject> enemies = new List<GameObject>();
 
     [Header("Attack Limiter")]
@@ -14,17 +14,17 @@ public class GameManager : MonoBehaviour
     public int maxSimultaneousAttackers = 3;
 
     [Header("Scan")]
-    [Tooltip("¸É±½³õ´º¼Ä¤H®É¨Ï¥Îªº tag")]
+    [Tooltip("è£œæƒå ´æ™¯æ•µäººæ™‚ä½¿ç”¨çš„ tag")]
     [SerializeField] private string enemyTag = "Enemy";
 
-    // §ï¦s EnemyBrain °Ñ¦Ò¡A¦Ó¤£¬O GetInstanceID()¡C
+    // æ”¹å­˜ EnemyBrain åƒè€ƒï¼Œè€Œä¸æ˜¯ GetInstanceID()ã€‚
     //
-    // ¦s ID ªº°İÃD¡G«ù¦³¦WÃBªº¼Ä¤H³Q¾P·´®É¦pªG¨S©I¥s ReleaseAttackSlot¡]¦º¤`¡B
-    // ³õ´º¨ø¸ü¡B¤§«á±µª«¥ó¦À³Q SetActive(false)¡^¡A¨º­Ó ID ·|¥Ã»·¥d¦b¶°¦X¸Ì¡C
-    // ¤T­Ó¦WÃB³Q¤T°¦¦º±¼ªº¼Ä¤H¦ûº¡¤§«á¡A¥ş³õ¼Ä¤H´N¦A¤]¤£·|¶}¤õ ¡X¡X
-    // ¦Ó¥B§¹¥ş¨S¦³¿ù»~°T®§¡A¥u·|ªí²{¦¨¡u¥´¨ì«á­±¼Ä¤HÅÜ±o«Ü³Q°Ê¡v¡C
+    // å­˜ ID çš„å•é¡Œï¼šæŒæœ‰åé¡çš„æ•µäººè¢«éŠ·æ¯€æ™‚å¦‚æœæ²’å‘¼å« ReleaseAttackSlotï¼ˆæ­»äº¡ã€
+    // å ´æ™¯å¸è¼‰ã€ä¹‹å¾Œæ¥ç‰©ä»¶æ± è¢« SetActive(false)ï¼‰ï¼Œé‚£å€‹ ID æœƒæ°¸é å¡åœ¨é›†åˆè£¡ã€‚
+    // ä¸‰å€‹åé¡è¢«ä¸‰éš»æ­»æ‰çš„æ•µäººä½”æ»¿ä¹‹å¾Œï¼Œå…¨å ´æ•µäººå°±å†ä¹Ÿä¸æœƒé–‹ç« â€”â€”
+    // è€Œä¸”å®Œå…¨æ²’æœ‰éŒ¯èª¤è¨Šæ¯ï¼Œåªæœƒè¡¨ç¾æˆã€Œæ‰“åˆ°å¾Œé¢æ•µäººè®Šå¾—å¾ˆè¢«å‹•ã€ã€‚
     //
-    // ¦s°Ñ¦Ò´N¯à¦b¦WÃB¥Îº¡®É¦^ÀYÀË¬d«ù¦³ªÌÁÙ¦b¤£¦b¡A¦Û°Ê¦^¦¬¡C
+    // å­˜åƒè€ƒå°±èƒ½åœ¨åé¡ç”¨æ»¿æ™‚å›é ­æª¢æŸ¥æŒæœ‰è€…é‚„åœ¨ä¸åœ¨ï¼Œè‡ªå‹•å›æ”¶ã€‚
     private readonly HashSet<EnemyBrain> _attackers = new HashSet<EnemyBrain>();
 
     private void Awake()
@@ -32,7 +32,7 @@ public class GameManager : MonoBehaviour
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);   // Destroy duplicate instances
-            return;                // ¡¹ ­ì¥»¤Ö¤F³o¦æ¡G­«½Æªº¹ê¨Ò·|Ä~Äò¶]¤U­±¾ã¬qªì©l¤Æ
+            return;                // â˜… åŸæœ¬å°‘äº†é€™è¡Œï¼šé‡è¤‡çš„å¯¦ä¾‹æœƒç¹¼çºŒè·‘ä¸‹é¢æ•´æ®µåˆå§‹åŒ–
         }
 
         Instance = this;
@@ -41,28 +41,28 @@ public class GameManager : MonoBehaviour
         _attackers.Clear();
         RefreshEnemyList();
 
-        // DontDestroyOnLoad ¡÷ ´«³õ´º®É Awake ¤£·|¦A¶]¡A¥u¯à¾a³o­Ó¨Æ¥ó¸É¡C
+        // DontDestroyOnLoad â†’ æ›å ´æ™¯æ™‚ Awake ä¸æœƒå†è·‘ï¼Œåªèƒ½é é€™å€‹äº‹ä»¶è£œã€‚
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
     private void OnDestroy()
     {
-        // ³Q¾P·´ªº­«½Æ¹ê¨Ò¤£¸Ó°Ê¨ì¯u¥¿ªº³æ¨Ò
+        // è¢«éŠ·æ¯€çš„é‡è¤‡å¯¦ä¾‹ä¸è©²å‹•åˆ°çœŸæ­£çš„å–®ä¾‹
         if (Instance != this) return;
 
         SceneManager.sceneLoaded -= OnSceneLoaded;
-        Instance = null;   // §_«h Instance ·|«ü¦V¤@­Ó¤w¾P·´ªºª«¥ó
+        Instance = null;   // å¦å‰‡ Instance æœƒæŒ‡å‘ä¸€å€‹å·²éŠ·æ¯€çš„ç‰©ä»¶
     }
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        // ­«¸üÃö¥d®É¦pªG¤£°µ³o¥ó¨Æ¡G
-        //   1. enemies °±¯d¦b²Ä¤@¦¸¶i³õ´ºªºª¬ºA¡A·s³õ´ºªº¼Ä¤H¤@­Ó³£¤£¦b¸Ì­±
-        //   2. ²M³æ¸Ì¶ëº¡¤w¾P·´ª«¥óªºªÅ´ß¡A©Ò¦³¨«³X¥¦ªºµ{¦¡½X³£­n¦Û¤v¨¾ null
-        //   3. ¤W¤@§½«ù¦³§ğÀ»¦WÃBªº¼Ä¤H¤w¸g¤£¦s¦b¡A¦WÃB«oÁÙ³Q¦ûµÛ
+        // é‡è¼‰é—œå¡æ™‚å¦‚æœä¸åšé€™ä»¶äº‹ï¼š
+        //   1. enemies åœç•™åœ¨ç¬¬ä¸€æ¬¡é€²å ´æ™¯çš„ç‹€æ…‹ï¼Œæ–°å ´æ™¯çš„æ•µäººä¸€å€‹éƒ½ä¸åœ¨è£¡é¢
+        //   2. æ¸…å–®è£¡å¡æ»¿å·²éŠ·æ¯€ç‰©ä»¶çš„ç©ºæ®¼ï¼Œæ‰€æœ‰èµ°è¨ªå®ƒçš„ç¨‹å¼ç¢¼éƒ½è¦è‡ªå·±é˜² null
+        //   3. ä¸Šä¸€å±€æŒæœ‰æ”»æ“Šåé¡çš„æ•µäººå·²ç¶“ä¸å­˜åœ¨ï¼Œåé¡å»é‚„è¢«ä½”è‘—
 
         if (mode == LoadSceneMode.Single)
-            _attackers.Clear();   // Å|¥[¸ü¤J¡]UI ³õ´º¤§Ãş¡^¤£¸Ó¼vÅT¶i¦æ¤¤ªº¾Ô°«
+            _attackers.Clear();   // ç–ŠåŠ è¼‰å…¥ï¼ˆUI å ´æ™¯ä¹‹é¡ï¼‰ä¸è©²å½±éŸ¿é€²è¡Œä¸­çš„æˆ°é¬¥
 
         RefreshEnemyList();
     }
@@ -74,18 +74,18 @@ public class GameManager : MonoBehaviour
     public void AddEnemy(GameObject enemy)
     {
         if (enemy == null) return;
-        if (enemies.Contains(enemy)) return;   // ­«½Æµù¥U¡G¨Ò¦p¼Ä¤H¦P®É¦b Awake ©M OnEnable ©I¥s
+        if (enemies.Contains(enemy)) return;   // é‡è¤‡è¨»å†Šï¼šä¾‹å¦‚æ•µäººåŒæ™‚åœ¨ Awake å’Œ OnEnable å‘¼å«
         enemies.Add(enemy);
     }
 
     public void RemoveEnemy(GameObject enemy)
     {
-        // ¨è·N¤£¾× null ¡X¡X ¶Ç¶i¨Óªºª«¥ó¥i¯à¥¿¦b¾P·´¬yµ{¤¤¡]OnDestroy ¸Ì©I¥s¡^¡A
-        // ³o®É­Ô¾×±¼¤Ï¦Ó·|Åı¥¦¯d¦b²M³æ¸Ì
+        // åˆ»æ„ä¸æ“‹ null â€”â€” å‚³é€²ä¾†çš„ç‰©ä»¶å¯èƒ½æ­£åœ¨éŠ·æ¯€æµç¨‹ä¸­ï¼ˆOnDestroy è£¡å‘¼å«ï¼‰ï¼Œ
+        // é€™æ™‚å€™æ“‹æ‰åè€Œæœƒè®“å®ƒç•™åœ¨æ¸…å–®è£¡
         enemies.Remove(enemy);
     }
 
-    /// <summary>¨ú±o¼Ä¤H²M³æ¡C¦^¶Ç«e·|¥ı²M±¼¤w¾P·´ªº¶µ¥Ø¡C</summary>
+    /// <summary>å–å¾—æ•µäººæ¸…å–®ã€‚å›å‚³å‰æœƒå…ˆæ¸…æ‰å·²éŠ·æ¯€çš„é …ç›®ã€‚</summary>
     public List<GameObject> GetEnemies()
     {
         PruneEnemies();
@@ -93,10 +93,10 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// ²M±¼¤w¾P·´ªº¶µ¥Ø¡A¦A¸É±½³õ´º¤W±a tag ªº¼Ä¤H¡C
-    /// ¥Î¡u¦X¨Ö¡v¦Ó¤£¬O¡u­««Ø¡v¡X¡X
-    /// ¸}¥»°õ¦æ¶¶§Ç¤£«OÃÒ¡A¼Ä¤H¥i¯à¤w¸g¦b¦Û¤vªº Awake ¸Ì¥ı©I¥s¹L AddEnemy¡A
-    /// ­ì¥»ªº enemies = new List<>(FindGameObjectsWithTag(...)) ·|§â¨º¨Çµù¥U»\±¼¡C
+    /// æ¸…æ‰å·²éŠ·æ¯€çš„é …ç›®ï¼Œå†è£œæƒå ´æ™¯ä¸Šå¸¶ tag çš„æ•µäººã€‚
+    /// ç”¨ã€Œåˆä½µã€è€Œä¸æ˜¯ã€Œé‡å»ºã€â€”â€”
+    /// è…³æœ¬åŸ·è¡Œé †åºä¸ä¿è­‰ï¼Œæ•µäººå¯èƒ½å·²ç¶“åœ¨è‡ªå·±çš„ Awake è£¡å…ˆå‘¼å«é AddEnemyï¼Œ
+    /// åŸæœ¬çš„ enemies = new List<>(FindGameObjectsWithTag(...)) æœƒæŠŠé‚£äº›è¨»å†Šè“‹æ‰ã€‚
     /// </summary>
     public void RefreshEnemyList()
     {
@@ -114,7 +114,7 @@ public class GameManager : MonoBehaviour
 
     private void PruneEnemies()
     {
-        // ­ËµÛ¨«¡ARemoveAt ¤~¤£·|¸õ¹L¤¸¯À
+        // å€’è‘—èµ°ï¼ŒRemoveAt æ‰ä¸æœƒè·³éå…ƒç´ 
         for (int i = enemies.Count - 1; i >= 0; i--)
         {
             if (enemies[i] == null) enemies.RemoveAt(i);
@@ -133,7 +133,7 @@ public class GameManager : MonoBehaviour
 
         int cap = Mathf.Max(0, maxSimultaneousAttackers);
 
-        // ¥u¦b¬İ°_¨ÓÃBº¡®É¤~²M²z ¡X¡X ¶°¦X³Ì¦h´N maxSimultaneousAttackers ­Ó¡A«Ü«K©y
+        // åªåœ¨çœ‹èµ·ä¾†é¡æ»¿æ™‚æ‰æ¸…ç† â€”â€” é›†åˆæœ€å¤šå°± maxSimultaneousAttackers å€‹ï¼Œå¾ˆä¾¿å®œ
         if (_attackers.Count >= cap)
         {
             PruneAttackers();
@@ -148,7 +148,7 @@ public class GameManager : MonoBehaviour
     {
         if (brain == null)
         {
-            // ³s¬O½Ö³£¤£ª¾¹D¡]©I¥sºİªº°Ñ¦Ò¤w¸g¥¢®Ä¡^¡÷ ¾ã§å²M¤@¦¸¡A¦Ü¤Ö¤£·|¥d¦í¦WÃB
+            // é€£æ˜¯èª°éƒ½ä¸çŸ¥é“ï¼ˆå‘¼å«ç«¯çš„åƒè€ƒå·²ç¶“å¤±æ•ˆï¼‰â†’ æ•´æ‰¹æ¸…ä¸€æ¬¡ï¼Œè‡³å°‘ä¸æœƒå¡ä½åé¡
             PruneAttackers();
             return;
         }
@@ -156,7 +156,7 @@ public class GameManager : MonoBehaviour
         _attackers.Remove(brain);
     }
 
-    /// <summary>¥Ø«e¥¿¦b§ğÀ»ªº¼Ä¤H¼Æ¶q¡C</summary>
+    /// <summary>ç›®å‰æ­£åœ¨æ”»æ“Šçš„æ•µäººæ•¸é‡ã€‚</summary>
     public int CurrentAttackersCount
     {
         get
@@ -166,9 +166,20 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    /// <summary>«ù¦³ªÌ¤w³Q¾P·´©Î°±¥Î ¡÷ ¦¬¦^¦WÃB¡C°±¥Î¤¤ªº¼Ä¤H©w¸q¤W¤£¥i¯à¦b§ğÀ»¡C</summary>
+    /// <summary>æŒæœ‰è€…å·²è¢«éŠ·æ¯€æˆ–åœç”¨ â†’ æ”¶å›åé¡ã€‚åœç”¨ä¸­çš„æ•µäººå®šç¾©ä¸Šä¸å¯èƒ½åœ¨æ”»æ“Šã€‚</summary>
+    private int _pruneFrame = -1;
+
     private void PruneAttackers()
     {
+        // åŒä¸€å¹€åªæ¸…ä¸€æ¬¡ã€‚
+        //
+        // åé¡æ»¿äº†ä¹‹å¾Œï¼ˆcap é è¨­ 3ï¼‰ï¼Œæ¯å€‹æ¶ä¸åˆ°åé¡çš„æ•µäººæ¯æ¬¡å‘¼å«
+        // TryClaimAttackSlot éƒ½æœƒè§¸ç™¼ä¸€æ¬¡å®Œæ•´çš„ RemoveWhereï¼Œè€Œ
+        // isActiveAndEnabled æ˜¯ native å‘¼å«ã€‚100 éš»æ•µäººè¼ªè©¢å°±æ˜¯æ¯å¹€
+        // 300 æ¬¡ native callï¼Œç¬¬ä¸€æ¬¡ä¹‹å¾Œå…¨éƒ¨æ˜¯ç™½åšçš„ã€‚
+        if (_pruneFrame == Time.frameCount) return;
+        _pruneFrame = Time.frameCount;
+
         _attackers.RemoveWhere(b => b == null || !b.isActiveAndEnabled);
     }
 }

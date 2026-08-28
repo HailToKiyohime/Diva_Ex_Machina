@@ -8,7 +8,7 @@
 ///   ModularEntityMovement（要不要疊平台速度）  ← GetMobilePlatformVelocity
 ///
 /// ⚠ 這個元件必須跟實體的 collider 掛在同一個 GameObject 上，否則收不到 trigger 訊息。
-/// </summary>
+/// </summary>  
 public class ShipPassenger : MonoBehaviour
 {
     [SerializeField] private string platformTag = "Mobile Platform Hitbox";
@@ -62,7 +62,7 @@ public class ShipPassenger : MonoBehaviour
 
     private void OnTriggerStay(Collider other)
     {
-        Debug.Log("other: " + other.name + "tag" + other.tag);
+        //Debug.Log("other: " + other.name + "tag" + other.tag);
         if (other == null) return;
         if (!other.CompareTag(platformTag)) return;
 

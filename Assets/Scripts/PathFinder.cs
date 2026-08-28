@@ -10,7 +10,7 @@ public class PathFinder : MonoBehaviour
 
     [SerializeField] private Transform realShipRoot;
     [SerializeField] private Transform ghostShipRoot;
-    float navSampleMaxDistance = 100f; // Maximum distance for NavMesh.SamplePosition
+    float navSampleMaxDistance = 30f; // Maximum distance for NavMesh.SamplePosition
 
     [Header("Debug Gizmo")]
     [SerializeField] private bool drawPathGizmo = true;
