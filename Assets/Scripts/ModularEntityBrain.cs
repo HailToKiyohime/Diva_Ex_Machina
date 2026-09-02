@@ -93,6 +93,14 @@ public class ModularEntityBrain : MonoBehaviour
     [MinMaxSlider(0f, 15f)]
     public Vector2 dockDestinationUpdateRange = new Vector2(0.1f, 0.3f);
 
+    [Header("Attack Slot")]
+    [Tooltip("持有攻擊名額的時間上限（秒）。逾時交還名額，並把第一、第二優先目標的優先度對調，讓這隻敵人改打另一個。\n" +
+             "0 = 不設上限（拿到就一直持有到死亡為止）。")]
+    public float attackSlotHoldSeconds = 8f;
+
+    private bool _hasAttackSlot;
+    private float _attackSlotExpireTime;
+
     protected float destinationTimer;
 
     private readonly Dictionary<TargetType, float> decayMultiplierByType = new Dictionary<TargetType, float>();
@@ -121,6 +129,7 @@ public class ModularEntityBrain : MonoBehaviour
 
     public virtual void FixedUpdate()
     {
+        AttackSlotUpdate();
         PriorityUpdate();
         PathUpdate();
         StateBehaviour();
@@ -720,6 +729,11 @@ public class ModularEntityBrain : MonoBehaviour
     // 每座砲塔用「自己的彈速」算自己的攔截點
     protected virtual void UpdateTurretAiming(Transform target, Vector3 targetVelocity)
     {
+        // ★ 攻擊名額只擋「開火」，不擋瞄準。
+        //   拿不到名額的敵人照常走位、照常把砲塔轉向目標，只是不扣扳機。
+        //   狀態機、路徑、移動邏輯完全不受影響。
+        bool mayFire = TryAcquireAttackSlot();
+
         for (int i = 0; i < turrets.Length; i++)
         {
             TurretController turret = turrets[i];
@@ -734,17 +748,111 @@ public class ModularEntityBrain : MonoBehaviour
                     out Vector3 interceptPoint))
             {
                 turret.targetLocation = interceptPoint;
-                if (turret.HasLineOfSightTo(target))
+                if (mayFire && turret.HasLineOfSightTo(target))
                     turret.Shoot();
             }
             else
             {
                 // 解不出攔截（目標太快/彈太慢）→ 退回直接瞄準現在位置
                 turret.targetLocation = target.position;
-                if (turret.HasLineOfSightTo(target))
+                if (mayFire && turret.HasLineOfSightTo(target))
                     turret.Shoot();   // 直瞄退路也一樣:看得到就打
             }
         }
+    }
+
+    // ═══════════════════════ 攻擊名額 ═══════════════════════
+    //
+    // GameManager.maxSimultaneousAttackers 限制「同時開火」的敵人數量。
+    //
+    // 那組 API 原本收的型別是 EnemyBrain，而場上跑的是 ModularEntityBrain ——
+    // 兩套系統從來沒接上，所以那個上限一直是空轉的。
+    //
+    // 名額只擋 UpdateTurretAiming 裡的 turret.Shoot()。移動、路徑、狀態轉換
+    // 一律不受影響：拿不到名額的敵人照樣圍上來、照樣把砲塔轉向目標，只是不開火。
+
+    /// <summary>
+    /// 取得或續用攻擊名額。沒有 GameManager 時一律放行，維持沒有限制器的舊行為。
+    /// </summary>
+    protected bool TryAcquireAttackSlot()
+    {
+        if (_hasAttackSlot) return true;
+
+        GameManager gm = GameManager.Instance;
+        if (gm == null) return true;
+
+        if (!gm.TryClaimAttackSlot(this)) return false;
+
+        _hasAttackSlot = true;
+        _attackSlotExpireTime = Time.time + Mathf.Max(0f, attackSlotHoldSeconds);
+        return true;
+    }
+
+    /// <summary>交還名額。沒有持有時是 no-op。</summary>
+    protected void ReleaseAttackSlot()
+    {
+        if (!_hasAttackSlot) return;
+        _hasAttackSlot = false;
+
+        GameManager gm = GameManager.Instance;
+        if (gm != null) gm.ReleaseAttackSlot(this);
+    }
+
+    /// <summary>
+    /// 持有逾時 → 交還名額，並把第一、第二優先目標的優先度對調。
+    ///
+    /// 為什麼要在 FixedUpdate 每幀檢查，而不是在 TryAcquireAttackSlot 裡順便看：
+    /// 敵人離開戰鬥（目標消失、切回 Chasing / Patrolling）之後就不會再呼叫
+    /// UpdateTurretAiming，逾時判定永遠不會被執行 → 名額會被一隻根本沒在打架的
+    /// 敵人佔到死為止，其他人全部啞火。
+    ///
+    /// 這個方法只動名額與目標優先度，不碰移動、路徑、狀態。
+    /// </summary>
+    private void AttackSlotUpdate()
+    {
+        if (!_hasAttackSlot) return;
+        if (attackSlotHoldSeconds <= 0f) return;          // 0 = 不設上限
+        if (Time.time < _attackSlotExpireTime) return;
+
+        ReleaseAttackSlot();
+        SwapTopTwoTargetPriorities();
+    }
+
+    /// <summary>
+    /// 把最高與次高優先度的兩個目標「互換優先度數值」，讓這隻敵人改打另一個。
+    ///
+    /// ★ 交換的是 targetPriority 的「值」，不是它們在 targets 清單裡的位置。
+    ///   FindTarget() 是掃全清單挑 targetPriority 最大的那個，跟索引完全無關 ——
+    ///   交換位置不會有任何效果。
+    ///
+    /// 有效目標少於兩個時什麼都不做（IsTargetUsable 會濾掉已銷毀與停用的）。
+    /// </summary>
+    protected virtual void SwapTopTwoTargetPriorities()
+    {
+        Target first = null;
+        Target second = null;
+
+        for (int i = 0; i < targets.Count; i++)
+        {
+            Target t = targets[i];
+            if (!IsTargetUsable(t)) continue;
+
+            if (first == null || t.targetPriority > first.targetPriority)
+            {
+                second = first;
+                first = t;
+            }
+            else if (second == null || t.targetPriority > second.targetPriority)
+            {
+                second = t;
+            }
+        }
+
+        if (first == null || second == null) return;   // 有效目標不到兩個
+
+        float tmp = first.targetPriority;
+        first.targetPriority = second.targetPriority;
+        second.targetPriority = tmp;
     }
 
     //將每座砲塔轉向實體的移動方向（砲管放平）；沒有移動方向時退回中立朝向

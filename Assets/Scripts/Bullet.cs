@@ -439,11 +439,46 @@ public class Bullet : MonoBehaviour, IPooled
         return (enemyLayer.value & bit) != 0;
     }
 
-    private int GetPredictMask()
+    // ═══════════════ 命中過濾：單一真相來源 ═══════════════
+    //
+    // 舊版有兩套獨立的過濾，必須手動保持一致：
+    //
+    //   Predict()             → GetPredictMask() & ~ignoreLayer.value，餵給 Physics.Linecast
+    //   OnTriggerEnterFixed() → IsInIgnoreLayer / ignoreObstacles 兩個早期 return
+    //
+    // 而且它們的底層機制根本不同：
+    //   Physics.Linecast 是 query，只吃 layerMask，完全不看 Layer Collision Matrix。
+    //   OnTriggerEnter   則是由矩陣決定會不會被呼叫。
+    //
+    // 結果是「矩陣裡關掉的組合，Predict 照樣打得到」—— 子彈會在預測階段被一個
+    // OnTriggerEnter 永遠不會回報的東西殺掉，表現成子彈莫名其妙消失。
+    //
+    // 現在兩邊都從 BuildReactMask() 導出，不可能再不同步。
+
+    /// <summary>
+    /// 這顆子彈「應該有反應」的層遮罩。
+    ///
+    /// Predict 直接拿它當 Linecast 的 layerMask，
+    /// OnTriggerEnterFixed 透過 ShouldReactTo 拿它做早期 return。
+    ///
+    /// 注意這回答的是「要不要理會這個碰撞體」，不是「這是不是可以傷害的目標」。
+    /// 後者仍然由 IsInEnemyLayer + IDamageable 判斷。
+    /// </summary>
+    protected int BuildReactMask()
     {
         int notBullet = ~LayerMask.GetMask("Bullet");
+
+        // ignoreObstacles = true → 只對 enemyLayer 有反應，其餘一律穿過
         int mask = ignoreObstacles ? enemyLayer.value : notBullet;
-        return mask & notBullet;
+
+        return mask & notBullet & ~ignoreLayer.value;
+    }
+
+    /// <summary>單一 collider 版本，語意跟 BuildReactMask 完全一致。</summary>
+    protected bool ShouldReactTo(Collider col)
+    {
+        if (col == null) return false;
+        return (BuildReactMask() & (1 << col.gameObject.layer)) != 0;
     }
 
     /// <summary>
@@ -461,7 +496,7 @@ public class Bullet : MonoBehaviour, IPooled
         Vector3 from = transform.position;
         Vector3 to = from + rb.linearVelocity * Time.fixedDeltaTime;
 
-        int layerMask = GetPredictMask() & ~ignoreLayer.value;
+        int layerMask = BuildReactMask();
         if (Physics.Linecast(from, to, out RaycastHit hit, layerMask))
         {
             transform.position = hit.point;
@@ -697,16 +732,14 @@ public class Bullet : MonoBehaviour, IPooled
 
     protected virtual void OnTriggerEnterFixed(Collider other)
     {
-        //Debug.Log("Bullet hit: " + other.name);
+        Debug.Log($"Bullet hit: {other.name} / layer={LayerMask.LayerToName(other.gameObject.layer)}");
         if (!_live) return;
         if (other == null) return;
 
-        // Ignore specified layers
-        if (IsInIgnoreLayer(other))
-            return;
-
-        // ignoreObstacles => only react to enemyLayer
-        if (ignoreObstacles && !IsInEnemyLayer(other))
+        // ★ 共用過濾：跟 Predict 的 Linecast layerMask 是同一個來源。
+        //   舊版這裡是兩個獨立的早期 return（IsInIgnoreLayer + ignoreObstacles），
+        //   跟 Predict 的遮罩各算各的。
+        if (!ShouldReactTo(other))
             return;
 
         // 可被傷害的目標？（不再綁死 EnemyStats，改認 IDamageable 介面）
@@ -770,14 +803,8 @@ public class Bullet : MonoBehaviour, IPooled
         Despawn();
     }
 
-    private bool IsInIgnoreLayer(Collider col)
-    {
-        if (col == null)
-        {
-            return false;
-        }
-        return (ignoreLayer.value & (1 << col.gameObject.layer)) != 0;
-    }
+    // IsInIgnoreLayer 已移除 —— 它是舊的第二套過濾，唯一的呼叫點已改用
+    // ShouldReactTo。留著它只會讓人日後不小心又寫出跟 Predict 不同步的判斷。
 
 #if UNITY_EDITOR
     private void OnDrawGizmosSelected()

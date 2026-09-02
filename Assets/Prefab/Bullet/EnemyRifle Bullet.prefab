@@ -102,11 +102,11 @@ MonoBehaviour:
   coldDamage: 0
   criticalChance: 0.05
   criticalMultiplier: 1.5
-  lifespan: 5
+  lifespan: 10
   rb: {fileID: 0}
   ignoreLayer:
     serializedVersion: 2
-    m_Bits: 81920
+    m_Bits: 249591
   enemyLayer:
     serializedVersion: 2
     m_Bits: 8448
@@ -212,7 +212,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Time
-      value: 0.05
+      value: 0.1
       objectReference: {fileID: 0}
     - target: {fileID: 8059352469836347630, guid: 2c22babe6998d7745911dcd72fece9af, type: 3}
       propertyPath: m_Parameters.widthCurve.m_Curve.Array.size

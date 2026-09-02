@@ -17,7 +17,7 @@ public class GameManager : MonoBehaviour
     [Tooltip("補掃場景敵人時使用的 tag")]
     [SerializeField] private string enemyTag = "Enemy";
 
-    // 改存 EnemyBrain 參考，而不是 GetInstanceID()。
+    // 改存 ModularEntityBrain 參考，而不是 GetInstanceID()。
     //
     // 存 ID 的問題：持有名額的敵人被銷毀時如果沒呼叫 ReleaseAttackSlot（死亡、
     // 場景卸載、之後接物件池被 SetActive(false)），那個 ID 會永遠卡在集合裡。
@@ -25,7 +25,7 @@ public class GameManager : MonoBehaviour
     // 而且完全沒有錯誤訊息，只會表現成「打到後面敵人變得很被動」。
     //
     // 存參考就能在名額用滿時回頭檢查持有者還在不在，自動回收。
-    private readonly HashSet<EnemyBrain> _attackers = new HashSet<EnemyBrain>();
+    private readonly HashSet<ModularEntityBrain> _attackers = new HashSet<ModularEntityBrain>();
 
     private void Awake()
     {
@@ -122,10 +122,10 @@ public class GameManager : MonoBehaviour
     }
 
     // ============================
-    // Attack slot API (called by EnemyBrain)
+    // Attack slot API (called by ModularEntityBrain)
     // ============================
 
-    public bool TryClaimAttackSlot(EnemyBrain brain)
+    public bool TryClaimAttackSlot(ModularEntityBrain brain)
     {
         if (brain == null) return false;
 
@@ -144,7 +144,7 @@ public class GameManager : MonoBehaviour
         return true;
     }
 
-    public void ReleaseAttackSlot(EnemyBrain brain)
+    public void ReleaseAttackSlot(ModularEntityBrain brain)
     {
         if (brain == null)
         {
