@@ -104,10 +104,9 @@ MonoBehaviour:
   criticalMultiplier: 1.5
   lifespan: 5
   rb: {fileID: 0}
-  isMelee: 0
   ignoreLayer:
     serializedVersion: 2
-    m_Bits: 82176
+    m_Bits: 247040
   enemyLayer:
     serializedVersion: 2
     m_Bits: 512

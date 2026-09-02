@@ -104,14 +104,26 @@ MonoBehaviour:
   criticalMultiplier: 1.5
   lifespan: 5
   rb: {fileID: 0}
-  isMelee: 0
   ignoreLayer:
     serializedVersion: 2
-    m_Bits: 16640
+    m_Bits: 82176
   enemyLayer:
     serializedVersion: 2
     m_Bits: 512
   ignoreObstacles: 0
+  homingDegreePerSecond: 0
+  homingRange: 30
+  homingSearchAngle: 40
+  homingLoseAngle: 90
+  maxHomingAngle: 120
+  retargetInterval: 0.15
+  homingRequireLineOfSight: 0
+  homingObstacleLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  alignToVelocity: 1
+  homingStartDelay: 0
+  lockAssignedTarget: 1
   penetration: 0
   meleeImpactOwnerAnim: {fileID: 0}
 --- !u!1001 &8511368318867935596
