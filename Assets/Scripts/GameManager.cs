@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.Serialization;
 
 public class GameManager : MonoBehaviour
 {
@@ -10,13 +11,17 @@ public class GameManager : MonoBehaviour
     public List<GameObject> enemies = new List<GameObject>();
 
     [Header("Attack Limiter")]
-    [Tooltip("Max number of enemies allowed to ATTACK (shoot / deal ranged damage) at the same time")]
-    public int maxSimultaneousAttackers = 3;
+    [Tooltip("單一目標最多能同時被幾隻敵人鎖定開火。\n" +
+             "這是「每個目標」各自計算的，不是全場總量 —— 玩家、船、Core 各有各的額度。")]
+    [FormerlySerializedAs("maxSimultaneousAttackers")]
+    public int maxAttackersPerTarget = 3;
 
     [Header("Scan")]
     [Tooltip("補掃場景敵人時使用的 tag")]
     [SerializeField] private string enemyTag = "Enemy";
 
+    // 目標 → 正在鎖定它的敵人。名額是「每個目標」各自一組。
+    //
     // 改存 ModularEntityBrain 參考，而不是 GetInstanceID()。
     //
     // 存 ID 的問題：持有名額的敵人被銷毀時如果沒呼叫 ReleaseAttackSlot（死亡、
@@ -25,7 +30,11 @@ public class GameManager : MonoBehaviour
     // 而且完全沒有錯誤訊息，只會表現成「打到後面敵人變得很被動」。
     //
     // 存參考就能在名額用滿時回頭檢查持有者還在不在，自動回收。
-    private readonly HashSet<ModularEntityBrain> _attackers = new HashSet<ModularEntityBrain>();
+    private readonly Dictionary<Transform, HashSet<ModularEntityBrain>> _attackersByTarget =
+        new Dictionary<Transform, HashSet<ModularEntityBrain>>();
+
+    // PruneAttackers 用的暫存，避免每次清理都配置一個新 List
+    private readonly List<Transform> _emptyKeyBuffer = new List<Transform>();
 
     private void Awake()
     {
@@ -38,7 +47,7 @@ public class GameManager : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
-        _attackers.Clear();
+        _attackersByTarget.Clear();
         RefreshEnemyList();
 
         // DontDestroyOnLoad → 換場景時 Awake 不會再跑，只能靠這個事件補。
@@ -62,7 +71,7 @@ public class GameManager : MonoBehaviour
         //   3. 上一局持有攻擊名額的敵人已經不存在，名額卻還被佔著
 
         if (mode == LoadSceneMode.Single)
-            _attackers.Clear();   // 疊加載入（UI 場景之類）不該影響進行中的戰鬥
+            _attackersByTarget.Clear();   // 疊加載入（UI 場景之類）不該影響進行中的戰鬥
 
         RefreshEnemyList();
     }
@@ -125,26 +134,39 @@ public class GameManager : MonoBehaviour
     // Attack slot API (called by ModularEntityBrain)
     // ============================
 
-    public bool TryClaimAttackSlot(ModularEntityBrain brain)
+    /// <summary>
+    /// 針對某個目標取得一個攻擊名額。已經持有時直接回傳 true。
+    /// </summary>
+    public bool TryClaimAttackSlot(ModularEntityBrain brain, Transform target)
     {
-        if (brain == null) return false;
+        if (brain == null || target == null) return false;
 
-        if (_attackers.Contains(brain)) return true;   // already has a slot
+        HashSet<ModularEntityBrain> set = GetOrCreateSet(target);
 
-        int cap = Mathf.Max(0, maxSimultaneousAttackers);
+        if (set.Contains(brain)) return true;   // already has a slot on this target
 
-        // 只在看起來額滿時才清理 —— 集合最多就 maxSimultaneousAttackers 個，很便宜
-        if (_attackers.Count >= cap)
+        int cap = Mathf.Max(0, maxAttackersPerTarget);
+
+        // 只在看起來額滿時才清理 —— 每個目標最多就 cap 個，很便宜
+        if (set.Count >= cap)
         {
             PruneAttackers();
-            if (_attackers.Count >= cap) return false;
+
+            // PruneAttackers 可能把這個目標整組移除（全部持有者都失效了），
+            // 所以要重新取一次，不能沿用上面那個可能已經被丟棄的參考。
+            set = GetOrCreateSet(target);
+            if (set.Count >= cap) return false;
         }
 
-        _attackers.Add(brain);
+        set.Add(brain);
         return true;
     }
 
-    public void ReleaseAttackSlot(ModularEntityBrain brain)
+    /// <summary>
+    /// 交還名額。target 傳的是「當初claim 時的那個目標」——
+    /// 呼叫端（ModularEntityBrain）自己記著，因為它可能已經換目標了。
+    /// </summary>
+    public void ReleaseAttackSlot(ModularEntityBrain brain, Transform target)
     {
         if (brain == null)
         {
@@ -153,17 +175,34 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        _attackers.Remove(brain);
+        if (target != null && _attackersByTarget.TryGetValue(target, out HashSet<ModularEntityBrain> set))
+        {
+            set.Remove(brain);
+            if (set.Count == 0) _attackersByTarget.Remove(target);
+            return;
+        }
+
+        // 目標已被銷毀，或對不上任何一組 → 全表清一次，不留孤兒
+        PruneAttackers();
     }
 
-    /// <summary>目前正在攻擊的敵人數量。</summary>
-    public int CurrentAttackersCount
+    /// <summary>某個目標目前被幾隻敵人鎖定。</summary>
+    public int GetAttackerCount(Transform target)
     {
-        get
+        if (target == null) return 0;
+
+        PruneAttackers();
+        return _attackersByTarget.TryGetValue(target, out HashSet<ModularEntityBrain> set) ? set.Count : 0;
+    }
+
+    private HashSet<ModularEntityBrain> GetOrCreateSet(Transform target)
+    {
+        if (!_attackersByTarget.TryGetValue(target, out HashSet<ModularEntityBrain> set))
         {
-            PruneAttackers();
-            return _attackers.Count;
+            set = new HashSet<ModularEntityBrain>();
+            _attackersByTarget[target] = set;
         }
+        return set;
     }
 
     /// <summary>持有者已被銷毀或停用 → 收回名額。停用中的敵人定義上不可能在攻擊。</summary>
@@ -173,13 +212,32 @@ public class GameManager : MonoBehaviour
     {
         // 同一幀只清一次。
         //
-        // 名額滿了之後（cap 預設 3），每個搶不到名額的敵人每次呼叫
-        // TryClaimAttackSlot 都會觸發一次完整的 RemoveWhere，而
-        // isActiveAndEnabled 是 native 呼叫。100 隻敵人輪詢就是每幀
-        // 300 次 native call，第一次之後全部是白做的。
+        // 名額滿了之後，每個搶不到名額的敵人每次呼叫 TryClaimAttackSlot 都會
+        // 觸發一次完整清理，而 isActiveAndEnabled 是 native 呼叫。
+        // 100 隻敵人輪詢就是每幀幾百次 native call，第一次之後全部是白做的。
         if (_pruneFrame == Time.frameCount) return;
         _pruneFrame = Time.frameCount;
 
-        _attackers.RemoveWhere(b => b == null || !b.isActiveAndEnabled);
+        _emptyKeyBuffer.Clear();
+
+        foreach (KeyValuePair<Transform, HashSet<ModularEntityBrain>> kv in _attackersByTarget)
+        {
+            // 目標本身被銷毀 → 整組回收（Unity 的假 null 會走 == 多載，判得出來）
+            if (kv.Key == null)
+            {
+                _emptyKeyBuffer.Add(kv.Key);
+                continue;
+            }
+
+            kv.Value.RemoveWhere(b => b == null || !b.isActiveAndEnabled);
+
+            if (kv.Value.Count == 0) _emptyKeyBuffer.Add(kv.Key);
+        }
+
+        // 不能在 foreach 裡改字典，所以收集完再刪
+        for (int i = 0; i < _emptyKeyBuffer.Count; i++)
+            _attackersByTarget.Remove(_emptyKeyBuffer[i]);
+
+        _emptyKeyBuffer.Clear();
     }
 }

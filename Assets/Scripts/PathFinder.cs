@@ -8,8 +8,45 @@ public class PathFinder : MonoBehaviour
     public bool isOnShip = false;
     private NavMeshPath path;
 
+    // ── 船的 root：序列化欄位是「覆寫」，留空就走 LandshipNavigation ──────
+    //
+    // Prefab 存不了場景物件的引用，所以任何在執行期 Instantiate 出來的敵人
+    // （EnemySpawner 生的、物件池生的）這兩個欄位必然是 None。
+    // 一旦 SyncShipFlags 把 isOnShip / isTargetOnShip 設成 true，
+    // ShipNavProjector 就會拿 null 去做投影 → NRE → FixedUpdate 中斷 →
+    // 那隻敵人連移動都停掉。症狀是「平常正常，一靠近船整個 AI 死掉」。
+    //
+    // 改成優先讀欄位、留空才退回 singleton：
+    // 場景裡已經指好的實例行為完全不變，prefab 生出來的自動拿到正確引用，
+    // 生成端（EnemySpawner）一行都不用改。
+    [Tooltip("留空會用 LandshipNavigation.Instance.realShip。只有需要指向別艘船時才填。")]
     [SerializeField] private Transform realShipRoot;
+
+    [Tooltip("留空會用 LandshipNavigation.Instance.ghostShip。只有需要指向別艘船時才填。")]
     [SerializeField] private Transform ghostShipRoot;
+
+    private Transform RealShipRoot
+    {
+        get
+        {
+            if (realShipRoot != null) return realShipRoot;
+            LandshipNavigation nav = LandshipNavigation.Instance;
+            return (nav != null) ? nav.realShip : null;
+        }
+    }
+
+    private Transform GhostShipRoot
+    {
+        get
+        {
+            if (ghostShipRoot != null) return ghostShipRoot;
+            LandshipNavigation nav = LandshipNavigation.Instance;
+            return (nav != null) ? nav.ghostShip : null;
+        }
+    }
+
+    /// <summary>兩個 root 都拿得到才能做投影。</summary>
+    private bool HasShipRoots => RealShipRoot != null && GhostShipRoot != null;
     float navSampleMaxDistance = 30f; // Maximum distance for NavMesh.SamplePosition
 
     [Header("Debug Gizmo")]
@@ -73,7 +110,7 @@ public class PathFinder : MonoBehaviour
                 var extendedGhost = new Vector3[lastPathGhost.Length + 1];
                 lastPathGhost.CopyTo(extendedGhost, 0);
                 extendedGhost[extendedGhost.Length - 1] =
-                    ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, exitPoint);
+                    ShipNavProjector.RealToGhostPoint(RealShipRoot, GhostShipRoot, exitPoint);
                 lastPathGhost = extendedGhost;
             }
             else
@@ -117,13 +154,13 @@ public class PathFinder : MonoBehaviour
     {
         LastPathIsFallback = true;
 
-        if (ghostSpace)
+        if (ghostSpace && HasShipRoots)
         {
             // 船上的保底點也要存 ghost 空間，GetCurrentWorldPath 才會每幀跟著船投影
             lastPathOnShip = true;
             lastPathGhost = new Vector3[]
             {
-                ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, endWorld)
+                ShipNavProjector.RealToGhostPoint(RealShipRoot, GhostShipRoot, endWorld)
             };
         }
         else
@@ -141,12 +178,12 @@ public class PathFinder : MonoBehaviour
         if (!lastPathOnShip)
             return lastPath;   // 地面路徑不會動，世界座標本來就不 stale
 
-        if (lastPathGhost == null || lastPathGhost.Length == 0)
+        if (lastPathGhost == null || lastPathGhost.Length == 0 || !HasShipRoots)
             return System.Array.Empty<Vector3>();
 
         var outArr = new Vector3[lastPathGhost.Length];
         for (int i = 0; i < lastPathGhost.Length; i++)
-            outArr[i] = ShipNavProjector.GhostToRealPoint(realShipRoot, ghostShipRoot, lastPathGhost[i]);
+            outArr[i] = ShipNavProjector.GhostToRealPoint(RealShipRoot, GhostShipRoot, lastPathGhost[i]);
         return outArr;
     }
 
@@ -184,8 +221,16 @@ public class PathFinder : MonoBehaviour
 
     private Vector3[] ComputeGhostPath(Vector3 startWorld, Vector3 endWorld)
     {
-        Vector3 navStart = ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, startWorld);
-        Vector3 navEnd = ShipNavProjector.RealToGhostPoint(realShipRoot, ghostShipRoot, endWorld);
+        // 兩個 root 都拿不到（場景沒有 LandshipNavigation、或它沒指好）→
+        // 回傳空陣列讓呼叫端走保底直線，而不是把 null 丟進 ShipNavProjector 直接 NRE。
+        if (!HasShipRoots)
+        {
+            lastPathGhost = System.Array.Empty<Vector3>();
+            return System.Array.Empty<Vector3>();
+        }
+
+        Vector3 navStart = ShipNavProjector.RealToGhostPoint(RealShipRoot, GhostShipRoot, startWorld);
+        Vector3 navEnd = ShipNavProjector.RealToGhostPoint(RealShipRoot, GhostShipRoot, endWorld);
 
         if (!NavMesh.SamplePosition(navStart, out NavMeshHit s, navSampleMaxDistance, NavMesh.AllAreas) ||
             !NavMesh.SamplePosition(navEnd, out NavMeshHit e, navSampleMaxDistance, NavMesh.AllAreas))
@@ -209,7 +254,7 @@ public class PathFinder : MonoBehaviour
         // return 當下的 real world 版本（呼叫端 SetPath 立即使用一次）
         var outArr = new Vector3[g.Length];
         for (int i = 0; i < g.Length; i++)
-            outArr[i] = ShipNavProjector.GhostToRealPoint(realShipRoot, ghostShipRoot, g[i]);
+            outArr[i] = ShipNavProjector.GhostToRealPoint(RealShipRoot, GhostShipRoot, g[i]);
         return outArr;
     }
 
@@ -250,9 +295,12 @@ public class PathFinder : MonoBehaviour
     }
     private Vector3 GetDisembarkPoint(Vector3 dockPos)
     {
-        Vector3 outward = dockPos - realShipRoot.position;
+        Transform ship = RealShipRoot;
+        if (ship == null) return dockPos;   // 沒有 root 就沒有「往船外」的方向可言
+
+        Vector3 outward = dockPos - ship.position;
         outward.y = 0f;
-        if (outward.sqrMagnitude < 0.0001f) outward = realShipRoot.forward;   // dock 在船中心的退路
+        if (outward.sqrMagnitude < 0.0001f) outward = ship.forward;   // dock 在船中心的退路
         outward.Normalize();
 
         Vector3 candidate = dockPos + outward * disembarkDistance;

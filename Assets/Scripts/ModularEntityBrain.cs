@@ -95,11 +95,13 @@ public class ModularEntityBrain : MonoBehaviour
 
     [Header("Attack Slot")]
     [Tooltip("持有攻擊名額的時間上限（秒）。逾時交還名額，並把第一、第二優先目標的優先度對調，讓這隻敵人改打另一個。\n" +
+             "名額是「每個目標」各自計算的，上限在 GameManager.maxAttackersPerTarget。\n" +
              "0 = 不設上限（拿到就一直持有到死亡為止）。")]
     public float attackSlotHoldSeconds = 8f;
 
     private bool _hasAttackSlot;
     private float _attackSlotExpireTime;
+    private Transform _slotTarget;   // 名額是針對哪個目標拿的（換目標時要先還舊的）
 
     protected float destinationTimer;
 
@@ -732,7 +734,7 @@ public class ModularEntityBrain : MonoBehaviour
         // ★ 攻擊名額只擋「開火」，不擋瞄準。
         //   拿不到名額的敵人照常走位、照常把砲塔轉向目標，只是不扣扳機。
         //   狀態機、路徑、移動邏輯完全不受影響。
-        bool mayFire = TryAcquireAttackSlot();
+        bool mayFire = TryAcquireAttackSlot(target);
 
         for (int i = 0; i < turrets.Length; i++)
         {
@@ -763,7 +765,8 @@ public class ModularEntityBrain : MonoBehaviour
 
     // ═══════════════════════ 攻擊名額 ═══════════════════════
     //
-    // GameManager.maxSimultaneousAttackers 限制「同時開火」的敵人數量。
+    // GameManager.maxAttackersPerTarget 限制「單一目標最多能被幾隻敵人同時鎖定開火」。
+    // 是每個目標各自一組額度，不是全場總量 —— 玩家、船、Core 各算各的。
     //
     // 那組 API 原本收的型別是 EnemyBrain，而場上跑的是 ModularEntityBrain ——
     // 兩套系統從來沒接上，所以那個上限一直是空轉的。
@@ -774,16 +777,24 @@ public class ModularEntityBrain : MonoBehaviour
     /// <summary>
     /// 取得或續用攻擊名額。沒有 GameManager 時一律放行，維持沒有限制器的舊行為。
     /// </summary>
-    protected bool TryAcquireAttackSlot()
+    protected bool TryAcquireAttackSlot(Transform target)
     {
-        if (_hasAttackSlot) return true;
+        if (target == null) return false;
 
         GameManager gm = GameManager.Instance;
         if (gm == null) return true;
 
-        if (!gm.TryClaimAttackSlot(this)) return false;
+        // 已經持有、而且就是同一個目標 → 續用，不用再跟 GameManager 要
+        if (_hasAttackSlot && _slotTarget == target) return true;
+
+        // 換目標了（例如逾時對調之後）→ 先把舊目標的名額還回去，
+        // 否則舊目標的額度會被一隻已經不打它的敵人一直佔著。
+        if (_hasAttackSlot) ReleaseAttackSlot();
+
+        if (!gm.TryClaimAttackSlot(this, target)) return false;
 
         _hasAttackSlot = true;
+        _slotTarget = target;
         _attackSlotExpireTime = Time.time + Mathf.Max(0f, attackSlotHoldSeconds);
         return true;
     }
@@ -794,8 +805,11 @@ public class ModularEntityBrain : MonoBehaviour
         if (!_hasAttackSlot) return;
         _hasAttackSlot = false;
 
+        Transform released = _slotTarget;
+        _slotTarget = null;
+
         GameManager gm = GameManager.Instance;
-        if (gm != null) gm.ReleaseAttackSlot(this);
+        if (gm != null) gm.ReleaseAttackSlot(this, released);
     }
 
     /// <summary>
