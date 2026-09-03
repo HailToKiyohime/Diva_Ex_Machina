@@ -8,28 +8,26 @@ public class PathFinder : MonoBehaviour
     public bool isOnShip = false;
     private NavMeshPath path;
 
-    // ── 船的 root：序列化欄位是「覆寫」，留空就走 LandshipNavigation ──────
+    // ── 船的 root：唯一來源是 LandshipNavigation ─────────────────────────
     //
+    // 原本這裡是兩個 [SerializeField] Transform，靠 Inspector 逐一指定。
     // Prefab 存不了場景物件的引用，所以任何在執行期 Instantiate 出來的敵人
-    // （EnemySpawner 生的、物件池生的）這兩個欄位必然是 None。
+    // （EnemySpawner 生的、物件池生的）那兩個欄位必然是 None。
     // 一旦 SyncShipFlags 把 isOnShip / isTargetOnShip 設成 true，
     // ShipNavProjector 就會拿 null 去做投影 → NRE → FixedUpdate 中斷 →
     // 那隻敵人連移動都停掉。症狀是「平常正常，一靠近船整個 AI 死掉」。
     //
-    // 改成優先讀欄位、留空才退回 singleton：
-    // 場景裡已經指好的實例行為完全不變，prefab 生出來的自動拿到正確引用，
+    // 現在一律讀 LandshipNavigation.Instance，場景裡指一次就好，
     // 生成端（EnemySpawner）一行都不用改。
-    [Tooltip("留空會用 LandshipNavigation.Instance.realShip。只有需要指向別艘船時才填。")]
-    [SerializeField] private Transform realShipRoot;
+    //
+    // ⚠ realShip 與 ghostShip 必須是同一個物件的「本尊 / 分身」關係。
+    //   指錯不會報錯，只會讓船上的路徑投影到錯誤的世界座標。
 
-    [Tooltip("留空會用 LandshipNavigation.Instance.ghostShip。只有需要指向別艘船時才填。")]
-    [SerializeField] private Transform ghostShipRoot;
 
     private Transform RealShipRoot
     {
         get
         {
-            if (realShipRoot != null) return realShipRoot;
             LandshipNavigation nav = LandshipNavigation.Instance;
             return (nav != null) ? nav.realShip : null;
         }
@@ -39,7 +37,6 @@ public class PathFinder : MonoBehaviour
     {
         get
         {
-            if (ghostShipRoot != null) return ghostShipRoot;
             LandshipNavigation nav = LandshipNavigation.Instance;
             return (nav != null) ? nav.ghostShip : null;
         }

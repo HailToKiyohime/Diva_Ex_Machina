@@ -229,10 +229,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   targetLocation: {x: 0, y: 0, z: 0}
-  isTargetOnShip: 1
-  isOnShip: 1
-  realShipRoot: {fileID: 0}
-  ghostShipRoot: {fileID: 0}
+  isTargetOnShip: 0
+  isOnShip: 0
   drawPathGizmo: 1
   pathColor: {r: 0, g: 1, b: 0, a: 1}
   waypointGizmoRadius: 0.5
@@ -253,7 +251,11 @@ MonoBehaviour:
   turrets: []
   currentState: 3
   targetPreferences: []
-  targets: []
+  targets:
+  - targetTransform: {fileID: 0}
+    type: 0
+    targetPriority: 0
+    priorityDecreaseMultiplier: 0
   nextWaypoint: {x: 0, y: 0, z: 0}
   destination: {x: 0, y: 0, z: 0}
   spawnLocation: {x: 0, y: 0, z: 0}
@@ -335,6 +337,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31fb2d2174ffd2a4a80728d54f1f0d07, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShipPassenger
+  alwaysOnShip: 0
   platformTag: Mobile Platform Hitbox
 --- !u!114 &7031235214745723284
 MonoBehaviour:

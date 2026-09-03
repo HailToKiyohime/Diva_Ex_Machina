@@ -59,6 +59,16 @@ public class EnemySpawner : MonoBehaviour
              "第三人稱下相機在玩家後方幾公尺，對 activeRange 這種尺度通常夠用。")]
     [SerializeField] private Transform playerTransform;
 
+    [Header("Default Target")]
+    [Tooltip("true = 生成的敵人一出生就把船的 Core 設成預設目標，直接往船的方向去，\n" +
+             "不用等自己的偵測範圍掃到東西。\n" +
+             "Core 取自 LandshipNavigation.Instance.core。")]
+    [SerializeField] private bool setShipAsTarget = false;
+
+    // 規格指定的固定值。要能在 Inspector 調的話跟我說，拉成欄位很快。
+    private const float ShipTargetPriority = 30f;
+    private const float ShipTargetDecayMultiplier = 1f;
+
     private float _spawnTimer;
 
     // 這個生成器生出來、目前還活著的敵人。
@@ -199,8 +209,34 @@ public class EnemySpawner : MonoBehaviour
             if (GameManager.Instance != null)
                 GameManager.Instance.AddEnemy(enemy);
 
+            if (setShipAsTarget) AssignShipAsTarget(enemy);
+
             _spawned.Add(enemy);   // 存活上限用；死亡時變成假 null，CountAlive 會清掉
         }
+    }
+
+    /// <summary>
+    /// 把船的 Core 加進這隻敵人的目標清單。
+    ///
+    /// 時機是安全的：Instantiate 會同步跑完 Awake / OnEnable，而 targets 是在
+    /// 欄位宣告時就 new 好的，所以這裡加得進去。ModularEntityBrain.Start()
+    /// 只設 spawnLocation / pathFinder / 狀態，不會清空 targets，
+    /// 所以這一筆不會在下一幀被洗掉。
+    ///
+    /// AddTarget 內部有去重，跟敵人自己偵測到 Core 的情況不會打架 ——
+    /// 重複時取較高的優先度。
+    /// </summary>
+    private void AssignShipAsTarget(GameObject enemy)
+    {
+        LandshipNavigation nav = LandshipNavigation.Instance;
+        if (nav == null || nav.core == null) return;
+
+        // 用 GetComponentInChildren 而不是 GetComponent：目前的 prefab
+        // （Wolf / Falcon）brain 都掛在 root，但這樣不挑階層結構。
+        ModularEntityBrain brain = enemy.GetComponentInChildren<ModularEntityBrain>();
+        if (brain == null) return;
+
+        brain.AddTarget(nav.core, TargetType.Core, ShipTargetPriority, ShipTargetDecayMultiplier);
     }
 
     /// <summary>按 spawnWeight 加權抽一組。權重 &lt;= 0 的組會被跳過。</summary>
