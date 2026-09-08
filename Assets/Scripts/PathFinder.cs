@@ -46,6 +46,18 @@ public class PathFinder : MonoBehaviour
     private bool HasShipRoots => RealShipRoot != null && GhostShipRoot != null;
     float navSampleMaxDistance = 30f; // Maximum distance for NavMesh.SamplePosition
 
+    [Header("Elevated Target Probe")]
+    [Tooltip("目標 pivot 懸空時（例如 core 架在甲板上方 20m），先往下找到它正下方的\n" +
+             "可走表面，再交給 SamplePosition。\n\n" +
+             "不做這件事的話：SamplePosition 會用 navSampleMaxDistance（30）的半徑\n" +
+             "去搜最近的 navmesh，而「最近」不保證是甲板 —— 可能吸到船底、地形、\n" +
+             "或甲板上某塊不相連的碎片。吸歪不會報錯，只會讓 CalculatePath 拿一個\n" +
+             "替身點去算路，結果是永遠的 PathPartial 加一個固定的終點缺口。\n\n" +
+             "這條 ray 打在 ghost 空間 —— ghost 建築只關 Renderer、保留 Collider，\n" +
+             "所以打得到。groundMask 必須包含 ghost 甲板所在的 layer。")]
+    [SerializeField] private float verticalProbeDistance = 40f;
+    [SerializeField] private LayerMask groundMask = ~0;
+
     [Header("Debug Gizmo")]
     [SerializeField] private bool drawPathGizmo = true;
     [SerializeField] private Color pathColor = Color.green;
@@ -229,6 +241,14 @@ public class PathFinder : MonoBehaviour
         Vector3 navStart = ShipNavProjector.RealToGhostPoint(RealShipRoot, GhostShipRoot, startWorld);
         Vector3 navEnd = ShipNavProjector.RealToGhostPoint(RealShipRoot, GhostShipRoot, endWorld);
 
+        // ★ 懸空目標先往下找地板。core 的 pivot 在甲板上方 20m，直接 sample 會被
+        //   30m 的半徑吸到「最近的任意一塊 navmesh」，而那塊不一定跟甲板相連。
+        //   打不到東西就維持原值 —— 目標本來就在地面高度時（例如 docking point），
+        //   這條 ray 要嘛打到腳下的甲板、要嘛落空，兩種情況行為都跟改動前一樣。
+        if (Physics.Raycast(navEnd, Vector3.down, out RaycastHit floor,
+                verticalProbeDistance, groundMask, QueryTriggerInteraction.Ignore))
+            navEnd = floor.point;
+
         if (!NavMesh.SamplePosition(navStart, out NavMeshHit s, navSampleMaxDistance, NavMesh.AllAreas) ||
             !NavMesh.SamplePosition(navEnd, out NavMeshHit e, navSampleMaxDistance, NavMesh.AllAreas))
         {
@@ -237,13 +257,24 @@ public class PathFinder : MonoBehaviour
         }
 
         NavMesh.CalculatePath(s.position, e.position, NavMesh.AllAreas, path);
-        if (path.status == NavMeshPathStatus.PathInvalid || path.corners.Length == 0)
+
+        // corners 是 property，每次存取都配一個新陣列 —— 取一次，後面都用它
+        Vector3[] g = path.corners;
+
+        // ── 診斷用，四個數字確認正常之後可以整段刪掉 ──────────────
+        float endGap = (g.Length > 0) ? Vector3.Distance(g[g.Length - 1], e.position) : -1f;
+        Debug.Log(name + "#" + GetInstanceID()
+            + " status=" + path.status + " corners=" + g.Length
+            + " endGap=" + endGap.ToString("F1")
+            + " | navEnd=" + navEnd.ToString("F1")
+            + " eSnap=" + Vector3.Distance(navEnd, e.position).ToString("F1"), this);
+        // ──────────────────────────────────────────────────────
+
+        if (path.status == NavMeshPathStatus.PathInvalid || g.Length == 0)
         {
             lastPathGhost = System.Array.Empty<Vector3>();
             return System.Array.Empty<Vector3>();
         }
-
-        Vector3[] g = path.corners;
 
         // ★ 存 ghost 空間原始 corner（不會隨船移動而 stale），供 GetCurrentWorldPath 每幀投影
         lastPathGhost = (Vector3[])g.Clone();

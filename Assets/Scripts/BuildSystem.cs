@@ -334,6 +334,8 @@ public class BuildSystem : MonoBehaviour
 
 
         // ----------  DUPLICATE TO GHOST SHIP  ----------
+        Transform ghostTransform = null;
+
         if (duplicateToGhost && TryGetShipRoots(out var realRoot, out var ghostRoot))
         {
             Vector3 gp = placed.transform.localPosition;
@@ -342,12 +344,18 @@ public class BuildSystem : MonoBehaviour
             ghost.transform.localRotation = placed.transform.localRotation;
             ghost.name = placed.name + "_GHOST";
 
+            ghostTransform = ghost.transform;
+
             if (duplicateDisableRenderers)
             {
                 foreach (var r in ghost.GetComponentsInChildren<Renderer>())
                     r.enabled = false;   // 只保留 Collider + NavMeshObstacle
             }
         }
+
+        // 敵人 AI 需要一份可列舉的建築清單，用來搜尋「路被封死時該拆哪一棟」。
+        // 本尊 + 分身一起登記，之後寫拆除功能時兩邊才不會漏掉一邊。
+        BuildingRegistry.Register(placed.transform, ghostTransform);
     }
 
     private void UpdatePreview()

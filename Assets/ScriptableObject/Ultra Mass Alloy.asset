@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Ultra Mass Alloy
   m_EditorClassIdentifier: Assembly-CSharp::ItemObject
   itemName: Ultra Mass Alloy
-  type: 11
+  type: 12
   icon: {fileID: 0}
   maxStack: 999999
   dropPrefab: {fileID: 0}

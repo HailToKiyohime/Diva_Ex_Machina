@@ -231,6 +231,10 @@ MonoBehaviour:
   targetLocation: {x: 0, y: 0, z: 0}
   isTargetOnShip: 0
   isOnShip: 0
+  verticalProbeDistance: 40
+  groundMask:
+    serializedVersion: 2
+    m_Bits: 4224
   drawPathGizmo: 1
   pathColor: {r: 0, g: 1, b: 0, a: 1}
   waypointGizmoRadius: 0.5
@@ -337,7 +341,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31fb2d2174ffd2a4a80728d54f1f0d07, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShipPassenger
-  alwaysOnShip: 0
   platformTag: Mobile Platform Hitbox
 --- !u!114 &7031235214745723284
 MonoBehaviour:
@@ -767,7 +770,7 @@ MonoBehaviour:
   aimRayDistance: 500
   aimRayMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 196599
   drawAimGizmo: 1
   bulletPrefab: {fileID: 3891428710695554583, guid: 68e2671b654f5c1459ceabba81c6cb34, type: 3}
   physicalDamage: 10
@@ -785,10 +788,10 @@ MonoBehaviour:
   magazineSize: 1000
   bulletTargetLayer:
     serializedVersion: 2
-    m_Bits: 8448
+    m_Bits: 12544
   bulletIgnoreLayer:
     serializedVersion: 2
-    m_Bits: 99840
+    m_Bits: 230912
   attacker: {fileID: 4963351499911707288}
 --- !u!1001 &3335374069086650301
 PrefabInstance:

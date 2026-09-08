@@ -65,7 +65,8 @@ public class ShipPassenger : MonoBehaviour
         //Debug.Log("other: " + other.name + "tag" + other.tag);
         if (other == null) return;
         if (!other.CompareTag(platformTag)) return;
-
+        Debug.Log(name + " platform contact: " + other.name
+    + " dist=" + Vector3.Distance(transform.position, other.ClosestPoint(transform.position)).ToString("F1"), this);
         _contactsThisStep++;
 
         if (other != _cachedPlatformCollider)
