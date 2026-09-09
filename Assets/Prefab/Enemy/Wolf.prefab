@@ -276,6 +276,7 @@ MonoBehaviour:
   dockUpdateDistance: 30
   dockDestinationUpdateRange: {x: 0.1, y: 0.3}
   attackSlotHoldSeconds: 8
+  priorityRetentionRadius: 60
   waypointArriveRadius: 1.5
   slowDownRadius: 10
   waypointSearchLookAhead: 2

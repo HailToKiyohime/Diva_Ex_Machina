@@ -22,15 +22,15 @@ public class EnemyDetection : MonoBehaviour
         }
         if (other.tag == "Player")
         {
-            enemyBrain.AddTarget(other.transform, TargetType.Player, 3,1);
+            enemyBrain.AddTarget(other.transform, TargetType.Player, 25,1);
         }
         else if (other.tag == "Defence Fortifications")
         {
-            enemyBrain.AddTarget(other.transform, TargetType.Building, 3, 1);
+            enemyBrain.AddTarget(other.transform, TargetType.Building, 50, 1);
 
         }else if (other.tag == "Obstacle")  
         {
-            enemyBrain.AddTarget(other.transform, TargetType.Obstacle, 3, 1);
+            enemyBrain.AddTarget(other.transform, TargetType.Obstacle, 10, 1);
         }
     }
 

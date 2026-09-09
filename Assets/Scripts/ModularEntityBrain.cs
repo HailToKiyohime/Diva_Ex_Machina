@@ -107,6 +107,13 @@ public class ModularEntityBrain : MonoBehaviour
 
     private readonly Dictionary<TargetType, float> decayMultiplierByType = new Dictionary<TargetType, float>();
 
+    [Header("Priority Retention")]
+    [Tooltip("目標與實體的距離小於這個半徑時，該目標的 targetPriority 不會隨時間衰減 —— " +
+             "近身的威脅不會被「遺忘」。只在多目標（targets.Count > 1）情境下有意義，" +
+             "因為單一目標本來就不衰減。\n" +
+             "0 = 關閉此功能，維持原本的衰減行為。距離為 3D 直線距離。")]
+    [SerializeField] protected float priorityRetentionRadius = 0f;
+
     [SerializeField] protected float waypointArriveRadius = 5f;
     [SerializeField] protected float slowDownRadius = 6f;
 
@@ -158,9 +165,25 @@ public class ModularEntityBrain : MonoBehaviour
 
         if (targets.Count > 1)
         {
+            // priorityRetentionRadius 的平方，迴圈外算一次就好。
+            float retentionSqr = priorityRetentionRadius * priorityRetentionRadius;
+
             for (int x = targets.Count - 1; x >= 0; x--)
             {
                 Target t = targets[x];
+
+                // ★ 近距離保留：目標離實體夠近時，跳過這一幀的衰減。
+                //    這裡 t.targetTransform 一定非 null —— PruneDestroyedTargets()
+                //    已在本方法開頭把假 null 的項目清掉了。
+                //    用平方距離比大小，不開根號（跟本檔 SqrDistanceToSegmentXZ 一致）。
+                //    retentionSqr == 0（半徑 0）時這個條件幾乎不可能成立 →
+                //    等於關閉功能，行為與加這段之前完全相同。
+                if (retentionSqr > 0f)
+                {
+                    Vector3 toTarget = t.targetTransform.position - transform.position;
+                    if (toTarget.sqrMagnitude <= retentionSqr)
+                        continue;   // 在範圍內 → 不衰減，這一幀也不會因衰減而被移除
+                }
 
                 float typeMultiplier = 1f;
                 if (decayMultiplierByType.TryGetValue(t.type, out float found))

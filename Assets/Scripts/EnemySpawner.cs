@@ -67,7 +67,7 @@ public class EnemySpawner : MonoBehaviour
 
     // 規格指定的固定值。要能在 Inspector 調的話跟我說，拉成欄位很快。
     private const float ShipTargetPriority = 30f;
-    private const float ShipTargetDecayMultiplier = 1f;
+    private const float ShipTargetDecayMultiplier = 0f;
 
     private float _spawnTimer;
 
