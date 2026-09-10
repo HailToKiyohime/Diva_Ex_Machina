@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+ï»¿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -46,6 +46,7 @@ public class ColorPicker : MonoBehaviour
     private float currentHue = 0f; // 0..1
 
     private bool HasEffectTarget => targetEffectColorController != null;
+    private LayeredToonMaterialController targetLayeredToonController;
 
     private void Awake()
     {
@@ -218,10 +219,26 @@ public class ColorPicker : MonoBehaviour
     {
         if (targetMaterials == null) targetMaterials = new List<Material>();
         targetMaterials.Clear();
+        targetLayeredToonController = null;
 
         // If this is an effect prefab, we don't use materials.
         if (ResolveEffectTarget())
             return;
+
+        // Baked UTS3 target:
+        // edit the hidden runtime Mix material, not the UTS3 display material.
+        targetLayeredToonController = LayeredToonMaterialController.FindFor(targetGameObject);
+        if (targetLayeredToonController != null)
+        {
+            targetLayeredToonController.EnsureInitialized();
+
+            var sourceMix = targetLayeredToonController.SourceMixMaterial;
+            if (sourceMix != null)
+            {
+                targetMaterials.Add(sourceMix);
+                return;
+            }
+        }
 
         // Helper: add ONLY element 0
         void AddElement0(Renderer renderer)
@@ -425,6 +442,10 @@ public class ColorPicker : MonoBehaviour
             Debug.LogWarning($"{mat.name} missing property: {propName}");
 
         WriteColorBackToItemInstance(color, materialIndex, textureIndex);
+
+        // Rebuild the baked albedo and push it into the untouched UTS3 material.
+        if (targetLayeredToonController != null)
+            targetLayeredToonController.Rebake();
     }
 
     private void ApplyEffectColor(Color color, int colorIndex)
@@ -469,6 +490,11 @@ public class ColorPicker : MonoBehaviour
             colorsList = mwi.colors;
             shaderName = mwi.shaderName;
         }
+        else if (targetItemInstance is ShoulderWeaponInstance swi)
+        {
+            colorsList = swi.colors;
+            shaderName = swi.shaderName;
+        }
         else if (targetItemInstance is PartInstance pi)
         {
             colorsList = pi.colors;
@@ -492,6 +518,7 @@ public class ColorPicker : MonoBehaviour
                 if (targetItemInstance is ArmorInstance ai2) ai2.shaderName = shaderName;
                 else if (targetItemInstance is RangeWeaponInstance rwi2) rwi2.shaderName = shaderName;
                 else if (targetItemInstance is MeleeWeaponInstance mwi2) mwi2.shaderName = shaderName;
+                else if (targetItemInstance is ShoulderWeaponInstance swi2) swi2.shaderName = shaderName;
                 else if (targetItemInstance is PartInstance pi2) pi2.shaderName = shaderName;
             }
         }
@@ -524,6 +551,7 @@ public class ColorPicker : MonoBehaviour
         if (targetItemInstance is ArmorInstance ai3) ai3.colors = colorsList;
         else if (targetItemInstance is RangeWeaponInstance rwi3) rwi3.colors = colorsList;
         else if (targetItemInstance is MeleeWeaponInstance mwi3) mwi3.colors = colorsList;
+        else if (targetItemInstance is ShoulderWeaponInstance swi3) swi3.colors = colorsList;
         else if (targetItemInstance is PartInstance pi3) pi3.colors = colorsList;
     }
 
@@ -538,8 +566,8 @@ public class ColorPicker : MonoBehaviour
             return false;
         }
 
-        // ¥u§â¡u¥Ø¼Ð¥»Åé¡v©Î¡u¨ä¤÷¨t¡v·í§@ effect ¨Ó·½
-        // ¥Ø¼Ð¬O weapon root ®É¡G³q±`¦Û¤v¨S¦³ ParticleSystem / ParticleSystemRenderer -> false
+        // ï¿½uï¿½ï¿½uï¿½Ø¼Ð¥ï¿½ï¿½ï¿½vï¿½Î¡uï¿½ï¿½ï¿½ï¿½tï¿½vï¿½ï¿½ï¿½@ effect ï¿½Ó·ï¿½
+        // ï¿½Ø¼Ð¬O weapon root ï¿½É¡Gï¿½qï¿½`ï¿½Û¤vï¿½Sï¿½ï¿½ ParticleSystem / ParticleSystemRenderer -> false
         bool targetIsParticleObject =
             targetGameObject.GetComponent<ParticleSystem>() != null ||
             targetGameObject.GetComponent<ParticleSystemRenderer>() != null;
@@ -550,7 +578,7 @@ public class ColorPicker : MonoBehaviour
             return false;
         }
 
-        // ¥u§ä¦Û¤v©Î¤÷¨tªº controller¡]¤£­n§ä children¡^
+        // ï¿½uï¿½ï¿½Û¤vï¿½Î¤ï¿½ï¿½tï¿½ï¿½ controllerï¿½]ï¿½ï¿½ï¿½nï¿½ï¿½ childrenï¿½^
         targetEffectColorController = targetGameObject.GetComponentInParent<EffectColorController>(true);
         return targetEffectColorController != null;
     }

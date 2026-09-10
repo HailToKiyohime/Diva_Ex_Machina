@@ -35,6 +35,9 @@ public class EquipmentSlot
 
 public class EquipmentManager : MonoBehaviour
 {
+    [Header("Runtime Mix -> UTS3 Baking")]
+    [Tooltip("Assign MixAlbedoBaker.shader here. Used by armor controllers created at runtime.")]
+    [SerializeField] private Shader mixAlbedoBakeShader;
     [SerializeField] private Transform leftMuzzleFlash;
     [SerializeField] private Transform rightMuzzleFlash;
 
@@ -212,6 +215,36 @@ public class EquipmentManager : MonoBehaviour
                 }
                 Debug.Log($"TryEquipFromInventory: armor {armor.itemName} equipped to slot {i}");
 
+                // Armor is instantiated directly from a SkinnedMeshRenderer reference,
+                // so add the baking controller to the runtime armor object here.
+                // This happens after ArmorInstance.colors have been restored.
+                var armorRenderer = slot.equipedItem.GetComponent<SkinnedMeshRenderer>();
+                if (armorRenderer == null)
+                    armorRenderer = slot.equipedItem.GetComponentInChildren<SkinnedMeshRenderer>(true);
+
+                if (armorRenderer != null && armor.uts3MaterialTemplate != null)
+                {
+                    var toonController =
+                        armorRenderer.GetComponent<LayeredToonMaterialController>();
+
+                    if (toonController == null)
+                        toonController =
+                            armorRenderer.gameObject.AddComponent<LayeredToonMaterialController>();
+
+                    toonController.Configure(
+                        armorRenderer,
+                        armor.uts3MaterialTemplate,
+                        mixAlbedoBakeShader
+                    );
+                }
+                else if (armorRenderer != null && armor.uts3MaterialTemplate == null)
+                {
+                    Debug.LogWarning(
+                        $"Armor '{armor.itemName}' has no UTS3 Material Template. " +
+                        "It will continue using its Mix material."
+                    );
+                }
+
                 PlayerStats.Instance?.RecalculateFromEquipment();
                 RefreshEquipmentStatBlock();
                 return true;
@@ -354,6 +387,10 @@ public class EquipmentManager : MonoBehaviour
 
             bool isLeftHand = (slotIndex == PlayerStats.Instance.leftWeaponSlotIndex);
             ParentMuzzleFlashToMuzzle(isLeftHand ? leftMuzzleFlash : rightMuzzleFlash, rwi.muzzlePoint);
+
+            // Saved Mix colors and all weapon parts are now restored.
+            // Bake them and switch their visible materials to untouched UTS3 clones.
+            LayeredToonMaterialController.InitializeAll(slot.equipedItem);
 
             PlayerStats.Instance?.RecalculateFromEquipment();
             RefreshEquipmentStatBlock();
@@ -504,6 +541,9 @@ public class EquipmentManager : MonoBehaviour
             // ───── 握把對位（必須在零件全部掛完之後）─────
             AlignMeleeGrip(slot.equipedItem.transform, mountPoint, mw, handlePartGO, handlePartSO);
 
+            // Saved Mix colors and all weapon parts are now restored.
+            LayeredToonMaterialController.InitializeAll(slot.equipedItem);
+
             // 註冊 hitbox。必須在零件掛完之後 —— hitbox 有可能長在零件上。
             // 也必須在 RecalculateFromEquipment 之前，因為那會觸發
             // OnHandWeaponDataChanged → AttackManager.ApplyHand 讀取這個欄位。
@@ -615,6 +655,9 @@ public class EquipmentManager : MonoBehaviour
                     }
                 }
             }
+
+            // Saved Mix colors and all shoulder-weapon parts are now restored.
+            LayeredToonMaterialController.InitializeAll(slot.equipedItem);
 
             PlayerStats.Instance?.RecalculateFromEquipment();
             RefreshEquipmentStatBlock();

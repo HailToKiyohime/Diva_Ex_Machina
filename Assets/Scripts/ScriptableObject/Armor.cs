@@ -19,6 +19,11 @@ public class RandomBuff
 public class Armor : ItemObject
 {
     public SkinnedMeshRenderer skinnedMeshRenderer;
+
+    [Header("UTS3 Runtime Material")]
+    [Tooltip("Original UTS3 material used as the runtime template after the Mix 3/4/5 albedo is baked.")]
+    public Material uts3MaterialTemplate;
+
     public List<EquipmentBuff> buffs = new List<EquipmentBuff>();
     public List<RandomBuff> randomBuffs = new List<RandomBuff>();
     public RandomBuff GetRandomBuff()
@@ -43,4 +48,3 @@ public class Armor : ItemObject
         return randomBuffs[randomBuffs.Count - 1];
     }
 }
-

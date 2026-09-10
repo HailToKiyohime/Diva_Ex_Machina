@@ -18,6 +18,7 @@ MonoBehaviour:
   maxStack: 0
   dropPrefab: {fileID: 0}
   skinnedMeshRenderer: {fileID: 3350046120491577610, guid: 17e5ed8abab316244bb23b6212ec04fd, type: 3}
+  uts3MaterialTemplate: {fileID: 2100000, guid: 5d5f84e82f580fd46b070a0e673bf1fd, type: 2}
   buffs:
   - attribute: 31
     mode: 0

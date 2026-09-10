@@ -783,7 +783,8 @@ public class CraftingManager : MonoBehaviour
                 }
             }
             RefreshMeleeDefaultCoatingState();
-        }else if (item.item is ShoulderWeapon sw)
+        }
+        else if (item.item is ShoulderWeapon sw)
         {
             // 先清掉舊預覽與舊插槽（避免重複產生 part slot）
             if (weaponPreview != null)
@@ -837,7 +838,8 @@ public class CraftingManager : MonoBehaviour
                     t.interactable = true;
                 }
             }
-        }else if (item.item is ShoulderWeaponPart swp)
+        }
+        else if (item.item is ShoulderWeaponPart swp)
         {
             if (shoulderWeapon == null || weaponPreview == null)
                 return;
@@ -867,8 +869,8 @@ public class CraftingManager : MonoBehaviour
             }
         }
 
-            // 更新左側插槽圖示
-            int selectedIndex = GetSelectedSlotIndex();
+        // 更新左側插槽圖示
+        int selectedIndex = GetSelectedSlotIndex();
         if (selectedIndex >= 0 && selectedIndex < craftingPartsButtonParent.childCount)
         {
             Image spriteImage = InventoryManager.Instance
@@ -1139,11 +1141,12 @@ public class CraftingManager : MonoBehaviour
                     else if (craftingType == 1)
                     {
                         OpenMeleeWeaponPartsInventory(ItemType.WeaponPart, capturedSlot.equipmentType);
-                    }else if(craftingType == 2)
+                    }
+                    else if (craftingType == 2)
                     {
                         OpenShoulderWeaponPartsInventory(ItemType.WeaponPart, capturedSlot.equipmentType);
                     }
-                        SelectWeaponPartToColor(slotIndex);
+                    SelectWeaponPartToColor(slotIndex);
                 });
             }
         }
@@ -1219,14 +1222,10 @@ public class CraftingManager : MonoBehaviour
             weaponPartColorPicker.CreateButtons();
             if (slots[index].item is RangeWeaponInstance rwi)
             {
-                // 可選：用材質當作 fallback
-                var renderer = go.GetComponentInChildren<Renderer>();
-                if (renderer != null)
-                {
-                    var mat = renderer.material;
-                    if (mat != null && mat.HasProperty("_BaseColor"))
-                        weaponPartColorPicker.CursorToColor(mat.GetColor("_BaseColor"));
-                }
+                // UTS3 顯示材質已經是白色 BaseColor，所以 ColorPicker 要讀回隱藏的 Mix source。
+                var mat = GetColorSourceMaterial(go);
+                if (mat != null && mat.HasProperty("_BaseColor"))
+                    weaponPartColorPicker.CursorToColor(mat.GetColor("_BaseColor"));
             }
         }
     }
@@ -1519,6 +1518,25 @@ public class CraftingManager : MonoBehaviour
         if (rightStatBlock != null) rightStatBlock.text = string.Empty;
     }
 
+    // Visible renderer may already be UTS3. When a baked-toon controller exists,
+    // read colors from its hidden Mix source material.
+    private Material GetColorSourceMaterial(GameObject go)
+    {
+        if (!go) return null;
+
+        var layered = LayeredToonMaterialController.FindFor(go);
+        if (layered != null)
+        {
+            layered.EnsureInitialized();
+            var sourceMix = layered.SourceMixMaterial;
+            if (sourceMix != null)
+                return sourceMix;
+        }
+
+        var renderer = go.GetComponentInChildren<Renderer>();
+        return renderer != null ? renderer.material : null;
+    }
+
     // 從實際場景中的 GameObject 抽出顏色與 shader 名稱
     private List<Color> ExtractColorsFromGameObject(GameObject go, out string shaderName)
     {
@@ -1527,10 +1545,7 @@ public class CraftingManager : MonoBehaviour
 
         if (!go) return colors;
 
-        var renderer = go.GetComponentInChildren<Renderer>();
-        if (!renderer) return colors;
-
-        var mat = renderer.material;
+        var mat = GetColorSourceMaterial(go);
         if (!mat || mat.shader == null) return colors;
 
         shaderName = mat.shader.name;
