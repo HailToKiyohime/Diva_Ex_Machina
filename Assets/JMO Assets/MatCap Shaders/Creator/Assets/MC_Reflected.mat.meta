@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 5b00ccde1dae94c4d94360856c7643ce
+timeCreated: 1553175356
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 8221
+  packageName: Free MatCap Shaders
+  packageVersion: 1.4
+  assetPath: Assets/JMO Assets/MatCap Shaders/Creator/Assets/MC_Reflected.mat
+  uploadId: 301231

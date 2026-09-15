@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: bb4ebc3652d6c1941879b7fb05a05a9c
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+AssetOrigin:
+  serializedVersion: 1
+  productId: 8221
+  packageName: Free MatCap Shaders
+  packageVersion: 1.4
+  assetPath: Assets/JMO Assets/MatCap Shaders/Demo/Assets/MC_AutoRotate.cs
+  uploadId: 301231

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 03bbabfe25c37f8479999f258ee76101
+timeCreated: 1553160080
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 8221
+  packageName: Free MatCap Shaders
+  packageVersion: 1.4
+  assetPath: Assets/JMO Assets/MatCap Shaders/Creator/_MC_Sphere_Material.mat
+  uploadId: 301231

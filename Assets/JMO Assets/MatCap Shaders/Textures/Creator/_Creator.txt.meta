@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: afa9e724fc1219c4ea7d18558a734705
+timeCreated: 1553163057
+licenseType: Store
+TextScriptImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 8221
+  packageName: Free MatCap Shaders
+  packageVersion: 1.4
+  assetPath: Assets/JMO Assets/MatCap Shaders/Textures/Creator/_Creator.txt
+  uploadId: 301231

@@ -22,10 +22,10 @@ MonoBehaviour:
   buffs:
   - attribute: 28
     mode: 0
-    value: 5
+    value: 10
   - attribute: 29
     mode: 0
-    value: 10
+    value: 15
   - attribute: 26
     mode: 0
     value: 5

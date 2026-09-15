@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 736be06dac93b70419616f7002c397f2
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+AssetOrigin:
+  serializedVersion: 1
+  productId: 8221
+  packageName: Free MatCap Shaders
+  packageVersion: 1.4
+  assetPath: Assets/JMO Assets/MatCap Shaders/Demo/Assets/MC_SwitchTexture.cs
+  uploadId: 301231

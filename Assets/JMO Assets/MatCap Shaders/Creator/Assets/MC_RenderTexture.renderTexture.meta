@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 489bf18ce21e9f54c8cfd155cba17ffc
+timeCreated: 1553159839
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 8221
+  packageName: Free MatCap Shaders
+  packageVersion: 1.4
+  assetPath: Assets/JMO Assets/MatCap Shaders/Creator/Assets/MC_RenderTexture.renderTexture
+  uploadId: 301231
