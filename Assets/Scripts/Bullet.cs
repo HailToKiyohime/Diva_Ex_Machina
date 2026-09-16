@@ -732,7 +732,7 @@ public class Bullet : MonoBehaviour, IPooled
 
     protected virtual void OnTriggerEnterFixed(Collider other)
     {
-        Debug.Log($"Bullet hit: {other.name} / layer={LayerMask.LayerToName(other.gameObject.layer)}");
+        //Debug.Log($"Bullet hit: {other.name} / layer={LayerMask.LayerToName(other.gameObject.layer)}");
         if (!_live) return;
         if (other == null) return;
 

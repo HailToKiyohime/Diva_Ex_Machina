@@ -229,19 +229,40 @@ public class TurretController : MonoBehaviour
             AimHitTransform = null;
         }
     }
+    /// <summary>
+    /// 目標的瞄準點：目標身上有 Collider 就打它的中心，否則退回 pivot。
+    /// 建築 / 砲塔的 pivot 通常在地面，直接瞄 position 會打到基座。
+    /// </summary>
+    public static Vector3 GetAimPoint(Transform target)
+    {
+        if (target == null) return Vector3.zero;
+        if (target.TryGetComponent(out Collider col) && col.enabled)
+            return col.bounds.center;
+        return target.position;
+    }
+
     public bool HasLineOfSightTo(Transform target)
     {
         if (target == null || muzzle == null) return false;
 
         Vector3 origin = muzzle.position;
-        Vector3 toTarget = target.position - origin;
+        Vector3 toTarget = GetAimPoint(target) - origin;
         float dist = toTarget.magnitude;
         if (dist < 0.001f) return true;   // 貼在一起,視為可見
 
         if (Physics.Raycast(origin, toTarget / dist, out RaycastHit hit, dist, aimRayMask, QueryTriggerInteraction.Ignore))
         {
             // 打到的東西是目標自己(或目標的子 collider)→ 視線通
-            return hit.transform == target || hit.transform.IsChildOf(target);
+            if (hit.transform == target || hit.transform.IsChildOf(target)) return true;
+
+            // 打到同一個「可受傷物件」的其他部位也算視線通。
+            // 例：鎖定的是砲塔頭部，射線先碰到同一座砲塔的基座 ——
+            // 基座不是頭部的子物件，但打下去一樣會扣到同一個 BuildingStats。
+            IDamageable targetOwner = target.GetComponentInParent<IDamageable>();
+            if (targetOwner != null && hit.collider.GetComponentInParent<IDamageable>() == targetOwner)
+                return true;
+
+            return false;
         }
 
         // 射線全程沒打到任何東西 → 中間沒障礙,視線通

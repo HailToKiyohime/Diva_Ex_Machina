@@ -42,6 +42,9 @@ public class BuildingStats : MonoBehaviour, IDamageable
     [Tooltip("血量歸零後延遲多久才真正 Destroy（給死亡動畫用）。0 = 立即。")]
     [Min(0f)] public float destroyDelay = 0f;
 
+    [Header("Debug")]
+    [SerializeField] private bool logDamage = true;
+
     [Header("Events")]
     public UnityEvent<float> onDamaged;   // 參數：實際扣掉的血量
     public UnityEvent onDestroyed;
@@ -75,6 +78,9 @@ public class BuildingStats : MonoBehaviour, IDamageable
         if (amount <= 0f) return;
 
         health = Mathf.Max(0f, health - amount);
+
+        if (logDamage)
+            Debug.Log($"[BuildingStats] {GetInstanceID()} '{name}' took {amount:F1} from {(attacker != null ? attacker.name : "null")}, HP {health:F0}/{maxHealth:F0}", this);
 
         // 先扣血、先判死，回饋放後面 —— 回饋出錯也不會讓建築變成不死
         if (health <= 0f) Die();

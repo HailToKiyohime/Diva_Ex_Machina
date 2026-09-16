@@ -18,8 +18,6 @@ public class ShipPassenger : MonoBehaviour
              "不需要 Rigidbody、也不需要 trigger。會走動的實體（敵人、玩家）請保持關閉。")]
     [SerializeField] private bool detectByHierarchy = false;
 
-    [SerializeField] private bool logContacts = false;
-
     /// <summary>目前是否站在移動平台上。</summary>
     public bool isOnShip { get; private set; }
 
@@ -87,12 +85,8 @@ public class ShipPassenger : MonoBehaviour
 
     private void OnTriggerStay(Collider other)
     {
-        //Debug.Log("other: " + other.name + "tag" + other.tag);
         if (other == null) return;
         if (!other.CompareTag(platformTag)) return;
-        if (logContacts)
-            Debug.Log(name + " platform contact: " + other.name
-                + " dist=" + Vector3.Distance(transform.position, other.ClosestPoint(transform.position)).ToString("F1"), this);
         _contactsThisStep++;
 
         if (other != _cachedPlatformCollider)

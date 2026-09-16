@@ -98,7 +98,6 @@ public class EnemyMovement : MonoBehaviour
 
         Vector3 outRel2 = new Vector3(horizontalRel.x, vRel.y, horizontalRel.z);
         enemyRigidbody.linearVelocity = outRel2 + platformVel;      // ✅ 加回平台速度
-        Debug.Log("platformVel"+platformVel);
     }
 
     public void SetWorldMoveDirection(Vector3 worldDir)

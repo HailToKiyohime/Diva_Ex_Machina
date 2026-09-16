@@ -761,6 +761,9 @@ public class ModularEntityBrain : MonoBehaviour
         //   狀態機、路徑、移動邏輯完全不受影響。
         bool mayFire = TryAcquireAttackSlot(target);
 
+        // 瞄 collider 中心而不是 pivot（砲塔 / 建築的 pivot 在地面，會打到基座）
+        Vector3 aimPoint = TurretController.GetAimPoint(target);
+
         for (int i = 0; i < turrets.Length; i++)
         {
             TurretController turret = turrets[i];
@@ -768,7 +771,7 @@ public class ModularEntityBrain : MonoBehaviour
 
             // 讀 turret 自己的 bulletSpeed —— 資料在哪，就去哪讀
             if (MathToolKit.InterceptionPoint(
-                    target.position,                  // a: 目標現在位置
+                    aimPoint,                  // a: 目標現在位置
                     turret.MuzzlePosition,            // b: 這座砲塔的砲口
                     targetVelocity,                   // vA: 目標速度
                     turret.bulletSpeed,               // sB: 這座砲塔的彈速
@@ -781,7 +784,7 @@ public class ModularEntityBrain : MonoBehaviour
             else
             {
                 // 解不出攔截（目標太快/彈太慢）→ 退回直接瞄準現在位置
-                turret.targetLocation = target.position;
+                turret.targetLocation = aimPoint;
                 if (mayFire && turret.HasLineOfSightTo(target))
                     turret.Shoot();   // 直瞄退路也一樣:看得到就打
             }

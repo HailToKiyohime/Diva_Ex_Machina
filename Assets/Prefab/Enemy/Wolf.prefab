@@ -72,13 +72,14 @@ GameObject:
   m_Component:
   - component: {fileID: 5600650950397893444}
   - component: {fileID: 2594956985039282536}
-  m_Layer: 9
-  m_Name: WarningRange
+  - component: {fileID: 3542143699365224330}
+  m_Layer: 15
+  m_Name: EnemyDetectRange
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &5600650950397893444
 Transform:
   m_ObjectHideFlags: 0
@@ -87,12 +88,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2532650271323738627}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 3549206968946698764}
+  m_Father: {fileID: 939233490346937139}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!135 &2594956985039282536
 SphereCollider:
@@ -115,6 +116,19 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 30
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &3542143699365224330
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2532650271323738627}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b9cab01fc4a976d49927eecd7495ec2e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyDetection
+  enemyBrain: {fileID: 5243097427755126230}
 --- !u!1 &4539360904586497824
 GameObject:
   m_ObjectHideFlags: 0
@@ -185,7 +199,6 @@ Transform:
   - {fileID: 939233490346937139}
   - {fileID: 5683356253138610646}
   - {fileID: 300082199341682337}
-  - {fileID: 5600650950397893444}
   - {fileID: 6729084931049856498}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -273,8 +286,8 @@ MonoBehaviour:
   combatActivityAreaRadius: 50
   reactionCoolDown: 1
   reactionChance: 0.5
-  dockUpdateDistance: 30
-  dockDestinationUpdateRange: {x: 0.1, y: 0.3}
+  dockUpdateDistance: 100
+  dockDestinationUpdateRange: {x: 0.1, y: 0.5}
   attackSlotHoldSeconds: 8
   priorityRetentionRadius: 60
   waypointArriveRadius: 1.5
@@ -317,13 +330,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4357371bb2485c44e8a1cf8e46508cd9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  maxHealth: 10000
-  health: 10000
+  maxHealth: 300
+  health: 300
   physicalDefense: 200
   explosionDefense: 200
   energyDefense: 200
   coldDefense: 200
-  sprintSpeed: 30
+  sprintSpeed: 25
   accelerationSpeed: 60
   decelerationSpeed: 60
   rotationSpeed: 180
@@ -343,6 +356,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShipPassenger
   platformTag: Mobile Platform Hitbox
+  detectByHierarchy: 0
 --- !u!114 &7031235214745723284
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -692,6 +706,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 895489e336b99f647b4aae707abba28f, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5381951446980489110}
+    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 895489e336b99f647b4aae707abba28f, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5600650950397893444}
     - targetCorrespondingSourceObject: {fileID: -7894837268036850075, guid: 895489e336b99f647b4aae707abba28f, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3009275871808198742}
@@ -783,10 +800,10 @@ MonoBehaviour:
   bulletPerRound: 1
   roundsPerFire: 1
   timeBetweenShots: 0
-  timeBetweenShooting: 0.1
+  timeBetweenShooting: 0.2
   reloadTime: 5
   reloadTimer: 0
-  magazineSize: 1000
+  magazineSize: 30
   bulletTargetLayer:
     serializedVersion: 2
     m_Bits: 12544

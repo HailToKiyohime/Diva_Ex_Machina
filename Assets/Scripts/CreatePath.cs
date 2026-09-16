@@ -116,14 +116,6 @@ public class CreatePath : MonoBehaviour
                 ? Random.Range(combatRangeBrainMinUpdateTime, combatRangeBrainMaxUpdateTime)
                 : normalRangeBrainUpdateTime;
         }
-
-        // Debug
-        if (path != null && path.corners != null)
-        {
-            for (int i = 0; i < path.corners.Length - 1; i++)
-                Debug.DrawLine(ProjectCornerToReal(path.corners[i]),
-                               ProjectCornerToReal(path.corners[i + 1]), Color.red);
-        }
     }
 
     public void FindPath()

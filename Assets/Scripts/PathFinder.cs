@@ -261,15 +261,6 @@ public class PathFinder : MonoBehaviour
         // corners 是 property，每次存取都配一個新陣列 —— 取一次，後面都用它
         Vector3[] g = path.corners;
 
-        // ── 診斷用，四個數字確認正常之後可以整段刪掉 ──────────────
-        float endGap = (g.Length > 0) ? Vector3.Distance(g[g.Length - 1], e.position) : -1f;
-        /*Debug.Log(name + "#" + GetInstanceID()
-            + " status=" + path.status + " corners=" + g.Length
-            + " endGap=" + endGap.ToString("F1")
-            + " | navEnd=" + navEnd.ToString("F1")
-            + " eSnap=" + Vector3.Distance(navEnd, e.position).ToString("F1"), this);*/
-        // ──────────────────────────────────────────────────────
-
         if (path.status == NavMeshPathStatus.PathInvalid || g.Length == 0)
         {
             lastPathGhost = System.Array.Empty<Vector3>();
