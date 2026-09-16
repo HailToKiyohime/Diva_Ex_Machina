@@ -13,8 +13,24 @@ public class ShipPassenger : MonoBehaviour
 {
     [SerializeField] private string platformTag = "Mobile Platform Hitbox";
 
+    [Tooltip("固定在船上的物件（建築、砲塔）用。\n" +
+             "開啟後，只要這個物件是真實船（LandshipNavigation.realShip）的子物件，就視為在船上，\n" +
+             "不需要 Rigidbody、也不需要 trigger。會走動的實體（敵人、玩家）請保持關閉。")]
+    [SerializeField] private bool detectByHierarchy = false;
+
+    [SerializeField] private bool logContacts = false;
+
     /// <summary>目前是否站在移動平台上。</summary>
     public bool isOnShip { get; private set; }
+
+    /// <summary>isOnShip 的別名（CreatePath 用的是這個大小寫）。</summary>
+    public bool IsOnShip => isOnShip;
+
+    // 階層判定的快取：船不會換，父物件改變時才需要重查
+    private Transform _hierarchyShip;
+    private Transform _hierarchyParent;
+    private bool _hierarchyOnShip;
+    private Rigidbody _hierarchyRb;
 
     /// <summary>目前所在平台的 Rigidbody；不在平台上時為 null。</summary>
     public Rigidbody PlatformRigidbody { get; private set; }
@@ -48,6 +64,15 @@ public class ShipPassenger : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (detectByHierarchy && CheckHierarchy())
+        {
+            // 掛在船底下：不看 trigger，直接視為在船上
+            isOnShip = true;
+            PlatformRigidbody = _hierarchyRb;
+            _contactsThisStep = 0;
+            return;
+        }
+
         isOnShip = _contactsThisStep > 0;
 
         if (!isOnShip)
@@ -65,8 +90,9 @@ public class ShipPassenger : MonoBehaviour
         //Debug.Log("other: " + other.name + "tag" + other.tag);
         if (other == null) return;
         if (!other.CompareTag(platformTag)) return;
-        Debug.Log(name + " platform contact: " + other.name
-    + " dist=" + Vector3.Distance(transform.position, other.ClosestPoint(transform.position)).ToString("F1"), this);
+        if (logContacts)
+            Debug.Log(name + " platform contact: " + other.name
+                + " dist=" + Vector3.Distance(transform.position, other.ClosestPoint(transform.position)).ToString("F1"), this);
         _contactsThisStep++;
 
         if (other != _cachedPlatformCollider)
@@ -79,8 +105,41 @@ public class ShipPassenger : MonoBehaviour
             PlatformRigidbody = _cachedPlatformRb;
     }
 
+    /// <summary>
+    /// 這個物件是否掛在真實船底下。結果依「船 + 父物件」快取，
+    /// 建築被放上 / 移出船時（parent 改變）才會重算。
+    /// </summary>
+    private bool CheckHierarchy()
+    {
+        LandshipNavigation nav = LandshipNavigation.Instance;
+        Transform ship = (nav != null) ? nav.realShip : null;
+        if (ship == null) return false;
+
+        if (ship != _hierarchyShip || transform.parent != _hierarchyParent)
+        {
+            _hierarchyShip = ship;
+            _hierarchyParent = transform.parent;
+            _hierarchyOnShip = transform.IsChildOf(ship) && transform != ship;
+
+            _hierarchyRb = null;
+            if (_hierarchyOnShip)
+            {
+                // 船的 Rigidbody 可能在 root 上，也可能在 root 的父物件上
+                _hierarchyRb = ship.GetComponent<Rigidbody>();
+                if (_hierarchyRb == null) _hierarchyRb = ship.GetComponentInParent<Rigidbody>();
+            }
+        }
+
+        return _hierarchyOnShip;
+    }
+
     private void OnDisable()
     {
+        _hierarchyShip = null;
+        _hierarchyParent = null;
+        _hierarchyOnShip = false;
+        _hierarchyRb = null;
+
         // 被停用（或之後池化回收）時不要留著上一次的狀態
         isOnShip = false;
         PlatformRigidbody = null;

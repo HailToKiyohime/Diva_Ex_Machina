@@ -8,6 +8,7 @@ TagManager:
   - Enemy
   - Mobile Platform
   - Mobile Platform Hitbox
+  - Defence Fortifications
   layers:
   - Default
   - TransparentFX

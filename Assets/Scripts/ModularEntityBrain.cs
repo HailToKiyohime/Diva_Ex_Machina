@@ -248,7 +248,9 @@ public class ModularEntityBrain : MonoBehaviour
         if (target != null)
         {
             // 目標身上的 ShipPassenger；沒掛就當作不在船上（例如靜態建築、Core）
-            ShipPassenger tp = target.GetComponent<ShipPassenger>();
+            // 用 InParent：EnemyDetection 加進來的是「被碰到的 collider」的 transform，
+            // 建築的 ShipPassenger 通常在 prefab root，不在那個子物件上
+            ShipPassenger tp = target.GetComponentInParent<ShipPassenger>();
             pathFinder.isTargetOnShip = tp != null && tp.isOnShip;
             pathFinder.targetLocation = target.position;   // GetTargetClosestDockingLocation 需要它
         }

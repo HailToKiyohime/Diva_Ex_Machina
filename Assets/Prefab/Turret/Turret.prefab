@@ -298,6 +298,8 @@ GameObject:
   - component: {fileID: 8087295809779568784}
   - component: {fileID: 3902974196550821903}
   - component: {fileID: 8520183751568274877}
+  - component: {fileID: 3608191395778547943}
+  - component: {fileID: 3652946989640725271}
   m_Layer: 13
   m_Name: Turret
   m_TagString: Untagged
@@ -384,6 +386,49 @@ MonoBehaviour:
   fireConeDeg: 6
   preferUniqueTargets: 1
   ignoreDeadObjects: 1
+--- !u!114 &3608191395778547943
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4415953370039347569}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7151e665c80d37f4cb7950e3c8d0df52, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BuildingStats
+  maxHealth: 500
+  health: 500
+  physicalDefense: 0
+  explosionDefense: 0
+  energyDefense: 0
+  coldDefense: 0
+  effectManager: {fileID: 0}
+  destroyEffectPrefab: {fileID: 0}
+  destroyGhostOnDeath: 1
+  destroyDelay: 0
+  onDamaged:
+    m_PersistentCalls:
+      m_Calls: []
+  onDestroyed:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!114 &3652946989640725271
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4415953370039347569}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 31fb2d2174ffd2a4a80728d54f1f0d07, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShipPassenger
+  platformTag: Mobile Platform Hitbox
+  detectByHierarchy: 1
+  logContacts: 0
 --- !u!1 &4492677885157587010
 GameObject:
   m_ObjectHideFlags: 0
@@ -491,9 +536,10 @@ GameObject:
   - component: {fileID: 1008057277740507130}
   - component: {fileID: 3589875768314924099}
   - component: {fileID: 2386214095277266245}
+  - component: {fileID: 792568557420770321}
   m_Layer: 13
   m_Name: Turret
-  m_TagString: Untagged
+  m_TagString: Defence Fortifications
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -570,3 +616,24 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!65 &792568557420770321
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8467481265708857813}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 13.44309, y: 7.4430366, z: 12.615384}
+  m_Center: {x: -0.00000071525574, y: 5.9158545, z: 0}

@@ -263,11 +263,11 @@ public class PathFinder : MonoBehaviour
 
         // ── 診斷用，四個數字確認正常之後可以整段刪掉 ──────────────
         float endGap = (g.Length > 0) ? Vector3.Distance(g[g.Length - 1], e.position) : -1f;
-        Debug.Log(name + "#" + GetInstanceID()
+        /*Debug.Log(name + "#" + GetInstanceID()
             + " status=" + path.status + " corners=" + g.Length
             + " endGap=" + endGap.ToString("F1")
             + " | navEnd=" + navEnd.ToString("F1")
-            + " eSnap=" + Vector3.Distance(navEnd, e.position).ToString("F1"), this);
+            + " eSnap=" + Vector3.Distance(navEnd, e.position).ToString("F1"), this);*/
         // ──────────────────────────────────────────────────────
 
         if (path.status == NavMeshPathStatus.PathInvalid || g.Length == 0)
