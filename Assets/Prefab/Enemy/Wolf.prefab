@@ -248,6 +248,13 @@ MonoBehaviour:
   groundMask:
     serializedVersion: 2
     m_Bits: 4224
+  combatCandidateCount: 4
+  candidateProbeUp: 10
+  candidateProbeDown: 60
+  losEyeHeight: 1.5
+  losMask:
+    serializedVersion: 2
+    m_Bits: 28928
   drawPathGizmo: 1
   pathColor: {r: 0, g: 1, b: 0, a: 1}
   waypointGizmoRadius: 0.5

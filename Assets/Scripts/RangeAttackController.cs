@@ -225,7 +225,10 @@ public class RangeAttackController : MonoBehaviour
                 var rb = currentBullet.GetComponent<Rigidbody>();
                 if (rb) rb.linearVelocity = (dirWithSpread * w.range.bulletSpeed) + movingPlatformOffset;
                 //make bullet face the direction it's moving
-                currentBullet.transform.forward = (dirWithSpread * w.range.bulletSpeed);
+                // 用方向本身，不要乘上速度：bulletSpeed 為 0 時 forward 會收到零向量，
+                // Unity 會忽略這次賦值，子彈就維持 Quaternion.identity 的朝向。
+                if (dirWithSpread.sqrMagnitude > 0.0001f)
+                    currentBullet.transform.rotation = Quaternion.LookRotation(dirWithSpread.normalized, Vector3.up);
             }
 
             w.rangeRuntime.bulletsLeft--;

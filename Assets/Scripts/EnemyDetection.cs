@@ -1,5 +1,4 @@
 using UnityEngine;
-using static UnityEngine.UI.Image;
 
 public class EnemyDetection : MonoBehaviour
 {

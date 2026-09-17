@@ -423,8 +423,29 @@ public class Bullet : MonoBehaviour, IPooled
         UpdateHoming(Time.fixedDeltaTime);
         if (!_live) return;
 
+        // 3.5) 機頭對齊飛行方向
+        //      原本只有 UpdateHoming 轉向時才會對齊，所以沒有追蹤目標的子彈
+        //      一輩子維持發射瞬間的朝向。速度一旦改變（重力下墜、被平台速度疊加、
+        //      打到東西後減速），模型就跟實際飛行方向對不上。
+        //      每個 physics step 對齊一次，上述情況全部涵蓋。
+        AlignToVelocity();
+
         // 4) 下一步的碰撞預測
         Predict();
+    }
+
+    /// <summary>
+    /// 把機頭轉向目前的速度方向。速度接近零時維持原朝向，
+    /// 避免 LookRotation 收到零向量而跳成預設朝向。
+    /// </summary>
+    private void AlignToVelocity()
+    {
+        if (!alignToVelocity || rb == null) return;
+
+        Vector3 vel = rb.linearVelocity;
+        if (vel.sqrMagnitude < 0.0001f) return;
+
+        transform.rotation = Quaternion.LookRotation(vel.normalized, Vector3.up);
     }
 
     private void OnTriggerEnter(Collider collider)

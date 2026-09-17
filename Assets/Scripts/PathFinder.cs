@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.AI;
 
 public class PathFinder : MonoBehaviour
@@ -58,6 +58,20 @@ public class PathFinder : MonoBehaviour
     [SerializeField] private float verticalProbeDistance = 40f;
     [SerializeField] private LayerMask groundMask = ~0;
 
+    [Header("Combat Destination Sampling")]
+    [Tooltip("戰鬥狀態一次產生幾個候選點。每個候選點各打 1 條向下 ray + 1 條視線 ray。")]
+    [SerializeField, Min(1)] private int combatCandidateCount = 4;
+    [Tooltip("候選點從「目標高度 + 這個值」往下找地面。要大於地形起伏，否則站在斜坡上方的點會打不到地面。")]
+    [SerializeField] private float candidateProbeUp = 10f;
+    [Tooltip("候選點往下找地面的最大距離（從 目標高度 + candidateProbeUp 起算）。")]
+    [SerializeField] private float candidateProbeDown = 60f;
+    [Tooltip("視線檢查的起點高度（候選地面點往上幾公尺，約等於敵人砲口 / 眼睛高度）。")]
+    [SerializeField] private float losEyeHeight = 1.5f;
+    [Tooltip("視線檢查會被哪些 layer 擋住。目標自己的 layer 也要包含在內，否則永遠「打不到」目標。")]
+    [SerializeField] private LayerMask losMask = ~0;
+
+    private static readonly RaycastHit[] losHits = new RaycastHit[16];
+
     [Header("Debug Gizmo")]
     [SerializeField] private bool drawPathGizmo = true;
     [SerializeField] private Color pathColor = Color.green;
@@ -77,17 +91,10 @@ public class PathFinder : MonoBehaviour
         path = new NavMeshPath();
     }
 
-    /// <summary>
-    /// 上一次算出來的是不是「保底路徑」（NavMesh 什麼都沒算出來，改用目的地直線）。
-    /// 呼叫端可以用它來縮短重試間隔或做別的降級處理。
-    /// </summary>
-    public bool LastPathIsFallback { get; private set; }
-
     public Vector3[] FindPath(Vector3 targetLocation)
     {
         Vector3[] result;
         lastPathOnShip = false;   // 預設地面；下面命中 ghost 分支才設 true
-        LastPathIsFallback = false;
 
         if (isOnShip && isTargetOnShip)// if both side on ship, convert gobal coordinates to ship local coordinates
         {
@@ -161,7 +168,6 @@ public class PathFinder : MonoBehaviour
     /// </summary>
     private Vector3[] BuildFallbackPath(Vector3 endWorld, bool ghostSpace)
     {
-        LastPathIsFallback = true;
 
         if (ghostSpace && HasShipRoots)
         {
@@ -194,6 +200,103 @@ public class PathFinder : MonoBehaviour
         for (int i = 0; i < lastPathGhost.Length; i++)
             outArr[i] = ShipNavProjector.GhostToRealPoint(RealShipRoot, GhostShipRoot, lastPathGhost[i]);
         return outArr;
+    }
+
+    /// <summary>
+    /// 戰鬥用目的地：在目標周圍產生 combatCandidateCount 個候選點，
+    /// 只保留「站在那裡看得到目標」的點；多個可用時選高度最接近目標的。
+    ///
+    /// 解決的問題：目標站在懸崖邊時，隨機點落在崖外，SamplePosition 會把它吸到崖底。
+    /// 崖底的點視線會被崖壁擋住 → 被淘汰；就算崖底剛好看得到，高度差也會輸給崖頂的點。
+    ///
+    /// 全部候選都看不到目標時，退而選高度最接近的點（仍比舊版的純隨機好）；
+    /// 連地面都打不到，就回傳目標位置本身。
+    /// </summary>
+    public Vector3 PickCombatDestination(Transform target, float radius)
+    {
+        Vector3 targetPos = target.position;
+        Vector3 aimPoint = TurretController.GetAimPoint(target);
+
+        bool haveVisible = false, haveAny = false;
+        Vector3 bestVisible = targetPos, bestAny = targetPos;
+        float bestVisibleDy = float.MaxValue, bestAnyDy = float.MaxValue;
+
+        for (int i = 0; i < combatCandidateCount; i++)
+        {
+            Vector2 r = Random.insideUnitCircle * radius;
+            Vector3 probeOrigin = new Vector3(targetPos.x + r.x, targetPos.y + candidateProbeUp, targetPos.z + r.y);
+
+            // 用向下 ray 找「這個水平位置」的地面，而不是 SamplePosition 的「最近 navmesh」——
+            // 後者在崖邊會橫向吸附，前者至少保證 XZ 不變，高度才有比較的意義。
+            if (!Physics.Raycast(probeOrigin, Vector3.down, out RaycastHit ground,
+                    candidateProbeUp + candidateProbeDown, groundMask, QueryTriggerInteraction.Ignore))
+                continue;
+
+            // 候選點落在目標自己身上（例如大型建築的屋頂）→ 不算地面
+            if (IsPartOfTarget(ground.collider, target))
+                continue;
+
+            Vector3 candidate = ground.point;
+            float dy = Mathf.Abs(candidate.y - targetPos.y);
+
+            if (dy < bestAnyDy) { bestAnyDy = dy; bestAny = candidate; haveAny = true; }
+
+            if (dy < bestVisibleDy && HasLineOfSight(candidate + Vector3.up * losEyeHeight, aimPoint, target))
+            {
+                bestVisibleDy = dy;
+                bestVisible = candidate;
+                haveVisible = true;
+            }
+        }
+
+        if (haveVisible) return bestVisible;
+        if (haveAny) return bestAny;
+        return targetPos;
+    }
+
+    /// <summary>
+    /// 從 from 往 to 打一條線，忽略自己的 collider；
+    /// 第一個擋到的東西是目標 → 看得到；途中沒有任何東西 → 也算看得到。
+    /// </summary>
+    private bool HasLineOfSight(Vector3 from, Vector3 to, Transform target)
+    {
+        Vector3 dir = to - from;
+        float dist = dir.magnitude;
+        if (dist < 0.01f) return true;
+        dir /= dist;
+
+        // 多打 0.5m，確保 bounds 中心在 collider 內部時仍能命中表面
+        int n = Physics.RaycastNonAlloc(from, dir, losHits, dist + 0.5f, losMask, QueryTriggerInteraction.Ignore);
+
+        float nearest = float.MaxValue;
+        Collider nearestCol = null;
+        for (int i = 0; i < n; i++)
+        {
+            Collider col = losHits[i].collider;
+            if (col.transform.IsChildOf(transform)) continue;   // 自己的身體不算遮蔽
+            if (losHits[i].distance < nearest)
+            {
+                nearest = losHits[i].distance;
+                nearestCol = col;
+            }
+        }
+
+        if (nearestCol == null) return true;
+        return IsPartOfTarget(nearestCol, target);
+    }
+
+    /// <summary>
+    /// collider 是否屬於目標。
+    /// 不用 target.root 比對：建築 / Core 可能掛在船底下，root 是整艘船，會把船身誤判成目標。
+    /// </summary>
+    private bool IsPartOfTarget(Collider col, Transform target)
+    {
+        if (col.transform == target || col.transform.IsChildOf(target)) return true;
+
+        // EnemyDetection 傳進來的可能是子物件 collider，本體在同一個 Rigidbody 下
+        Rigidbody rb = col.attachedRigidbody;
+        if (rb == null || rb.transform == RealShipRoot) return false;
+        return target.IsChildOf(rb.transform);
     }
 
     public Vector3 GetClosestDockingLocation()

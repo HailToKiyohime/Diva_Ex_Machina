@@ -19,7 +19,6 @@ public class ModularEntityStats : MonoBehaviour, IDamageable
     // Optional events
     public event Action OnDeath;
 
-    public ModularEntityBrain enemyBrain;
     public ModularEntityEffectManager modularEntityEffectManager;
 
     public float jumpHeight;

@@ -38,7 +38,7 @@ public class Target
 }
 
 [System.Serializable]
-public class TargerPreference
+public class TargetPreference
 {
     public TargetType targetType;
     public float priorityMultiplier;
@@ -56,11 +56,10 @@ public class ModularEntityBrain : MonoBehaviour
     protected ShipPassenger selfPassenger;   // 自己的船上狀態（掛在同一個 GameObject 上）
 
     public EntityState currentState;
-    public List<TargerPreference> targetPreferences = new List<TargerPreference>();
+    public List<TargetPreference> targetPreferences = new List<TargetPreference>();
     public List<Target> targets = new List<Target>();
 
     protected Vector3[] path;
-    public Vector3 nextWaypoint;
     public Vector3 destination;
     public Vector3 spawnLocation;
     [Header("Idle Setting")]
@@ -304,8 +303,8 @@ public class ModularEntityBrain : MonoBehaviour
                     destinationTimer = RollInterval(combatDestinationUpdateRange);
                     Transform combatTarget = FindTarget();
                     if (combatTarget == null) { ChangeState(EntityState.Patrolling); break; }   // 沒目標 → 回巡邏
-                    r = Random.insideUnitCircle * combatActivityAreaRadius;
-                    destination = combatTarget.position + new Vector3(r.x, 0f, r.y);
+                    // 多點採樣 + 視線檢查，避免目標在崖邊時選到崖底
+                    destination = pathFinder.PickCombatDestination(combatTarget, combatActivityAreaRadius);
                     SyncShipFlags(combatTarget);
                     SetPath(pathFinder.FindPath(destination));
                     break;
@@ -524,7 +523,7 @@ public class ModularEntityBrain : MonoBehaviour
     /// </summary>
     protected float RollInterval(Vector2 range)
     {
-        if (IsNearDockingPoint())
+        if (IsNearDockingPoint()&& !pathFinder.isOnShip)
             range = dockDestinationUpdateRange;
 
         return Random.Range(range.x, range.y);

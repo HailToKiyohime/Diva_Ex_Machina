@@ -21,9 +21,6 @@ public class ShipPassenger : MonoBehaviour
     /// <summary>目前是否站在移動平台上。</summary>
     public bool isOnShip { get; private set; }
 
-    /// <summary>isOnShip 的別名（CreatePath 用的是這個大小寫）。</summary>
-    public bool IsOnShip => isOnShip;
-
     // 階層判定的快取：船不會換，父物件改變時才需要重查
     private Transform _hierarchyShip;
     private Transform _hierarchyParent;

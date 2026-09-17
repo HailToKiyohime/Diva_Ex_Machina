@@ -345,7 +345,7 @@ MonoBehaviour:
     firingMode: 0
     turretRotationSpeed: 90
     barrelElevationSpeed: 30
-    turretRotationLimit: 180
+    turretRotationLimit: 360
     barrelElevationLimitUp: 30
     barrelElevationLimitDown: 30
     muzzles:
@@ -398,8 +398,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7151e665c80d37f4cb7950e3c8d0df52, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BuildingStats
-  maxHealth: 500
-  health: 500
+  maxHealth: 5000
+  health: 5000
   physicalDefense: 0
   explosionDefense: 0
   energyDefense: 0
