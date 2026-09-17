@@ -318,8 +318,6 @@ public class BuildSystem : MonoBehaviour
 
         if (!InventoryManager.Instance.DeductItem(bp.costs)) return;
 
-        ApplyFootprintOccupancyRotated(_hitGrid, _hitGridIndex, _hitCellX, _hitCellY, fp, rotationStep);
-
         Vector3 pos = GetFootprintCenterWorld(_hitGrid, _hitGridIndex, _hitCellX, _hitCellY, fp, rotationStep);
 
         Quaternion baseRot = placeAlignToGridRotation ? _hitGrid.transform.rotation : Quaternion.identity;
@@ -328,6 +326,10 @@ public class BuildSystem : MonoBehaviour
         Transform parent = placeParentToGrid ? _hitGrid.transform : null;
 
         GameObject placed = Instantiate(bp.buildingPrefab, pos, rot, parent);
+
+        // 佔用要在 Instantiate 之後：grid 記的是「哪幾格屬於這棟建築」，
+        // 需要先有建築本人才能登記。合法性在上面 EvaluatePlacement 已經確認過了。
+        ApplyFootprintOccupancyRotated(_hitGrid, _hitGridIndex, _hitCellX, _hitCellY, fp, rotationStep, placed);
 
         if (bp.buildingMaterial != null)
             ApplyMaterialToAllRenderers(placed, bp.buildingMaterial);
@@ -482,7 +484,11 @@ public class BuildSystem : MonoBehaviour
         return any;
     }
 
-    private void ApplyFootprintOccupancyRotated(BuildingGrid grid, int gridIndex, int anchorX, int anchorY, BoolMatrix fp, int rotStep)
+    /// <summary>
+    /// 把 footprint 依 rotStep 旋轉後寫進 grid 的佔用表，並把佔用者登記給 grid，
+    /// 建築被摧毀時 grid 才知道該還哪幾格。
+    /// </summary>
+    private void ApplyFootprintOccupancyRotated(BuildingGrid grid, int gridIndex, int anchorX, int anchorY, BoolMatrix fp, int rotStep, GameObject owner)
     {
         int srcW = fp.width;
         int srcH = fp.height;
@@ -498,7 +504,7 @@ public class BuildSystem : MonoBehaviour
                 int gx = anchorX + rx;
                 int gy = anchorY + ry;
 
-                grid.SetOccupied(gridIndex, gx, gy, true);
+                grid.OccupyCell(gridIndex, gx, gy, owner);
             }
         }
     }

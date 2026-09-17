@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class BuildingGrid : MonoBehaviour
@@ -59,6 +60,89 @@ public class BuildingGrid : MonoBehaviour
 
         EnsureOccupancy(gridIndex);
         g.occupied.Set(x, y, value);
+    }
+
+    // ── Ownership（執行期資料，不序列化）─────────────────────────────
+    //
+    // occupied 只是一張 bool 表，沒有記錄「是誰佔的」，所以建築被摧毀時
+    // 沒人知道該把哪幾格還回來。這裡替每個佔用者記下它的格子，
+    // 釋放時直接照著清單還 —— 不需要把 anchor / footprint / 旋轉再反推一次，
+    // 放置與釋放看的是同一份資料，兩邊不可能對不上。
+    //
+    // 放在 BuildingGrid 上而不是建築上：格子是 grid 的資產，
+    // 佔用與釋放都由 grid 自己負責，建築只要報上自己的名字。
+    //
+    // 不序列化：場上的建築本來就只在 Play Mode 存在，離開 Play Mode
+    // 這份資料跟著消失才是對的。
+
+    private readonly Dictionary<GameObject, OwnedCells> _owners = new Dictionary<GameObject, OwnedCells>();
+
+    /// <summary>目前啟用中的所有 grid。給 ReleaseFromAnyGrid 用，建築不必自己找 grid。</summary>
+    private static readonly List<BuildingGrid> _activeGrids = new List<BuildingGrid>();
+
+    private class OwnedCells
+    {
+        public int gridIndex;
+        public readonly List<Vector2Int> cells = new List<Vector2Int>();
+    }
+
+    private void OnEnable()
+    {
+        if (!_activeGrids.Contains(this)) _activeGrids.Add(this);
+    }
+
+    private void OnDisable()
+    {
+        _activeGrids.Remove(this);
+    }
+
+    /// <summary>
+    /// 把一格標成佔用，並記下佔用者。owner 為 null 時等同 SetOccupied(..., true) ——
+    /// 沒有佔用者的格子（例如地形本來就不能蓋的區域）永遠不會被釋放。
+    /// </summary>
+    public void OccupyCell(int gridIndex, int x, int y, GameObject owner)
+    {
+        SetOccupied(gridIndex, x, y, true);
+
+        if (owner == null) return;
+
+        if (!_owners.TryGetValue(owner, out OwnedCells owned))
+        {
+            owned = new OwnedCells { gridIndex = gridIndex };
+            _owners[owner] = owned;
+        }
+
+        owned.cells.Add(new Vector2Int(x, y));
+    }
+
+    /// <summary>
+    /// 把某個佔用者的格子全部還回來。沒登記過的 owner 是 no-op，
+    /// 所以重複呼叫、或對事先擺在場景裡的建築呼叫，都不會出問題。
+    /// </summary>
+    public void ReleaseOwner(GameObject owner)
+    {
+        if (owner == null) return;
+        if (!_owners.TryGetValue(owner, out OwnedCells owned)) return;
+
+        for (int i = 0; i < owned.cells.Count; i++)
+            SetOccupied(owned.gridIndex, owned.cells[i].x, owned.cells[i].y, false);
+
+        _owners.Remove(owner);
+    }
+
+    /// <summary>
+    /// 在所有啟用中的 grid 上釋放這個佔用者。
+    /// 建築不需要記住自己是被哪一個 grid 收下的，死亡時呼叫這個就好。
+    /// </summary>
+    public static void ReleaseFromAnyGrid(GameObject owner)
+    {
+        if (owner == null) return;
+
+        for (int i = 0; i < _activeGrids.Count; i++)
+        {
+            if (_activeGrids[i] != null)
+                _activeGrids[i].ReleaseOwner(owner);
+        }
     }
 
     // anchorX/Y = hit cell, footprint (0,0) will map onto (anchorX, anchorY)

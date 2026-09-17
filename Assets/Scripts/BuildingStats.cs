@@ -118,8 +118,10 @@ public class BuildingStats : MonoBehaviour, IDamageable
         Destroyed?.Invoke(this);
         onDestroyed?.Invoke();
 
-        // 注意：BuildingGrid 的佔用格目前沒有對應的清除 API，
-        // 之後做拆除功能時要在這裡把格子釋放，否則原位置無法再蓋。
+        // 把 grid 上佔用的格子還回去，玩家才能在原地重蓋。
+        // 這裡就釋放、不等 destroyDelay：死亡動畫還在播的時候格子已經可以再用。
+        // 沒登記過的建築（事先擺在場景裡的）是 no-op。
+        BuildingGrid.ReleaseFromAnyGrid(gameObject);
 
         if (ghost != null) Destroy(ghost.gameObject);
         Destroy(gameObject, destroyDelay);
