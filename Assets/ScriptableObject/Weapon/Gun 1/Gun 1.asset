@@ -45,7 +45,7 @@ MonoBehaviour:
     value: 35
   - attribute: 15
     mode: 0
-    value: 110
+    value: 200
   - attribute: 16
     mode: 0
     value: 1
