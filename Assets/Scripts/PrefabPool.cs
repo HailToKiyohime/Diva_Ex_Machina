@@ -143,6 +143,35 @@ public class PrefabPool : MonoBehaviour
         return _instance.DespawnInternal(instance, pooled);
     }
 
+    /// <summary>
+    /// 延遲歸還。一次性特效用：粒子播完才回池子，呼叫端不必自己開 coroutine
+    /// （特效的生產者通常是子彈，而子彈在命中的當下就退場了，它開的 coroutine 會跟著死）。
+    ///
+    /// ⚠ 只適合「生出來就放著播完」的一次性物件。延遲期間如果有別人先把這個實例
+    ///   Despawn 並重新 Spawn 出去，時間到時會把正在使用中的實例收回去。
+    /// </summary>
+    public static bool Despawn(GameObject instance, float delay)
+    {
+        if (instance == null) return false;
+        if (delay <= 0f) return Despawn(instance);
+
+        if (_instance == null)
+        {
+            Destroy(instance, delay);   // 沒有池子 → 跟 Spawn 的退路一致，直接銷毀
+            return false;
+        }
+
+        _instance.StartCoroutine(_instance.DespawnAfter(instance, delay));
+        return true;
+    }
+
+    private IEnumerator DespawnAfter(GameObject instance, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+
+        if (instance != null) Despawn(instance);
+    }
+
     /// <summary>手動預熱。可以在載入畫面裡針對這一關會用到的 prefab 呼叫。</summary>
     public static void Prewarm(GameObject prefab, int count)
     {

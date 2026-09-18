@@ -280,7 +280,6 @@ MonoBehaviour:
     type: 0
     targetPriority: 0
     priorityDecreaseMultiplier: 0
-  nextWaypoint: {x: 0, y: 0, z: 0}
   destination: {x: 0, y: 0, z: 0}
   spawnLocation: {x: 0, y: 0, z: 0}
   idleDestinationUpdateRange: {x: 10, y: 15}
@@ -295,7 +294,7 @@ MonoBehaviour:
   reactionChance: 0.5
   dockUpdateDistance: 100
   dockDestinationUpdateRange: {x: 0.1, y: 0.5}
-  attackSlotHoldSeconds: 8
+  attackSlotHoldSeconds: 30
   priorityRetentionRadius: 60
   waypointArriveRadius: 1.5
   slowDownRadius: 10
@@ -347,7 +346,6 @@ MonoBehaviour:
   accelerationSpeed: 60
   decelerationSpeed: 60
   rotationSpeed: 180
-  enemyBrain: {fileID: 5243097427755126230}
   modularEntityEffectManager: {fileID: 7031235214745723284}
   jumpHeight: 10
 --- !u!114 &8426514956781042070

@@ -21,6 +21,19 @@ public class Bullet : MonoBehaviour, IPooled
     public bool ignoreObstacles = false;
 
     // ─────────────────────────── Homing ───────────────────────────
+    // ─────────────────────────── Hit Effect ───────────────────────────
+    [Header("Hit Effect")]
+    [Tooltip("命中時在命中點生成的特效。根物件底下可以掛任意多個 Particle System。\n" +
+             "走 PrefabPool，播完會自動回池子，不需要在特效上掛任何腳本。")]
+    public GameObject hitEffect;
+
+    [Tooltip("特效存活幾秒後回池子。\n0 = 自動推算：取所有 Particle System 中 (duration + 最長粒子壽命) 的最大值。")]
+    [Min(0f)] public float hitEffectLifetime = 0f;
+
+    [Tooltip("特效沿命中面法線往外推幾公尺，避免跟牆面 z-fighting 或被切掉一半。")]
+    [Min(0f)] public float hitEffectSurfaceOffset = 0.1f;
+    // ──────────────────────────────────────────────────────────────
+
     [Header("Homing")]
     [Tooltip("轉向角速度。0 = 不追蹤，360 = 每秒可轉 360 度")]
     public float homingDegreePerSecond = 0f;
@@ -77,6 +90,19 @@ public class Bullet : MonoBehaviour, IPooled
 
     // Prevent multi-collider enemies from taking damage multiple times per bullet
     private readonly HashSet<int> _hitEnemyIds = new HashSet<int>();
+
+    // Predict 的 Linecast 記下的命中點與命中面法線。
+    //
+    // ★ 位置一定要在這裡記，不能等到結算時才讀 transform.position。
+    //   Predict 只是「登記」命中，真正的結算在下一個 physics step；
+    //   中間物理引擎已經把子彈往前推了 velocity × fixedDeltaTime，
+    //   砲塔子彈一步就是好幾公尺 —— 那時的位置早就在牆的另一側了。
+    //
+    // Trigger 回呼本身拿不到這兩個資訊，所以只有走預測那條路的命中才有；
+    // 沒有時退回子彈當下的位置與「來向的反方向」。
+    private Vector3 _pendingHitPoint;
+    private Vector3 _pendingHitNormal;
+    private bool _hasPendingHitPoint;
 
     // Homing runtime state
     private Transform _homingTarget;        // 目標本體（IDamageable 所在的 Transform）
@@ -187,6 +213,10 @@ public class Bullet : MonoBehaviour, IPooled
 
         public int penetration;
         public CollisionDetectionMode collisionDetectionMode;
+
+        public GameObject hitEffect;
+        public float hitEffectLifetime;
+        public float hitEffectSurfaceOffset;
     }
 
     private Defaults _defaults;
@@ -212,6 +242,10 @@ public class Bullet : MonoBehaviour, IPooled
         _defaults.homingLoseAngle = homingLoseAngle;
         _defaults.maxHomingAngle = maxHomingAngle;
         _defaults.retargetInterval = retargetInterval;
+        _defaults.hitEffect = hitEffect;
+        _defaults.hitEffectLifetime = hitEffectLifetime;
+        _defaults.hitEffectSurfaceOffset = hitEffectSurfaceOffset;
+
         _defaults.homingRequireLineOfSight = homingRequireLineOfSight;
         _defaults.homingObstacleLayer = homingObstacleLayer;
         _defaults.alignToVelocity = alignToVelocity;
@@ -249,6 +283,10 @@ public class Bullet : MonoBehaviour, IPooled
         homingLoseAngle = _defaults.homingLoseAngle;
         maxHomingAngle = _defaults.maxHomingAngle;
         retargetInterval = _defaults.retargetInterval;
+        hitEffect = _defaults.hitEffect;
+        hitEffectLifetime = _defaults.hitEffectLifetime;
+        hitEffectSurfaceOffset = _defaults.hitEffectSurfaceOffset;
+
         homingRequireLineOfSight = _defaults.homingRequireLineOfSight;
         homingObstacleLayer = _defaults.homingObstacleLayer;
         alignToVelocity = _defaults.alignToVelocity;
@@ -300,6 +338,9 @@ public class Bullet : MonoBehaviour, IPooled
         _hitEnemyIds.Clear();          // ★ 不清的話，這顆子彈永遠打不到它前世打過的目標
         _pendingHit = null;
         _hasPendingHit = false;
+        _pendingHitPoint = Vector3.zero;
+        _pendingHitNormal = Vector3.zero;
+        _hasPendingHitPoint = false;
 
         ClearTarget();
         _turnUsed = 0f;
@@ -524,6 +565,12 @@ public class Bullet : MonoBehaviour, IPooled
             rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
 
             _pendingHit = hit.collider;
+
+            // 給命中特效用：命中點與法線都要在這裡留下來，下一步結算時位置已經不對了
+            _pendingHitPoint = hit.point;
+            _pendingHitNormal = hit.normal;
+            _hasPendingHitPoint = true;
+
             _hasPendingHit = true;
         }
     }
@@ -796,6 +843,8 @@ public class Bullet : MonoBehaviour, IPooled
 
             target.TakeDamage(dmg, attacker);
 
+            SpawnHitEffect(other);
+
             // 避免穿過同一 collider 時重複觸發
             // （這個配對狀態會在子彈退場時由 _selfCol.enabled = false 清掉）
             if (_selfCol != null && other != null)
@@ -821,7 +870,104 @@ public class Bullet : MonoBehaviour, IPooled
         // Not enemy:
         // - if ignoreObstacles was true, we already returned above
         // - otherwise hit obstacle => despawn
+        SpawnHitEffect(other);
         Despawn();
+    }
+
+    // ═══════════════════════ 命中特效 ═══════════════════════
+
+    /// <summary>
+    /// 在命中點生成 hitEffect，並排程讓它播完自己回池子。
+    ///
+    /// 位置用 transform.position —— Predict 命中時已經把子彈貼到 hit.point，
+    /// 所以那就是命中點；沒走預測那條路時，子彈也正好在接觸面附近。
+    ///
+    /// 特效本身不需要掛任何腳本：存活時間在這裡算好，交給 PrefabPool 延遲歸還。
+    ///
+    /// 被打的東西有 Rigidbody 時，特效會變成它的子物件，跟著一起移動。
+    /// 不這樣做的話，打在行進中的陸行艦上，特效會停在世界座標的原地，
+    /// 船開走之後就變成一條拖在船屁股後面的長痕。
+    /// </summary>
+    protected void SpawnHitEffect(Collider hitCollider)
+    {
+        if (hitEffect == null) return;
+
+        // 命中點：優先用 Predict 記下來的，結算時的 transform.position 已經穿過牆面了。
+        // 位置仍然沿法線往外推一點點（朝向是另一回事），避免特效跟牆面 z-fighting、
+        // 或有一半被牆面裁掉。
+        Vector3 pos = _hasPendingHitPoint ? _pendingHitPoint : transform.position;
+        if (_hasPendingHitPoint) pos += _pendingHitNormal * hitEffectSurfaceOffset;
+
+        // 朝向：子彈飛行方向的反方向，也就是「往來的方向噴回去」。
+        // 不用命中面法線 —— 法線只看表面怎麼擺，斜射時噴出來的方向會跟子彈無關；
+        // 用來向的反方向，射擊角度才會反映在特效上。
+        Vector3 dir = (rb != null) ? -rb.linearVelocity : Vector3.zero;
+        if (dir.sqrMagnitude < 0.0001f) dir = -transform.forward;
+
+        Quaternion rot = Quaternion.LookRotation(dir.normalized, Vector3.up);
+
+        // 會動的目標（船、敵人）→ 掛成它的子物件，特效跟著走。
+        // 靜止的地形沒有 Rigidbody，維持世界空間即可。
+        Rigidbody hitRb = (hitCollider != null) ? hitCollider.attachedRigidbody : null;
+        Transform follow = (hitRb != null) ? hitRb.transform : null;
+
+        GameObject fx = PrefabPool.Spawn(hitEffect, pos, rot, follow);
+        if (fx == null) return;
+
+        // 掛到目標底下之後，特效會繼承目標的縮放 —— 船如果不是 1:1:1，
+        // 命中特效就會跟著變大變小。這裡把 localScale 反算回去，
+        // 讓特效的世界大小永遠等於 prefab 上設定的大小。
+        NormalizeEffectScale(fx.transform, hitEffect.transform.localScale);
+
+        float life = hitEffectLifetime > 0f ? hitEffectLifetime : GetEffectDuration(fx);
+        PrefabPool.Despawn(fx, life);
+    }
+
+    /// <summary>
+    /// 抵銷父物件的縮放，讓特效維持 prefab 設定的世界大小。
+    /// 沒有父物件（打在靜態地形上）時直接套用原尺寸。
+    /// </summary>
+    private static void NormalizeEffectScale(Transform fx, Vector3 desiredWorldScale)
+    {
+        Transform parent = fx.parent;
+        if (parent == null)
+        {
+            fx.localScale = desiredWorldScale;
+            return;
+        }
+
+        Vector3 p = parent.lossyScale;
+
+        // 父物件某一軸是 0 時除不下去，那一軸維持原值
+        fx.localScale = new Vector3(
+            Mathf.Approximately(p.x, 0f) ? desiredWorldScale.x : desiredWorldScale.x / p.x,
+            Mathf.Approximately(p.y, 0f) ? desiredWorldScale.y : desiredWorldScale.y / p.y,
+            Mathf.Approximately(p.z, 0f) ? desiredWorldScale.z : desiredWorldScale.z / p.z);
+    }
+
+    /// <summary>
+    /// 特效實際要播多久：所有 Particle System 中 (duration + 最長粒子壽命) 的最大值。
+    /// 一個都沒有（純 Animator / AudioSource 特效）時給一個保守的 2 秒。
+    /// </summary>
+    private static float GetEffectDuration(GameObject fx)
+    {
+        ParticleSystem[] systems = fx.GetComponentsInChildren<ParticleSystem>(true);
+        if (systems.Length == 0) return 2f;
+
+        float longest = 0f;
+
+        for (int i = 0; i < systems.Length; i++)
+        {
+            var main = systems[i].main;
+
+            // Looping 的特效不會自己結束；靠 hitEffectLifetime 收尾，這裡不讓它拉長總時間
+            if (main.loop) continue;
+
+            float span = main.duration + main.startLifetime.constantMax + main.startDelay.constantMax;
+            if (span > longest) longest = span;
+        }
+
+        return longest > 0f ? longest : 2f;
     }
 
     // IsInIgnoreLayer 已移除 —— 它是舊的第二套過濾，唯一的呼叫點已改用
