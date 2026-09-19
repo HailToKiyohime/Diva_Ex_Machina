@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using System;
+using MoreMountains.Feedbacks;
 
 public enum BuffApplyMode
 {
@@ -266,6 +267,12 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public static PlayerStats Instance { get; private set; }
 
+    [Header("Feedback")]
+    [Tooltip("受到傷害時播放。把 Player 底下的 HitFeedback 拖進來。\n" +
+             "刻意不自動搜尋 —— Player 底下有一整排 Feedback 物件（攻擊、換彈、跑步…），\n" +
+             "GetComponentInChildren 很容易抓到錯的那一個。")]
+    [SerializeField] private MMF_Player hitFeedback;
+
     //Buff之前全身基礎屬性 
     [Header("Base Stats (Foldout)")]
     public BaseStats baseStats = new BaseStats();
@@ -481,7 +488,17 @@ public class PlayerStats : MonoBehaviour, IDamageable
         if (amount <= 0f) return;
 
         currentHealth -= amount;
-        // TODO: 玩家受傷回饋（震動 / 音效 / UI 閃紅 / 鏡頭抖動等）
+
+        // 受傷回饋。
+        //
+        // ★ 用不帶參數的版本。帶 intensity 的多載（PlayFeedbacks(position, amount)）
+        //   實測完全不會震 —— MMF 的 intensity 預期是 1 附近的係數，
+        //   直接餵原始傷害值（幾十到上百）會讓 Cinemachine Impulse 失效。
+        //   要做「重擊震得更兇」的話，intensity 要先正規化到 0~1 再傳。
+        //
+        // 連續中彈時靠 MMF_Player 自己的 Cooldown Duration 節流，不在這裡擋。
+        if (hitFeedback != null)
+            hitFeedback.PlayFeedbacks();
 
         if (currentHealth <= 0f)
         {
