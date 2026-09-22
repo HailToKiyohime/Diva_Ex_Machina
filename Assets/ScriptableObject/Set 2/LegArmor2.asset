@@ -37,5 +37,5 @@ MonoBehaviour:
     value: 10
   randomBuffs: []
   visualChange:
-    heightOffset: 0.14
+    heightOffset: 0.095
     animationType: 0

@@ -7,7 +7,7 @@ AvatarMask:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Diva_Right_Hand
-  m_Mask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
+  m_Mask: 00000000000000000000000000000000000000000100000001000000010000000100000000000000000000000100000001000000
   m_Elements:
   - m_Path: 
     m_Weight: 1
@@ -43,8 +43,6 @@ AvatarMask:
     m_Weight: 0
   - m_Path: root
     m_Weight: 0
-  - m_Path: root/Armor leg l
-    m_Weight: 0
   - m_Path: root/c_eye_target.x
     m_Weight: 0
   - m_Path: root/c_eye_target.x/c_eye_target.l
@@ -70,6 +68,8 @@ AvatarMask:
   - m_Path: root/root.x/Armor l.001/Armor l
     m_Weight: 0
   - m_Path: root/root.x/Armor l.001/Armor r
+    m_Weight: 0
+  - m_Path: root/root.x/Armor leg l
     m_Weight: 0
   - m_Path: root/root.x/Armor leg r
     m_Weight: 0
@@ -352,85 +352,61 @@ AvatarMask:
     m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/forearm_stretch.l/hand.l/Weapon_l
     m_Weight: 0
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/subarm1_L
-    m_Weight: 0
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/subarm1_L/subarm2_L
-    m_Weight: 0
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/subarm1_L/subarm2_L/subarm3_L
-    m_Weight: 0
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/subarm1_L/subarm2_L/subarm3_L/subarm4_L
-    m_Weight: 0
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/subarm1_L/subarm2_L/subarm3_L/subarm4_L/subarm5_L
-    m_Weight: 0
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/subarm1_L/subarm2_L/subarm3_L/subarm4_L/subarm5_L/subarm6_L
-    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/arm_twist.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/Armor
       Hand.R
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/forearm_twist.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/index1_base.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/index1_base.r/index1.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/index1_base.r/index1.r/index2.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/index1_base.r/index1.r/index2.r/index3.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/middle1_base.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/middle1_base.r/middle1.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/middle1_base.r/middle1.r/middle2.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/middle1_base.r/middle1.r/middle2.r/middle3.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/pinky1_base.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/pinky1_base.r/pinky1.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/pinky1_base.r/pinky1.r/pinky2.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/pinky1_base.r/pinky1.r/pinky2.r/pinky3.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/ring1_base.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/ring1_base.r/ring1.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/ring1_base.r/ring1.r/ring2.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/ring1_base.r/ring1.r/ring2.r/ring3.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/thumb1.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/thumb1.r/thumb2.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/thumb1.r/thumb2.r/thumb3.r
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/Weapon_r
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/subarm1_R
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/subarm1_R/subarm2_R
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/subarm1_R/subarm2_R/subarm3_R
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/subarm1_R/subarm2_R/subarm3_R/subarm4_R
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/subarm1_R/subarm2_R/subarm3_R/subarm4_R/subarm5_R
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/subarm1_R/subarm2_R/subarm3_R/subarm4_R/subarm5_R/subarm6_R
-    m_Weight: 1
+    m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/Shoulder_Weapon
     m_Weight: 0
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/Shoulder_Weapon/Shoulder

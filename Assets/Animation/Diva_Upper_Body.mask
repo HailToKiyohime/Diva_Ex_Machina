@@ -7,7 +7,7 @@ AvatarMask:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Diva_Upper_Body
-  m_Mask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
+  m_Mask: 00000000010000000100000000000000000000000100000001000000010000000100000000000000000000000100000001000000
   m_Elements:
   - m_Path: 
     m_Weight: 1
@@ -43,8 +43,6 @@ AvatarMask:
     m_Weight: 0
   - m_Path: root
     m_Weight: 0
-  - m_Path: root/Armor leg l
-    m_Weight: 0
   - m_Path: root/c_eye_target.x
     m_Weight: 0
   - m_Path: root/c_eye_target.x/c_eye_target.l
@@ -71,6 +69,8 @@ AvatarMask:
     m_Weight: 0
   - m_Path: root/root.x/Armor l.001/Armor r
     m_Weight: 0
+  - m_Path: root/root.x/Armor leg l
+    m_Weight: 0
   - m_Path: root/root.x/Armor leg r
     m_Weight: 0
   - m_Path: root/root.x/c_thigh_b.l
@@ -85,18 +85,14 @@ AvatarMask:
     m_Weight: 0
   - m_Path: root/root.x/c_thigh_b.l/thigh_stretch.l/leg_stretch.l/foot.l/toes_01.l
     m_Weight: 0
-  - m_Path: root/root.x/c_thigh_b.l/thigh_stretch.l/leg_stretch.l/leg_twist.l
+  - m_Path: root/root.x/c_thigh_b.l/thigh_stretch.l/leg_stretch.l/foot.l.001
     m_Weight: 0
-  - m_Path: root/root.x/c_thigh_b.l/thigh_stretch.l/leg_stretch.l/leg_twist.l/foot.l.001
-    m_Weight: 0
-  - m_Path: root/root.x/c_thigh_b.l/thigh_stretch.l/leg_stretch.l/leg_twist.l/foot.l.001/foot.l.002
-    m_Weight: 0
-  - m_Path: root/root.x/c_thigh_b.l/thigh_stretch.l/thigh_twist.l
+  - m_Path: root/root.x/c_thigh_b.l/thigh_stretch.l/leg_stretch.l/foot.l.001/foot.l.002
     m_Weight: 0
   - m_Path: root/root.x/c_thigh_b.r
     m_Weight: 0
   - m_Path: root/root.x/spine_01.x
-    m_Weight: 0
+    m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x
@@ -301,14 +297,10 @@ AvatarMask:
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l
     m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/arm_twist.l
-    m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/forearm_stretch.l
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/forearm_stretch.l/Armor
       Hand.L
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/forearm_stretch.l/forearm_twist.l
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/forearm_stretch.l/hand.l
     m_Weight: 1
@@ -352,30 +344,14 @@ AvatarMask:
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/forearm_stretch.l/hand.l/Weapon_l
     m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/subarm1_L
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/subarm1_L/subarm2_L
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/subarm1_L/subarm2_L/subarm3_L
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/subarm1_L/subarm2_L/subarm3_L/subarm4_L
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/subarm1_L/subarm2_L/subarm3_L/subarm4_L/subarm5_L
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.l/arm_stretch.l/subarm1_L/subarm2_L/subarm3_L/subarm4_L/subarm5_L/subarm6_L
-    m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/arm_twist.r
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/Armor
       Hand.R
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/forearm_twist.r
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r
     m_Weight: 1
@@ -419,18 +395,6 @@ AvatarMask:
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/forearm_stretch.r/hand.r/Weapon_r
     m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/subarm1_R
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/subarm1_R/subarm2_R
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/subarm1_R/subarm2_R/subarm3_R
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/subarm1_R/subarm2_R/subarm3_R/subarm4_R
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/subarm1_R/subarm2_R/subarm3_R/subarm4_R/subarm5_R
-    m_Weight: 1
-  - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/shoulder.r/arm_stretch.r/subarm1_R/subarm2_R/subarm3_R/subarm4_R/subarm5_R/subarm6_R
-    m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/Shoulder_Weapon
     m_Weight: 1
   - m_Path: root/root.x/spine_01.x/spine_02.x/spine_03.x/Shoulder_Weapon/Shoulder
@@ -449,11 +413,7 @@ AvatarMask:
     m_Weight: 0
   - m_Path: root/root.x/thigh_stretch.r/leg_stretch.r/foot.r/toes_01.r
     m_Weight: 0
-  - m_Path: root/root.x/thigh_stretch.r/leg_stretch.r/leg_twist.r
+  - m_Path: root/root.x/thigh_stretch.r/leg_stretch.r/foot.r.001
     m_Weight: 0
-  - m_Path: root/root.x/thigh_stretch.r/leg_stretch.r/leg_twist.r/foot.r.001
-    m_Weight: 0
-  - m_Path: root/root.x/thigh_stretch.r/leg_stretch.r/leg_twist.r/foot.r.001/foot.r.002
-    m_Weight: 0
-  - m_Path: root/root.x/thigh_stretch.r/thigh_twist.r
+  - m_Path: root/root.x/thigh_stretch.r/leg_stretch.r/foot.r.001/foot.r.002
     m_Weight: 0
