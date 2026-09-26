@@ -1129,7 +1129,7 @@ AnimatorController:
   - serializedVersion: 5
     m_Name: Wielding_Gun_Left
     m_StateMachine: {fileID: 1184593004080760164}
-    m_Mask: {fileID: 31900000, guid: ec9c9ffe1510d894e8b0549b17bc1d2b, type: 2}
+    m_Mask: {fileID: 31900000, guid: 25a0a37deb2d44845ba0ac6e3b077265, type: 2}
     m_Motions: []
     m_Behaviours: []
     m_BlendingMode: 0
@@ -1141,7 +1141,7 @@ AnimatorController:
   - serializedVersion: 5
     m_Name: Wielding_Gun_Right
     m_StateMachine: {fileID: 1774378152073718481}
-    m_Mask: {fileID: 31900000, guid: c01ee8be76958d5489dc7c74840da2ab, type: 2}
+    m_Mask: {fileID: 31900000, guid: 25a0a37deb2d44845ba0ac6e3b077265, type: 2}
     m_Motions: []
     m_Behaviours: []
     m_BlendingMode: 0
@@ -1206,7 +1206,7 @@ AnimatorController:
     m_Behaviours: []
     m_BlendingMode: 0
     m_SyncedLayerIndex: -1
-    m_DefaultWeight: 0
+    m_DefaultWeight: 1
     m_IKPass: 0
     m_SyncedLayerAffectsTiming: 0
     m_Controller: {fileID: 9100000}
