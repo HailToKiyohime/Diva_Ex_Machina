@@ -62,73 +62,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 3549206968946698764}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &2532650271323738627
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 5600650950397893444}
-  - component: {fileID: 2594956985039282536}
-  - component: {fileID: 3542143699365224330}
-  m_Layer: 15
-  m_Name: EnemyDetectRange
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &5600650950397893444
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2532650271323738627}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 939233490346937139}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!135 &2594956985039282536
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2532650271323738627}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 4096
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 1
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 30
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &3542143699365224330
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2532650271323738627}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b9cab01fc4a976d49927eecd7495ec2e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EnemyDetection
-  enemyBrain: {fileID: 5243097427755126230}
 --- !u!1 &4539360904586497824
 GameObject:
   m_ObjectHideFlags: 0
@@ -273,6 +206,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ModularEnemyBrain
   modularEntityMovement: {fileID: 2063492767183481766}
   turrets: []
+  sensors: []
   currentState: 3
   targetPreferences: []
   targets:
@@ -360,7 +294,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31fb2d2174ffd2a4a80728d54f1f0d07, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShipPassenger
-  platformTag: Mobile Platform Hitbox
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 128
+  platformLayers:
+    serializedVersion: 2
+    m_Bits: 4096
+  maxDistance: 60
+  rayStartOffset: 0.5
+  drawDebugRay: 0
   detectByHierarchy: 0
 --- !u!114 &7031235214745723284
 MonoBehaviour:
@@ -715,9 +657,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 895489e336b99f647b4aae707abba28f, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5381951446980489110}
-    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 895489e336b99f647b4aae707abba28f, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 5600650950397893444}
     - targetCorrespondingSourceObject: {fileID: -7894837268036850075, guid: 895489e336b99f647b4aae707abba28f, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3009275871808198742}
@@ -741,7 +680,7 @@ CapsuleCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 451208023423570313}
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 13400000, guid: cbe1864c09c4f56488cbb304c07200a3, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -1002,39 +941,30 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 1137c42cf0ef7ea458486225c961f1ae, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 1463431960020067646}
+      addedObject: {fileID: 2903543673891839366}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 1137c42cf0ef7ea458486225c961f1ae, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 2903543673891839366}
+      addedObject: {fileID: 3264212376163207983}
   m_SourcePrefab: {fileID: 100100000, guid: 1137c42cf0ef7ea458486225c961f1ae, type: 3}
 --- !u!1 &4754491684280841516 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 1137c42cf0ef7ea458486225c961f1ae, type: 3}
   m_PrefabInstance: {fileID: 5564814367454038141}
   m_PrefabAsset: {fileID: 0}
---- !u!64 &1463431960020067646
-MeshCollider:
+--- !u!114 &2903543673891839366
+MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4754491684280841516}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 7927
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 1
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 5
-  m_Convex: 1
-  m_CookingOptions: 30
-  m_Mesh: {fileID: 3613567641014311022, guid: 1137c42cf0ef7ea458486225c961f1ae, type: 3}
---- !u!114 &2903543673891839366
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b9cab01fc4a976d49927eecd7495ec2e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  enemyBrain: {fileID: 5243097427755126230}
+--- !u!114 &3264212376163207983
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1043,10 +973,38 @@ MonoBehaviour:
   m_GameObject: {fileID: 4754491684280841516}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b9cab01fc4a976d49927eecd7495ec2e, type: 3}
+  m_Script: {fileID: 11500000, guid: 2f068eda3450bfb49ba2ea3b393aee47, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: '::'
-  enemyBrain: {fileID: 5243097427755126230}
+  m_EditorClassIdentifier: Assembly-CSharp::EnemySensor
+  brain: {fileID: 5243097427755126230}
+  targetLayers:
+    serializedVersion: 2
+    m_Bits: 24832
+  triggerInteraction: 2
+  tagRules:
+  - tag: Player
+    type: 0
+    priority: 25
+    priorityDecreaseMultiplier: 1
+  - tag: Defence Fortifications
+    type: 2
+    priority: 50
+    priorityDecreaseMultiplier: 1
+  - tag: Obstacle
+    type: 4
+    priority: 10
+    priorityDecreaseMultiplier: 1
+  useProximity: 1
+  proximityRadius: 45
+  proximityOffset: {x: 0, y: 0, z: 0}
+  useSight: 1
+  sightRange: 45
+  sightAngle: 19
+  sightOffset: {x: 0, y: 0, z: 0}
+  scanInterval: 0.25
+  drawWhenNotSelected: 0
+  proximityColor: {r: 1, g: 0.85, b: 0.2, a: 0.9}
+  sightColor: {r: 1, g: 0.35, b: 0.25, a: 0.9}
 --- !u!4 &5381951446980489110 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 1137c42cf0ef7ea458486225c961f1ae, type: 3}

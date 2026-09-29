@@ -112,7 +112,14 @@ public class FalconBrain : ModularEntityBrain
         float dist = moveDirection.magnitude;
 
         ResetTurretAiming(moveDirection);
-        if (currentWaypointIndex == path.Length - 1 && dist < waypointArriveRadius || Vector3.Distance(transform.position, FindTarget().position) > combatActivityAreaRadius)
+
+        // 目標消失時 FindTarget() 是 null → 原本這裡會 NullReferenceException。
+        // 沒目標就不算「離太遠」；下一次 PathUpdate 會自己切回 Patrolling。
+        Transform retreatFrom = FindTarget();
+        bool tooFarFromTarget = retreatFrom != null &&
+                                Vector3.Distance(transform.position, retreatFrom.position) > combatActivityAreaRadius;
+
+        if (currentWaypointIndex == path.Length - 1 && dist < waypointArriveRadius || tooFarFromTarget)
         {
             ChangeState(EntityState.Combat);   // 撤退到位 → 真正切換狀態
             Invoke(nameof(ChangeStateToRetreat), Random.Range(5f, 10f)); // 延遲調用 ChangeStateToRetreat 方法
@@ -201,15 +208,13 @@ public class FalconBrain : ModularEntityBrain
         Transform target = FindTarget();
         if (target != null)
         {
-            Rigidbody targetRb = target.GetComponentInParent<Rigidbody>();
-            Vector3 targetVel = targetRb != null ? targetRb.linearVelocity : Vector3.zero;
-            UpdateTurretAiming(target, targetVel);
+            UpdateTurretAiming(target, GetTargetVelocity(target));
         }
 
     }
     protected override void PathUpdate()
     {
-        destinationTimer -= Time.fixedDeltaTime;
+        destinationTimer -= ThinkDeltaTime;   // 降頻後兩次思考之間隔好幾個物理步
         if (destinationTimer > 0f) return;
 
         Vector2 r;
@@ -262,7 +267,9 @@ public class FalconBrain : ModularEntityBrain
                         ChangeState(EntityState.Patrolling); break;
                     }   // 沒目標 → 回巡邏
 
-                    if (MathToolKit.InterceptionPoint(combatTarget.position, transform.position, (combatTarget.GetComponentInParent<Rigidbody>().linearVelocity / 2), modularEntityStats.sprintSpeed, out Vector3 interceptPoint))
+                    // GetTargetVelocity：有快取，而且目標沒有 Rigidbody（例如建築）時回傳 0，
+                    // 不會像原本的 GetComponentInParent<Rigidbody>().linearVelocity 那樣 NullReferenceException。
+                    if (MathToolKit.InterceptionPoint(combatTarget.position, transform.position, (GetTargetVelocity(combatTarget) / 2), modularEntityStats.sprintSpeed, out Vector3 interceptPoint))
                     {
                         destination = MathToolKit.GetPointAtTargetBack(transform.position, interceptPoint, 10);
                     }
@@ -290,4 +297,4 @@ public class FalconBrain : ModularEntityBrain
             }
         }
     }
-}
+}

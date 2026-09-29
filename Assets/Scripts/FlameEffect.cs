@@ -27,8 +27,16 @@ public class FlameEffect : MonoBehaviour
 
     private bool _isOn;
 
+    [Header("Boost On Dash")]
+    [Tooltip("ThrusterFlameControllers that get Boost() when a dash starts. Leave empty to auto-find them in children.")]
+    [SerializeField] private ThrusterFlameController[] thrusterFlames;
+    private bool _wasDashing;
+
     private void Awake()
     {
+        if (thrusterFlames == null || thrusterFlames.Length == 0)
+            thrusterFlames = GetComponentsInChildren<ThrusterFlameController>(true);
+
         if (playerMovement == null)
             playerMovement = GetComponentInParent<PlayerMovement>(true);
 
@@ -100,6 +108,15 @@ public class FlameEffect : MonoBehaviour
         }
 
         ApplyDesired(shouldOn);
+
+        // Dash just started (rising edge): Boost the flames that are shown during a dash.
+        // After ApplyDesired so the flame is already playing when the burst is added.
+        if (dash && !_wasDashing && flameKind == FlameKind.Melee)
+        {
+            foreach (var t in thrusterFlames)
+                if (t != null) t.Boost();
+        }
+        _wasDashing = dash;
     }
 
     private void ApplyDesired(bool on)

@@ -187,7 +187,14 @@ public class PathFinder : MonoBehaviour
         return new Vector3[] { endWorld };
     }
 
-    // ★ 每幀呼叫：船上路徑用「當下船姿態」即時投影 → 不 stale；地面路徑直接回傳
+    // 船上路徑即時投影用的緩衝區。原本每次呼叫都 new 一個陣列 ——
+    // 船上每隻敵人每次思考都配置一次，是 Brain 產生 GC 的主要來源之一。
+    private Vector3[] _worldPathBuffer = System.Array.Empty<Vector3>();
+
+    // ★ 每次思考呼叫：船上路徑用「當下船姿態」即時投影 → 不 stale；地面路徑直接回傳
+    //
+    // ⚠ 船上路徑回傳的是重複使用的緩衝區，下一次呼叫會被覆寫。
+    //   拿來當下讀取就好，不要存起來。
     public Vector3[] GetCurrentWorldPath()
     {
         if (!lastPathOnShip)
@@ -196,10 +203,14 @@ public class PathFinder : MonoBehaviour
         if (lastPathGhost == null || lastPathGhost.Length == 0 || !HasShipRoots)
             return System.Array.Empty<Vector3>();
 
-        var outArr = new Vector3[lastPathGhost.Length];
+        if (_worldPathBuffer.Length != lastPathGhost.Length)
+            _worldPathBuffer = new Vector3[lastPathGhost.Length];   // 只有路徑長度改變時才配置
+
+        Transform real = RealShipRoot;
+        Transform ghost = GhostShipRoot;
         for (int i = 0; i < lastPathGhost.Length; i++)
-            outArr[i] = ShipNavProjector.GhostToRealPoint(RealShipRoot, GhostShipRoot, lastPathGhost[i]);
-        return outArr;
+            _worldPathBuffer[i] = ShipNavProjector.GhostToRealPoint(real, ghost, lastPathGhost[i]);
+        return _worldPathBuffer;
     }
 
     /// <summary>
@@ -390,10 +401,13 @@ public class PathFinder : MonoBehaviour
             return System.Array.Empty<Vector3>();
 
         NavMesh.CalculatePath(s.position, e.position, NavMesh.AllAreas, path);
-        if (path.status == NavMeshPathStatus.PathInvalid || path.corners.Length == 0)
+
+        // corners 是 property，每次存取都配一個新陣列 —— 原本這裡存取了兩次，取一次就好
+        Vector3[] corners = path.corners;
+        if (path.status == NavMeshPathStatus.PathInvalid || corners.Length == 0)
             return System.Array.Empty<Vector3>();
 
-        return path.corners;
+        return corners;
     }
 
     private void OnDrawGizmos()

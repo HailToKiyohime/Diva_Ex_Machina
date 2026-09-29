@@ -111,6 +111,9 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 512
   ignoreObstacles: 0
+  hitEffect: {fileID: 0}
+  hitEffectLifetime: 0
+  hitEffectSurfaceOffset: 0.1
   homingDegreePerSecond: 0
   homingRange: 50
   homingSearchAngle: 40

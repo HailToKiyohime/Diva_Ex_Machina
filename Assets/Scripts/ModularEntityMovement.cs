@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-public class ModularEntityMovement : MonoBehaviour
+public class ModularEntityMovement : MonoBehaviour, IManagedEntity
 {
     [Header("Rigidbody")]
     [SerializeField] protected Rigidbody entityRigidbody;
@@ -19,10 +19,73 @@ public class ModularEntityMovement : MonoBehaviour
     protected float jumpCooldown = 0.25f;
     protected float groundCheckDistance = 0.1f;
 
-    public virtual void FixedUpdate()
+    // ── 集中更新（ModularEntityManager） ─────────────────────────────────
+    //
+    // 原本這裡是 FixedUpdate。現在由 ModularEntityManager 每個物理步統一呼叫 ManagedFixedUpdate，
+    // 省掉 Unity 對每隻敵人各自呼叫 FixedUpdate 的開銷。仍然是每步都跑，跟原本一樣。
+    // 子類別覆寫 OnEnable / OnDisable 時記得呼叫 base，否則不會被登記。
+
+    private int _managerIndex = -1;   // 在 ModularEntityManager 清單裡的位置，-1 = 沒登記
+    int IManagedEntity.ManagerIndex { get => _managerIndex; set => _managerIndex = value; }
+
+    protected virtual void OnEnable()
+    {
+        ModularEntityManager.Register(this);
+    }
+
+    protected virtual void OnDisable()
+    {
+        ModularEntityManager.Unregister(this);
+    }
+
+    /// <summary>每個物理步由 ModularEntityManager 呼叫。子類別覆寫時記得呼叫 base。</summary>
+    public virtual void ManagedFixedUpdate(float dt)
     {
         GroundCheck();
-        ApplyHorizontalMovementFixed(Time.fixedDeltaTime);
+        ApplyHorizontalMovementFixed(dt);
+        UpdateFacing();
+    }
+
+    // ── 朝向 ─────────────────────────────────────────────────────────────
+    //
+    // Brain 降頻之後只會每 0.1 秒左右思考一次。轉向如果還留在 Brain 裡做，
+    // RotateMesh 每次只轉 rotationSpeed × fixedDeltaTime，轉向速度就會跟著變慢好幾倍。
+    // 所以 Brain 只負責「想面對哪裡」，實際轉動在這裡每步執行，速度跟原本一樣。
+
+    private bool _hasFacingTarget;
+    private Vector3 _facingTarget;
+    private float _facingDeadzone;
+
+    /// <summary>設定想面對的水平方向（世界座標）。角度誤差小於 deadzoneDegrees 就不轉，避免抖動。</summary>
+    public void SetFacingTarget(Vector3 worldDir, float deadzoneDegrees)
+    {
+        worldDir.y = 0f;
+        if (worldDir.sqrMagnitude < 0.0001f)
+        {
+            _hasFacingTarget = false;
+            return;
+        }
+
+        _facingTarget = worldDir;
+        _facingDeadzone = deadzoneDegrees;
+        _hasFacingTarget = true;
+    }
+
+    /// <summary>停止轉向（維持目前朝向）。</summary>
+    public void ClearFacingTarget()
+    {
+        _hasFacingTarget = false;
+    }
+
+    protected virtual void UpdateFacing()
+    {
+        if (!_hasFacingTarget) return;
+
+        float signedAngle = Vector3.SignedAngle(MeshForward, _facingTarget, Vector3.up);
+        if (Mathf.Abs(signedAngle) < _facingDeadzone) return;
+
+        // 傳入剩餘角度的絕對值，RotateMesh 會夾住不過頭
+        RotateMesh(Mathf.Sign(signedAngle), Mathf.Abs(signedAngle));
     }
 
     protected virtual void ApplyHorizontalMovementFixed(float dt)
@@ -97,14 +160,32 @@ public class ModularEntityMovement : MonoBehaviour
     public void GroundCheck()
     {
         float castDistance = groundCheckDistance + entityRigidbody.linearVelocity.y * Time.fixedDeltaTime;
-        RaycastHit hit;
-        bool didHit = Physics.Raycast(groundPoint.position,
-            Vector3.down,
-            out hit,
-            castDistance,
-            whatIsGround
-        );
-        grounded = didHit;
+
+        ShipPassenger p = Passenger;
+        if (p == null)
+        {
+            // 沒有 ShipPassenger：維持原本的短射線
+            grounded = Physics.Raycast(groundPoint.position, Vector3.down, out _, castDistance, whatIsGround);
+            return;
+        }
+
+        // 地面偵測 + 船上偵測共用同一條往下的射線（每步少打一條）。
+        // 長射線打到的第一個東西，就是原本短射線會打到的那個（只要在 castDistance 內），
+        // 所以 grounded 的結果跟原本相同。
+        // 起點往上抬 lift：腳底稍微陷進甲板時，射線才不會從碰撞體裡面開始打而漏掉它。
+        float lift = p.RayStartOffset;
+        Vector3 origin = groundPoint.position + Vector3.up * lift;
+        float distance = Mathf.Max(castDistance, p.MaxDistance) + lift;
+        int mask = whatIsGround.value | p.PlatformLayers;
+
+        bool hasHit = Physics.Raycast(origin, Vector3.down, out RaycastHit hit,
+                                      distance, mask, QueryTriggerInteraction.Ignore);
+
+        grounded = hasHit
+                   && (whatIsGround.value & (1 << hit.collider.gameObject.layer)) != 0
+                   && hit.distance - lift <= castDistance;
+
+        p.ReportGroundHit(hasHit, hit, origin, distance);
     }
 
     // ── Mobile Platform carry (velocity-based) ────────────────────────────

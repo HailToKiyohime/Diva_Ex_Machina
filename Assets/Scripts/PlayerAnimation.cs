@@ -607,10 +607,32 @@ public class PlayerAnimation : MonoBehaviour
     public void LeftWeaponMuzzleFlash()
     {
         leftAttackFeedback?.PlayFeedbacks(this.transform.position);
+        TriggerFireLeft();
     }
     public void RightWeaponMuzzleFlash()
     {
         rightAttackFeedback?.PlayFeedbacks(this.transform.position);
+        TriggerFireRight();
+    }
+
+    // 遠程武器每次生成子彈時觸發開槍動畫：
+    //   左手 → fire_L（Dual_Wielding_Weapon_Left 層）
+    //   右手 → fire_R（Dual_Wielding_Weapon_Right 層）
+    // RangeAttackController 在每顆子彈 Spawn 前呼叫 Left/RightWeaponMuzzleFlash()，
+    // 散彈槍一發多顆時同一幀會重複 SetTrigger，效果等同一次，不會多播。
+    private static readonly int FireLeftTriggerHash = Animator.StringToHash("fire_L");
+    private static readonly int FireRightTriggerHash = Animator.StringToHash("fire_R");
+
+    public void TriggerFireLeft()
+    {
+        if (anim == null) return;
+        anim.SetTrigger(FireLeftTriggerHash);
+    }
+
+    public void TriggerFireRight()
+    {
+        if (anim == null) return;
+        anim.SetTrigger(FireRightTriggerHash);
     }
     public void DustEffect()
     {

@@ -22,24 +22,41 @@ public class FalconMovement : ModularEntityMovement
     public bool HasGroundBelow { get; private set; }
     public Vector3 GroundBelowPoint { get; private set; }
 
-    public override void FixedUpdate()
+    // 懸停目標：由 brain 在每次思考時設定，這裡每個物理步套用
+    private bool _hasHoverTarget;
+    private float _hoverHeight;
+
+    public override void ManagedFixedUpdate(float dt)
     {
-        base.FixedUpdate();   // GroundCheck + ApplyHorizontalMovementFixed（下面已 override）
-        UpdateBank();         // 每幀更新傾斜（含回正）
+        base.ManagedFixedUpdate(dt);   // GroundCheck + ApplyHorizontalMovementFixed（下面已 override）+ 轉向
+        ApplyHover(dt);                // 每步維持懸停高度
+        UpdateBank();                  // 每幀更新傾斜（含回正）
     }
 
     /// <summary>
-    /// 維持在「腳下地面 + targetHeight」的高度。由 brain 的各個 state behaviour 呼叫。
+    /// 設定懸停高度：維持在「腳下地面 + targetHeight」。由 brain 的各個 state behaviour 呼叫。
+    ///
+    /// Brain 降頻之後只會每 0.1 秒左右呼叫一次，所以這裡只做兩件事：
+    /// 記住目標高度、打一次射線找腳下地面。實際的垂直速度控制在 ApplyHover 每個物理步執行 ——
+    /// 如果還是只在呼叫時設一次速度，兩次思考之間重力會把隼往下拉，看起來一頓一頓的。
     /// </summary>
     public void VerticalMovement(float targetHeight)
     {
+        _hoverHeight = targetHeight;
+        _hasHoverTarget = true;
+
         HasGroundBelow = Physics.Raycast(groundPoint.position, Vector3.down, out RaycastHit hit,
                                          hoverRaycastDistance, whatIsGround);
-        if (!HasGroundBelow) return;
+        if (HasGroundBelow)
+            GroundBelowPoint = hit.point;
+    }
 
-        GroundBelowPoint = hit.point;
+    /// <summary>每步把垂直速度推向「回到懸停高度」所需的速度。地面高度用上次 VerticalMovement 打到的點。</summary>
+    private void ApplyHover(float dt)
+    {
+        if (!_hasHoverTarget || !HasGroundBelow) return;
 
-        float heightError = (hit.point.y + targetHeight) - groundPoint.position.y;
+        float heightError = (GroundBelowPoint.y + _hoverHeight) - groundPoint.position.y;
 
         // 目標垂直速度：離目標越遠飛越快，接近時線性收斂（類似水平的 throttle）
         float desiredVerticalSpeed = Mathf.Clamp(
@@ -58,7 +75,7 @@ public class FalconMovement : ModularEntityMovement
             : modularEntityStats.accelerationSpeed;
 
         // 用選定的 rate 逼近目標垂直速度（rate 單位是「速度變化/秒」= 加速度）
-        float newVy = Mathf.MoveTowards(currentVy, desiredVerticalSpeed, rate * Time.fixedDeltaTime);
+        float newVy = Mathf.MoveTowards(currentVy, desiredVerticalSpeed, rate * dt);
 
         Vector3 v = entityRigidbody.linearVelocity;
         v.y = newVy;
@@ -122,4 +139,4 @@ public class FalconMovement : ModularEntityMovement
         if (!HasGroundBelow) return 0f;
         return groundPoint.position.y - GroundBelowPoint.y;
     }
-}
+}

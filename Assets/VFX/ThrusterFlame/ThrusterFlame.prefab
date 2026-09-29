@@ -9683,6 +9683,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4233194208223291462}
   - component: {fileID: 6114017332983242791}
+  - component: {fileID: 6359141314862029882}
   m_Layer: 0
   m_Name: ThrusterFlame
   m_TagString: Untagged
@@ -9730,6 +9731,37 @@ MonoBehaviour:
   - {fileID: 1271518589100517476}
   - {fileID: 7694643473967241258}
   fallingVelocityThreshold: -0.1
+--- !u!114 &6359141314862029882
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3114569237128090224}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86d82455df97d14449a0804ee63bfa12, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ThrusterFlameController
+  core: {fileID: 5962419289774735221}
+  flame: {fileID: 6931307543822649680}
+  outer: {fileID: 3483735869056798767}
+  nozzleGlow: {fileID: 5957161568999192287}
+  sparks: {fileID: 3672350971111818611}
+  rings: {fileID: 1271518589100517476}
+  trail: {fileID: 7694643473967241258}
+  throttle: 0.35
+  throttleResponse: 10
+  idleScale: 0.4
+  ringThrottleThreshold: 0.75
+  ringRateAtFullThrottle: 9
+  boostRingCount: 3
+  boostRingInterval: 0.05
+  boostSparkCount: 14
+  boostOvershoot: 1.3
+  boostOvershootDuration: 0.25
+  flickerAmount: 0.1
+  flickerSpeed: 18
 --- !u!1 &3267891256305796254
 GameObject:
   m_ObjectHideFlags: 0
@@ -14577,8 +14609,6 @@ GameObject:
   - component: {fileID: 356824828913428459}
   - component: {fileID: 5962419289774735221}
   - component: {fileID: 6993285119262688246}
-  - component: {fileID: 3896121273608749575}
-  - component: {fileID: 7733233159631628857}
   m_Layer: 0
   m_Name: ThrusterFlame
   m_TagString: Untagged
@@ -19410,62 +19440,6 @@ ParticleSystemRenderer:
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
   m_MaskInteraction: 0
---- !u!114 &3896121273608749575
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3742191128416751842}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6a76ccc63d71db9418ee7e37d06c9b55, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::EffectColorController
-  particleSystems:
-  - particleSystem:
-    - {fileID: 5962419289774735221}
-  - particleSystem:
-    - {fileID: 6931307543822649680}
-    - {fileID: 5957161568999192287}
-    - {fileID: 1271518589100517476}
-    - {fileID: 7694643473967241258}
-  - particleSystem:
-    - {fileID: 3483735869056798767}
-  - particleSystem:
-    - {fileID: 3672350971111818611}
-  colors: []
---- !u!114 &7733233159631628857
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3742191128416751842}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 86d82455df97d14449a0804ee63bfa12, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ThrusterFlameController
-  core: {fileID: 5962419289774735221}
-  flame: {fileID: 6931307543822649680}
-  outer: {fileID: 3483735869056798767}
-  nozzleGlow: {fileID: 5957161568999192287}
-  sparks: {fileID: 3672350971111818611}
-  rings: {fileID: 1271518589100517476}
-  trail: {fileID: 7694643473967241258}
-  throttle: 0.35
-  throttleResponse: 10
-  idleScale: 0.4
-  ringThrottleThreshold: 0.75
-  ringRateAtFullThrottle: 9
-  boostRingCount: 3
-  boostRingInterval: 0.05
-  boostSparkCount: 14
-  boostOvershoot: 1.3
-  boostOvershootDuration: 0.25
-  flickerAmount: 0.1
-  flickerSpeed: 18
 --- !u!1 &4906476331272363425
 GameObject:
   m_ObjectHideFlags: 0

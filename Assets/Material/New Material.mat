@@ -317,7 +317,7 @@ Material:
     - _Farthest_Distance: 3
     - _FirstShadeOverridden: 0
     - _FirstShadeVisible: 1
-    - _GI_Intensity: 0
+    - _GI_Intensity: 0.25
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0

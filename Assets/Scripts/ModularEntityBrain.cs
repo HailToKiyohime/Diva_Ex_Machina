@@ -45,12 +45,16 @@ public class TargetPreference
     public float priorityDecreaseMultiplier;
 }
 
-public class ModularEntityBrain : MonoBehaviour
+public class ModularEntityBrain : MonoBehaviour, IManagedEntity
 {
     public ModularEntityMovement modularEntityMovement;
 
     [Header("Turrets")]
     [SerializeField] protected TurretController[] turrets;   // 0..N 座，Inspector 拖或自動抓
+
+    [Header("Sensors")]
+    [Tooltip("偵測範圍（取代 EnemyDetectRange 的 trigger）。留空會自動抓子物件上所有 EnemySensor。")]
+    [SerializeField] protected EnemySensor[] sensors;
 
     protected PathFinder pathFinder;
     protected ShipPassenger selfPassenger;   // 自己的船上狀態（掛在同一個 GameObject 上）
@@ -133,19 +137,96 @@ public class ModularEntityBrain : MonoBehaviour
 
         if (turrets == null || turrets.Length == 0)
             turrets = GetComponentsInChildren<TurretController>();
+
+        if (sensors == null || sensors.Length == 0)
+            sensors = GetComponentsInChildren<EnemySensor>(true);
+
+        _started = true;
     }
 
-    public virtual void FixedUpdate()
+    // ═══════════════════════ 集中更新（ModularEntityManager） ═══════════════════════
+    //
+    // 原本這裡是 FixedUpdate —— 每個物理步由 Unity 各自呼叫，每步都完整思考一次。
+    // 現在改由 ModularEntityManager 統一呼叫，而且降頻：預設每 0.1 秒思考一次（錯開）。
+    //
+    // 思考之間的物理步，Movement 照常每步執行，沿用這次思考留下的：
+    //   · 移動方向（HorizontalMovement）
+    //   · 朝向（FaceMoveDirection → Movement.SetFacingTarget，Movement 每步轉過去）
+    //   · 砲塔瞄準點（turret.targetLocation，砲塔自己的 Update 每幀轉過去）
+    //
+    // ⚠ 寫在 Think() 裡、跟時間有關的計算，一律用 ThinkDeltaTime，不要用 Time.fixedDeltaTime ——
+    //   兩次思考之間隔的是好幾個物理步，用 fixedDeltaTime 會讓計時器走慢好幾倍。
+
+    private int _managerIndex = -1;   // 在 ModularEntityManager 清單裡的位置，-1 = 沒登記
+    int IManagedEntity.ManagerIndex { get => _managerIndex; set => _managerIndex = value; }
+
+    private bool _started;              // Start() 跑完之前不能思考（pathFinder 等欄位還沒抓）
+    private float _lastThinkTime = -1f;
+
+    /// <summary>下一次該思考的時間（Time.fixedTime）。由 ModularEntityManager 讀取。</summary>
+    public float NextThinkTime { get; private set; }
+
+    /// <summary>距離上一次思考經過的時間（秒）。Think() 裡的計時器請用這個。</summary>
+    protected float ThinkDeltaTime { get; private set; }
+
+    protected virtual void OnEnable()
     {
+        _lastThinkTime = -1f;
+        ModularEntityManager.Register(this);
+    }
+
+    protected virtual void OnDisable()
+    {
+        ModularEntityManager.Unregister(this);
+    }
+
+    /// <summary>登記時由 ModularEntityManager 呼叫，把第一次思考錯開到隨機時間點。</summary>
+    public void ScheduleFirstThink(float time)
+    {
+        NextThinkTime = time;
+    }
+
+    /// <summary>由 ModularEntityManager 在輪到這隻敵人時呼叫。</summary>
+    public void RunThink(float now, float interval)
+    {
+        if (!_started) return;   // 還沒 Start → 下一步再試（NextThinkTime 不動）
+
+        ThinkDeltaTime = (_lastThinkTime < 0f) ? Time.fixedDeltaTime : now - _lastThinkTime;
+        _lastThinkTime = now;
+        NextThinkTime = now + interval;
+
+        Think();
+    }
+
+    /// <summary>一次完整的思考。子類別要加邏輯就覆寫這裡（記得呼叫 base.Think()）。</summary>
+    protected virtual void Think()
+    {
+        // 這次思考沒有決定朝向的話，就不要再轉（跟原本「沒呼叫 FaceMoveDirection 就不轉」一致）
+        modularEntityMovement.ClearFacingTarget();
+
+        RunSensors();   // 先偵測，這次思考就能用到新發現的目標
         AttackSlotUpdate();
         PriorityUpdate();
         PathUpdate();
         StateBehaviour();
     }
 
+    /// <summary>讓每個 EnemySensor 做偵測（各自依 scanInterval 決定這次要不要真的查詢）。</summary>
+    protected void RunSensors()
+    {
+        if (sensors == null) return;
+
+        float now = Time.fixedTime;
+        for (int i = 0; i < sensors.Length; i++)
+        {
+            EnemySensor s = sensors[i];
+            if (s != null && s.isActiveAndEnabled) s.Scan(now);
+        }
+    }
+
     protected void PriorityUpdate()
     {
-        float dt = Time.fixedDeltaTime;
+        float dt = ThinkDeltaTime;
 
         // ★ 第一步：無條件剔除已被銷毀的目標。
         //
@@ -262,7 +343,7 @@ public class ModularEntityBrain : MonoBehaviour
 
     protected virtual void PathUpdate()
     {
-        destinationTimer -= Time.fixedDeltaTime;
+        destinationTimer -= ThinkDeltaTime;
         if (destinationTimer > 0f) return;
 
         Vector2 r;
@@ -729,27 +810,41 @@ public class ModularEntityBrain : MonoBehaviour
         Transform target = FindTarget();
         if (target != null)
         {
-            Rigidbody targetRb = target.GetComponentInParent<Rigidbody>();
-            Vector3 targetVel = targetRb != null ? targetRb.linearVelocity : Vector3.zero;
-            UpdateTurretAiming(target, targetVel);
-
+            UpdateTurretAiming(target, GetTargetVelocity(target));
         }
+    }
+
+    // 目標的 Rigidbody 快取：目標沒換就不用每次 GetComponentInParent
+    private Transform _velocityTarget;
+    private Rigidbody _velocityTargetRb;
+
+    /// <summary>目標（或它的父物件）的 Rigidbody 速度；沒有 Rigidbody（例如靜態建築）時回傳 0。</summary>
+    protected Vector3 GetTargetVelocity(Transform target)
+    {
+        if (target == null) return Vector3.zero;
+
+        if (target != _velocityTarget)
+        {
+            _velocityTarget = target;
+            _velocityTargetRb = target.GetComponentInParent<Rigidbody>();
+        }
+        return _velocityTargetRb != null ? _velocityTargetRb.linearVelocity : Vector3.zero;
     }
     protected virtual void ChangeState(EntityState next)
     {
         currentState = next;
         destinationTimer = 0f;
     }
+    /// <summary>
+    /// 設定想面對的方向。實際轉動由 Movement 每個物理步執行（Brain 降頻之後，
+    /// 如果還在這裡直接呼叫 RotateMesh，轉向速度會跟著思考頻率一起變慢）。
+    /// </summary>
     protected virtual void FaceMoveDirection(Vector3 worldDir)
     {
         worldDir.y = 0f;
         if (worldDir.sqrMagnitude < 0.0001f) return;
 
-        float signedAngle = Vector3.SignedAngle(modularEntityMovement.MeshForward, worldDir, Vector3.up);
-        if (Mathf.Abs(signedAngle) < facingDeadzone) return;
-
-        // 傳入剩餘角度的絕對值，RotateMesh 會夾住不過頭
-        modularEntityMovement.RotateMesh(Mathf.Sign(signedAngle), Mathf.Abs(signedAngle));
+        modularEntityMovement.SetFacingTarget(worldDir, facingDeadzone);
     }
 
     // 每座砲塔用「自己的彈速」算自己的攔截點
@@ -842,7 +937,7 @@ public class ModularEntityBrain : MonoBehaviour
     /// <summary>
     /// 持有逾時 → 交還名額，並把第一、第二優先目標的優先度對調。
     ///
-    /// 為什麼要在 FixedUpdate 每幀檢查，而不是在 TryAcquireAttackSlot 裡順便看：
+    /// 為什麼要在每次思考（Think）都檢查，而不是在 TryAcquireAttackSlot 裡順便看：
     /// 敵人離開戰鬥（目標消失、切回 Chasing / Patrolling）之後就不會再呼叫
     /// UpdateTurretAiming，逾時判定永遠不會被執行 → 名額會被一隻根本沒在打架的
     /// 敵人佔到死為止，其他人全部啞火。

@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 using UnityEngine.InputSystem;
+using UnityEngine.Animations.Rigging;
 public class PlayerMovement : MonoBehaviour
 {
     [Header("Character orientation")]
@@ -72,6 +73,24 @@ public class PlayerMovement : MonoBehaviour
     private float _aimHoldUntil;
     private Vector3 _lastAimHoldForward = Vector3.forward;
 
+    // Multi-Aim 同時負責「抵消跑步時髖部扭動」：上半身圖層的遮罩包含脊椎但不含髖部，
+    // 權重一歸 0 上半身就會跟著髖部甩。所以權重保持不變，改為切換「看哪裡」：
+    // 瞄準 / 向前移動 → 看準星；未瞄準且向左、右、後移動 → 看角色自己的正前方。
+    [Header("Aim Rig (Multi-Aim)")]
+    [SerializeField] private MultiAimConstraint multiAimBody;
+    [SerializeField] private MultiAimConstraint multiAimHead;
+    [SerializeField, Range(0f, 1f)] private float aimBodyWeight = 1f;
+    [SerializeField, Range(0f, 1f)] private float aimHeadWeight = 1f;
+    [Tooltip("兩個 Multi-Aim 的 Source Object。由程式每幀移動，在「準星」與「角色正前方」之間切換。")]
+    [SerializeField] private Transform aimRigTarget;
+    [Tooltip("代理目標放在離胸口多遠的地方（公尺）。")]
+    [SerializeField] private float aimRigTargetDistance = 20f;
+    [Tooltip("準星 ↔ 正前方的切換速度（每秒）。0 = 瞬間切換。4 約等於 0.25 秒。")]
+    [SerializeField] private float aimRigBlendSpeed = 4f;
+    [Tooltip("未瞄準時，移動方向與攝影機朝向的夾角在此角度內視為「向前」，繼續看準星；超過（左、右、後退）則改看角色正前方。")]
+    [SerializeField, Range(0f, 180f)] private float aimRigForwardAngle = 60f;
+    private float _aimRigAimBlend = 1f; // 1 = 看準星，0 = 看正前方
+
     [Header("Dust Effect")]
     [SerializeField] private float dustIntervalSlow = 0.4f;   // 慢速：間隔長 = 稀
     [SerializeField] private float dustIntervalFast = 0.08f;  // 全速：間隔短 = 密
@@ -93,8 +112,9 @@ public class PlayerMovement : MonoBehaviour
     }
     public void FixedUpdate()
     {
+        GroundCheck();          // 同一條射線同時更新 grounded 和 ShipPassenger
+        SyncMobilePlatform();   // 讀剛更新的船上狀態
         CarryWithPlatformRotation(Time.fixedDeltaTime);
-        GroundCheck();
         ApplyHorizontalMovementFixed(Time.fixedDeltaTime);
         ApplyFlyFixed(Time.fixedDeltaTime); // 新增
         ApplyDashFixed(Time.fixedDeltaTime); // 新增
@@ -375,6 +395,7 @@ public class PlayerMovement : MonoBehaviour
         else
             moveDirection.Normalize();
     }
+    private PlayerJumpDust _jumpDust;
     public bool JumpAction()
     {
         if (grounded && readyToJump)
@@ -383,6 +404,10 @@ public class PlayerMovement : MonoBehaviour
             playerRigidbody.linearVelocity = new Vector3(playerRigidbody.linearVelocity.x, 0, playerRigidbody.linearVelocity.z);
             playerRigidbody.AddForce(Vector3.up * convertJumpHeightToForce(PlayerStats.Instance.jumpHeight), ForceMode.Impulse);
             Invoke("ResetJump", jumpCooldown);
+
+            // 起跳塵土（玩家身上有 PlayerJumpDust 才會噴）
+            if (_jumpDust == null) _jumpDust = GetComponent<PlayerJumpDust>();
+            if (_jumpDust != null) _jumpDust.PlayJump();
             return true;
         }
         else if (!grounded && readyToJump && PlayerStats.Instance.currentEnergy > 0)
@@ -485,7 +510,6 @@ public class PlayerMovement : MonoBehaviour
 
         CancelInvoke("ResetEnergyRegenerate");
         canRegenerateEnergy = false;
-
 
         return true;
     }
@@ -1205,20 +1229,71 @@ public class PlayerMovement : MonoBehaviour
         // 1) dynamic ground check
         // ————————————————————
         float castDistance = groundCheckDistance + playerRigidbody.linearVelocity.y * Time.fixedDeltaTime;
-        RaycastHit hit;
-        bool didHit = Physics.Raycast(groundPoint.position,
-            Vector3.down,
-            out hit,
-            castDistance,
-            whatIsGround
-        );
-        grounded = didHit;
+
+        // 地面偵測 + 船上偵測共用同一條往下的射線（詳見 ModularEntityMovement.GroundCheck）
+        ShipPassenger p = Passenger;
+        float lift = p.RayStartOffset;
+        Vector3 origin = groundPoint.position + Vector3.up * lift;
+        float distance = Mathf.Max(castDistance, p.MaxDistance) + lift;
+        int mask = whatIsGround.value | p.PlatformLayers;
+
+        bool hasHit = Physics.Raycast(origin, Vector3.down, out RaycastHit hit,
+                                      distance, mask, QueryTriggerInteraction.Ignore);
+
+        grounded = hasHit
+                   && (whatIsGround.value & (1 << hit.collider.gameObject.layer)) != 0
+                   && hit.distance - lift <= castDistance;
+
+        p.ReportGroundHit(hasHit, hit, origin, distance);
         playerAnimation.SetIsOnGround(grounded);
     }
     private void ResetJump()
     {
         readyToJump = true;
     }
+    /// <summary>
+    /// 權重固定（Multi-Aim 要一直穩住脊椎），只移動代理目標 aimRigTarget：
+    /// aimAtCrosshair = true 時看準星，false 時看角色面向的正前方（胸口高度）。
+    /// 在 Update 呼叫，Animation Rigging 會在同一幀稍後讀到新位置。
+    /// </summary>
+    private void UpdateAimRig(bool aimAtCrosshair)
+    {
+        if (multiAimBody != null) multiAimBody.weight = aimBodyWeight;
+        if (multiAimHead != null) multiAimHead.weight = aimHeadWeight;
+
+        if (aimRigTarget == null || characterModel == null) return;
+
+        float goal = aimAtCrosshair ? 1f : 0f;
+        _aimRigAimBlend = aimRigBlendSpeed <= 0f
+            ? goal
+            : Mathf.MoveTowards(_aimRigAimBlend, goal, aimRigBlendSpeed * Time.deltaTime);
+
+        // 以脊椎（Multi-Aim Body 控制的骨頭）為原點，沒有的話退回角色模型
+        Transform chest = (multiAimBody != null && multiAimBody.data.constrainedObject != null)
+            ? multiAimBody.data.constrainedObject
+            : characterModel;
+        Vector3 origin = chest.position;
+
+        // 角色正前方（只取水平，避免近戰俯仰影響）
+        Vector3 faceDir = characterModel.forward;
+        faceDir.y = 0f;
+        if (faceDir.sqrMagnitude < 0.0001f) faceDir = transform.forward;
+        faceDir.Normalize();
+
+        // 準星方向
+        Vector3 aimDir = faceDir;
+        Transform aimingPoint = PlayerAiming.Instance != null ? PlayerAiming.Instance.aimingPoint : null;
+        if (aimingPoint != null)
+        {
+            Vector3 d = aimingPoint.position - origin;
+            if (d.sqrMagnitude > 0.0001f) aimDir = d.normalized;
+        }
+
+        // 內插方向而不是位置：準星可能在 100 公尺外，直接內插位置會繞出奇怪的弧線
+        Vector3 dir = Vector3.Slerp(faceDir, aimDir, _aimRigAimBlend);
+        aimRigTarget.position = origin + dir * aimRigTargetDistance;
+    }
+
     private void RotateCharacter()
     {
         // 監控 lockOn 狀態變化：剛失去 lockOn 時啟動保留
@@ -1231,6 +1306,7 @@ public class PlayerMovement : MonoBehaviour
 
         // 先處理角色朝向（攻擊優先，其次 lockOn，其次移動）
         Vector3? desiredForward = null;
+        bool aimRigWanted = true;
 
 
         if (attackFacingActive)
@@ -1263,8 +1339,19 @@ public class PlayerMovement : MonoBehaviour
             {
                 Vector3 faceDirection = moveDirection.normalized;
                 desiredForward = new Vector3(faceDirection.x, 0, faceDirection.z).normalized;
+                // 未瞄準時：只有朝攝影機方向（向前）移動才繼續看準星；
+                // 向左、右、後退移動時，身體和頭改看角色自己的正前方。
+                Vector3 cameraForward = characterOrientation.forward;
+                cameraForward.y = 0f;
+                if (cameraForward.sqrMagnitude > 0.0001f)
+                {
+                    float angle = Vector3.Angle(desiredForward.Value, cameraForward.normalized);
+                    aimRigWanted = angle <= aimRigForwardAngle;
+                }
             }
         }
+
+        UpdateAimRig(aimRigWanted);
 
         // 俯仰角：只在近戰攻擊期間朝目標抬頭 / 低頭，其餘時間平滑回 0。
         // 注意膠囊碰撞體不會跟著轉 —— 視覺斜著、碰撞維持直立是標準作法。
@@ -1391,33 +1478,59 @@ public class PlayerMovement : MonoBehaviour
     private bool _mobilePlatformRotInit;
     // 對外公開：玩家目前站著的移動平台（沒站平台 = null）。給殘影 parent 用。
     public Transform CurrentPlatform => _onMobilePlatform ? _mobilePlatformTf : null;
-    public void OnTriggerStay(Collider other)
+    // ── 在不在船上：改讀 ShipPassenger（往下射線），跟敵人共用同一套判斷 ──
+    //
+    // 舊版用 OnTriggerStay / OnTriggerExit 偵測 "Mobile Platform Hitbox"：
+    //   - 船身有多個 hitbox 時，離開其中一個就會被判定下船
+    //   - hitbox 被銷毀時收不到 Exit，狀態可能永遠卡住
+    //   - 每個 physics step 都重複呼叫 SetSimulationSpaceLandship / SetOnShip / SetPlatform
+    // 現在只在「上船 / 下船 / 換船」那一刻各呼叫一次。
+    [Header("Mobile Platform")]
+    [Tooltip("留空會自動在自己身上找；找不到會在執行時自動加一個（用預設設定）。")]
+    [SerializeField] private ShipPassenger shipPassenger;
+
+    private ShipPassenger Passenger
     {
-        if (!other.CompareTag("Mobile Platform Hitbox")) return;
-
-        var rb = other.GetComponentInParent<Rigidbody>();
-        if (rb == null) return;
-
-        if (_mobilePlatformRb != rb)
+        get
         {
-            _mobilePlatformRb = rb;
-            _mobilePlatformTf = rb.transform;
-
-            _mobilePlatformLastRot = rb.rotation;
-            _mobilePlatformRotInit = true;
+            if (shipPassenger == null)
+            {
+                shipPassenger = GetComponent<ShipPassenger>();
+                if (shipPassenger == null) shipPassenger = gameObject.AddComponent<ShipPassenger>();
+            }
+            return shipPassenger;
         }
+    }
 
+    /// <summary>每個 FixedUpdate 開頭呼叫：狀態有變才觸發上船 / 下船的副作用。</summary>
+    private void SyncMobilePlatform()
+    {
+        ShipPassenger p = Passenger;
+        Rigidbody rb = (p != null && p.isOnShip) ? p.PlatformRigidbody : null;
+
+        if (rb == _mobilePlatformRb) return;   // 沒變（包含一直都不在船上）
+
+        if (rb != null) EnterMobilePlatform(rb);
+        else ExitMobilePlatform();
+    }
+
+    private void EnterMobilePlatform(Rigidbody rb)
+    {
+        _mobilePlatformRb = rb;
+        _mobilePlatformTf = rb.transform;
+        _mobilePlatformLastRot = rb.rotation;
+        _mobilePlatformRotInit = true;
         _onMobilePlatform = true;
+
         playerAnimation.SetSimulationSpaceLandship();
         attackManager.SetOnShip(rb);
 
         if (PlayerAiming.Instance != null)
             PlayerAiming.Instance.SetPlatform(_mobilePlatformTf);   // 讓鏡頭跟船的朝向
     }
-    public void OnTriggerExit(Collider other)
-    {
-        if (!other.CompareTag("Mobile Platform Hitbox")) return;
 
+    private void ExitMobilePlatform()
+    {
         _onMobilePlatform = false;
         _mobilePlatformRb = null;
         _mobilePlatformTf = null;
