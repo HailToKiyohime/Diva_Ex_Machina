@@ -30,6 +30,19 @@ public class PlayerAiming : MonoBehaviour
     [SerializeField] private float lockOnDistance = 50f;
     [SerializeField] private float freeAimMaxDistance = 999f;
 
+    [Header("Assist Aim (非鎖定)")]
+    [Tooltip("換目標的容差，以鎖定圈半徑的比例表示。\n" +
+             "目前的目標還合格時，新目標必須比它更靠近畫面中心「這個比例 × 圈半徑」才會換過去，\n" +
+             "避免兩隻敵人差不多靠近中心時準星來回跳。0 = 永遠選最近的。")]
+    [SerializeField, Range(0f, 0.5f)] private float switchMarginRatio = 0.1f;
+
+    [Tooltip("開啟時，從鏡頭看過去被擋住的敵人不會被輔助瞄準選中。")]
+    [SerializeField] private bool requireLineOfSight = true;
+
+    [Tooltip("會擋住視線的層。敵人層不要勾，否則敵人會互相擋住。\n" +
+             "留空（Nothing）會在執行時自動用 Default、Ground、Mobile Platform、Defence Fortifications、Obstacle。")]
+    [SerializeField] private LayerMask lineOfSightBlockers;
+
     [Header("UI Speeds")]
     [SerializeField] private float centerLerpSpeed = 10f;
     [SerializeField] private float crosshairLerpSpeed = 18f;
@@ -138,6 +151,9 @@ public class PlayerAiming : MonoBehaviour
 
         if (meshTransform == null) meshTransform = transform;
         if (mainCam == null) mainCam = Camera.main;
+
+        if (lineOfSightBlockers.value == 0)
+            lineOfSightBlockers = LayerMask.GetMask("Default", "Ground", "Mobile Platform", "Defence Fortifications", "Obstacle");
 
         if (virtualCamera != null)
             _thirdPersonFollow = virtualCamera.GetCinemachineComponent(CinemachineCore.Stage.Body)
@@ -329,246 +345,269 @@ public class PlayerAiming : MonoBehaviour
     // =========================
     // Constrained Lock (核心)
     // =========================
+    //
+    // 兩種狀態：
+    //   · 鎖定（AutoAim，按中鍵之後）：黏住同一個目標，只有目標死亡 / 丟失才換。
+    //   · 輔助瞄準（按中鍵之前）：每一幀重新挑「鎖定圈內、離畫面中心最近」的敵人，
+    //     有更靠近中心的敵人就換過去（帶一點容差，避免兩隻差不多近時來回跳）。
     private void CrosshairDetect_ConstrainedLock()
     {
         screenCenter = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
         float radius = GetLockAreaPixelRadius();
 
-        // ======================================================
-        // AutoAim active: lock target is fixed to _autoAimTarget
-        // ======================================================
         if (_autoAimActive)
         {
-            if (_autoAimTarget == null || !_autoAimTarget.gameObject.activeInHierarchy)
-            {
-                // 目標丟失 / 被擊殺：搜尋下一個「最接近螢幕中心且在 lockOnDistance 內」的敵人
-                // 找不到才退出 AutoAim
-                if (!HandleAutoAimTargetLost())
-                {
-                    ClearLock();
-                    return;
-                }
-                // 已取得新目標，繼續往下用新目標維持鎖定
-            }
-
-            if (_lockedTarget != _autoAimTarget)
-            {
-                _lockedTarget = _autoAimTarget;
-                _lockedTargetRb = _autoAimTarget.GetComponentInParent<Rigidbody>();
-                _lockedTargetRenderer = _autoAimTarget.GetComponentInChildren<Renderer>();
-            }
-        }
-
-        // ======================================================
-        // 1) Have a locked target: maintain/update
-        // ======================================================
-        if (_lockedTarget != null && _lockedTarget.gameObject.activeInHierarchy)
-        {
-            if (_lockedTargetRenderer == null)
-                _lockedTargetRenderer = _lockedTarget.GetComponentInChildren<Renderer>();
-
-            // Only use Renderer.isVisible when NOT auto-aiming
-            bool isVisible = true;
-            if (!_autoAimActive)
-                isVisible = (_lockedTargetRenderer != null) ? _lockedTargetRenderer.isVisible : true;
-
-            targetDistance = Vector3.Distance(playerOrientation.transform.position, _lockedTarget.position);
-
-            // LockOnDistance hard drop：只在「非 AutoAim」時立即斷鎖。
-            // AutoAim 期間交給 LateUpdate 的 _autoAimOutDistanceTimer（超距 N 秒才退出），
-            // 這段緩衝期間 ray / 準星 / aimingPoint 仍持續更新，不會凍結在舊方向。
-            if (!_autoAimActive && (!isVisible || targetDistance > lockOnDistance))
-            {
-                ClearLock();
-            }
-            else
-            {
-                Vector3 sp = mainCam.WorldToScreenPoint(_lockedTarget.position);
-
-                // Behind camera（sp.z <= 0）：WorldToScreenPoint 的座標會左右/上下鏡像。
-                // 非 AutoAim：維持原本行為，直接斷鎖、往下走掃描/free-aim。
-                // AutoAim：不斷鎖也不 return（否則 ray 會凍結）；把 delta 鏡像翻回來、
-                //          視為圈外，讓夾點仍落在目標那一側的圈邊，等相機追上來。
-                bool behindCamera = (sp.z <= 0f);
-                if (behindCamera && !_autoAimActive)
-                {
-                    ClearLock();
-                    // IMPORTANT: do NOT return; allow scanning/free-aim below
-                }
-                else
-                {
-                    Vector2 targetScreen = new Vector2(sp.x, sp.y);
-                    Vector2 delta = targetScreen - screenCenter;
-                    if (behindCamera)
-                        delta = -delta; // 背後鏡像修正
-
-                    _lockedInsideCircle = !behindCamera && (delta.magnitude <= radius + 0.01f);
-
-                    // AutoAim OFF: no clamp; if outside circle -> drop lock and continue to scan/free-aim
-                    if (!_autoAimActive && !_lockedInsideCircle)
-                    {
-                        ClearLock();
-                        // IMPORTANT: do NOT return; allow scanning/free-aim below
-                    }
-                    else
-                    {
-                        // AutoAim ON: clamp when outside; inside follow target normally
-                        Vector2 uiPoint = targetScreen;
-                        if (_autoAimActive && !_lockedInsideCircle)
-                        {
-                            Vector2 dirOnScreen = (delta.sqrMagnitude > 0.0001f) ? delta.normalized : Vector2.up;
-                            uiPoint = screenCenter + dirOnScreen * radius;
-                        }
-
-                        // Circle-outside should look like normal crosshair (gray + no tilt)
-                        DriveCrosshairTo(uiPoint, _lockedInsideCircle);
-
-                        // Ray always follows crosshair point (needed for circle-outside firing)
-                        ray = mainCam.ScreenPointToRay(uiPoint);
-
-                        if (_lockedInsideCircle)
-                        {
-                            // Inside circle: TRUE lockOn (shoot target)
-                            lockOn = true;
-                            currentTargetRb = _lockedTargetRb;
-                            targetDirection = (_lockedTarget.position - transform.position).normalized;
-
-                            if (aimingPoint) aimingPoint.position = _lockedTarget.position;
-
-                            if (UIManager.Instance != null)
-                            {
-                                UIManager.Instance.distanceText.text = targetDistance.ToString("F2");
-                                UIManager.Instance.distanceText.color = UIManager.Instance.lockonColor;
-                                UIManager.Instance.distanceText.fontStyle = FontStyles.Bold;
-                            }
-                        }
-                        else
-                        {
-                            // Outside circle (clamped): NOT lockOn (shoot crosshair ray)
-                            lockOn = false;
-                            currentTargetRb = null;
-                            targetDirection = Vector3.zero;
-
-                            if (Physics.Raycast(ray, out RaycastHit hit2, freeAimMaxDistance, ~0, QueryTriggerInteraction.Ignore))
-                            {
-                                if (aimingPoint) aimingPoint.position = hit2.point;
-
-                                if (UIManager.Instance != null)
-                                    UIManager.Instance.distanceText.text = hit2.distance.ToString("F2");
-                            }
-                            else
-                            {
-                                if (aimingPoint) aimingPoint.position = ray.origin + ray.direction * freeAimMaxDistance;
-
-                                if (UIManager.Instance != null)
-                                    UIManager.Instance.distanceText.text = 0f.ToString("F2");
-                            }
-
-                            if (UIManager.Instance != null)
-                            {
-                                UIManager.Instance.distanceText.color = UIManager.Instance.normalColor;
-                                UIManager.Instance.distanceText.fontStyle = FontStyles.Normal;
-                            }
-                        }
-
-                        return; // handled locked-target case
-                    }
-                }
-            }
-        }
-
-        // ======================================================
-        // If AutoAim is active but lock got cleared this frame:
-        // never scan for a new target (prevents target switching)
-        // ======================================================
-        if (_autoAimActive)
-        {
+            UpdateAutoAimLock(radius);
             return;
         }
 
-        // ======================================================
-        // 2) No lock: scan closest enemy (must be inside circle + visible + within distance)
-        // ======================================================
-        GameObject closestEnemy = null;
-        Vector2 closestScreenPoint = Vector2.zero;
-        float closestProximity = Mathf.Infinity;
-
-        List<GameObject> enemies = GameManager.Instance.GetEnemies();
-        for (int i = 0; i < enemies.Count; i++)
+        if (TryPickAssistTarget(radius, out Vector2 targetScreen))
         {
-            var enemy = enemies[i];
-            if (!enemy) continue;
-
-            Vector3 sp = mainCam.WorldToScreenPoint(enemy.transform.position);
-            if (sp.z <= 0f) continue;
-
-            Vector2 pt = new Vector2(sp.x, sp.y);
-            float prox = Vector2.Distance(pt, screenCenter);
-
-            if (prox < closestProximity)
-            {
-                closestProximity = prox;
-                closestScreenPoint = pt;
-                closestEnemy = enemy;
-            }
+            _lockedInsideCircle = true;
+            DriveCrosshairTo(targetScreen, true);
+            ray = mainCam.ScreenPointToRay(targetScreen);
+            ApplyLockedTargetAim();
+            return;
         }
 
-        if (closestEnemy != null)
+        ClearLock();
+        FreeAim();
+    }
+
+    /// <summary>
+    /// 鎖定（AutoAim）期間：目標固定為 _autoAimTarget。
+    /// 目標在圈外時準星夾在圈邊、改打準星方向；背後時把螢幕座標鏡像翻回來再夾。
+    /// </summary>
+    private void UpdateAutoAimLock(float radius)
+    {
+        if (_autoAimTarget == null || !_autoAimTarget.gameObject.activeInHierarchy)
         {
-            Renderer r = closestEnemy.GetComponentInChildren<Renderer>();
-            bool isVisible = (r != null) ? r.isVisible : true;
-
-            targetDistance = Vector3.Distance(playerOrientation.transform.position, closestEnemy.transform.position);
-            bool inside = (closestProximity <= radius);
-            bool ok = inside && isVisible && (targetDistance <= lockOnDistance);
-
-            if (ok)
+            // 目標丟失 / 被擊殺：搜尋下一個目標，找不到才退出 AutoAim
+            if (!HandleAutoAimTargetLost())
             {
-                _lockedTarget = closestEnemy.transform;
-                _lockedTargetRb = closestEnemy.GetComponentInParent<Rigidbody>();
-                _lockedTargetRenderer = r;
-                _lockedInsideCircle = true;
-
-                lockOn = true;
-                currentTargetRb = _lockedTargetRb;
-
-                DriveCrosshairTo(closestScreenPoint, true);
-                ray = mainCam.ScreenPointToRay(closestScreenPoint);
-
-                if (aimingPoint) aimingPoint.position = _lockedTarget.position;
+                ClearLock();
                 return;
             }
         }
 
-        // ======================================================
-        // 3) Free aim (no lock)
-        // ======================================================
-        lockOn = false;
-        _lockedInsideCircle = false;
+        if (_lockedTarget != _autoAimTarget)
+        {
+            _lockedTarget = _autoAimTarget;
+            _lockedTargetRb = _autoAimTarget.GetComponentInParent<Rigidbody>();
+            _lockedTargetRenderer = _autoAimTarget.GetComponentInChildren<Renderer>();
+        }
+        if (_lockedTargetRenderer == null)
+            _lockedTargetRenderer = _lockedTarget.GetComponentInChildren<Renderer>();
 
+        // 超出 lockOnDistance 不在這裡斷鎖，交給 LateUpdate 的 _autoAimOutDistanceTimer（超距 N 秒才退出）
+        targetDistance = Vector3.Distance(playerOrientation.transform.position, _lockedTarget.position);
+
+        Vector3 sp = mainCam.WorldToScreenPoint(_lockedTarget.position);
+        bool behindCamera = sp.z <= 0f;
+
+        Vector2 targetScreen = new Vector2(sp.x, sp.y);
+        Vector2 delta = targetScreen - screenCenter;
+        if (behindCamera)
+            delta = -delta; // 背後時 WorldToScreenPoint 會鏡像，翻回來
+
+        _lockedInsideCircle = !behindCamera && delta.magnitude <= radius + 0.01f;
+
+        // 圈外：準星夾在圈邊（等鏡頭追上來）
+        Vector2 uiPoint = targetScreen;
+        if (!_lockedInsideCircle)
+        {
+            Vector2 dirOnScreen = (delta.sqrMagnitude > 0.0001f) ? delta.normalized : Vector2.up;
+            uiPoint = screenCenter + dirOnScreen * radius;
+        }
+
+        // 圈外看起來要跟一般準星一樣（灰色、不傾斜）
+        DriveCrosshairTo(uiPoint, _lockedInsideCircle);
+
+        // ray 永遠跟著準星（圈外開火需要）
+        ray = mainCam.ScreenPointToRay(uiPoint);
+
+        if (_lockedInsideCircle)
+        {
+            ApplyLockedTargetAim();   // 圈內：真正鎖定，打目標
+            return;
+        }
+
+        // 圈外（夾在圈邊）：不算鎖定，打準星方向
+        lockOn = false;
+        currentTargetRb = null;
+        targetDirection = Vector3.zero;
+
+        if (Physics.Raycast(ray, out RaycastHit hit, freeAimMaxDistance, ~0, QueryTriggerInteraction.Ignore))
+        {
+            if (aimingPoint) aimingPoint.position = hit.point;
+            SetDistanceText(hit.distance, locked: false);
+        }
+        else
+        {
+            if (aimingPoint) aimingPoint.position = ray.origin + ray.direction * freeAimMaxDistance;
+            SetDistanceText(0f, locked: false);
+        }
+    }
+
+    /// <summary>
+    /// 輔助瞄準：挑出鎖定圈內、離畫面中心最近的敵人，設為 _lockedTarget。
+    ///
+    /// 候選條件：在 lockOnDistance 內（3D 距離）、在鏡頭前方、螢幕位置在鎖定圈內、
+    /// Renderer 可見、而且（requireLineOfSight 開啟時）從鏡頭看過去沒有被擋住。
+    ///
+    /// 容差：目前鎖著的目標仍然合格時，新目標要比它「更靠近中心 switchMarginRatio × 圈半徑」才換。
+    /// </summary>
+    private bool TryPickAssistTarget(float radius, out Vector2 bestScreen)
+    {
+        bestScreen = Vector2.zero;
+        if (mainCam == null || playerOrientation == null || GameManager.Instance == null)
+            return false;
+
+        List<GameObject> enemies = GameManager.Instance.GetEnemies();
+        if (enemies == null || enemies.Count == 0)
+            return false;
+
+        Vector3 origin = playerOrientation.transform.position;
+        float maxDistSqr = lockOnDistance * lockOnDistance;
+        float circleSqr = (radius + 0.01f) * (radius + 0.01f);
+
+        Transform current = _lockedTarget;
+
+        Transform best = null;
+        Renderer bestRenderer = null;
+        float bestSqr = float.PositiveInfinity;
+
+        bool currentValid = false;
+        Renderer currentRenderer = null;
+        Vector2 currentScreen = Vector2.zero;
+        float currentSqr = float.PositiveInfinity;
+
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            GameObject enemy = enemies[i];
+            if (!enemy || !enemy.activeInHierarchy) continue;
+
+            Transform t = enemy.transform;
+            Vector3 pos = t.position;
+
+            // 便宜的檢查先做
+            if ((pos - origin).sqrMagnitude > maxDistSqr) continue;
+
+            Vector3 sp = mainCam.WorldToScreenPoint(pos);
+            if (sp.z <= 0f) continue;
+
+            Vector2 pt = new Vector2(sp.x, sp.y);
+            float proxSqr = (pt - screenCenter).sqrMagnitude;
+            if (proxSqr > circleSqr) continue;
+
+            // 貴的檢查（Renderer、射線）只做在「可能成為答案」的敵人上：
+            // 比目前最佳更靠近中心，或它就是目前鎖著的目標（容差判斷要用）
+            bool isCurrent = t == current;
+            if (!isCurrent && proxSqr >= bestSqr) continue;
+
+            Renderer r = enemy.GetComponentInChildren<Renderer>();
+            if (r != null && !r.isVisible) continue;
+            if (requireLineOfSight && !HasLineOfSight(t, pos)) continue;
+
+            if (isCurrent)
+            {
+                currentValid = true;
+                currentRenderer = r;
+                currentScreen = pt;
+                currentSqr = proxSqr;
+            }
+
+            if (proxSqr < bestSqr)
+            {
+                bestSqr = proxSqr;
+                best = t;
+                bestRenderer = r;
+                bestScreen = pt;
+            }
+        }
+
+        // 容差：新目標沒有明顯更靠近中心，就留在目前的目標上
+        if (currentValid && best != current)
+        {
+            float margin = radius * switchMarginRatio;
+            if (Mathf.Sqrt(bestSqr) > Mathf.Sqrt(currentSqr) - margin)
+            {
+                best = current;
+                bestRenderer = currentRenderer;
+                bestScreen = currentScreen;
+            }
+        }
+
+        if (best == null)
+            return false;
+
+        if (best != _lockedTarget)
+        {
+            _lockedTarget = best;
+            _lockedTargetRb = best.GetComponentInParent<Rigidbody>();
+            _lockedTargetRenderer = bestRenderer;
+        }
+
+        targetDistance = Vector3.Distance(origin, best.position);
+        return true;
+    }
+
+    /// <summary>
+    /// 從鏡頭看向目標，中間有沒有被擋住。
+    /// 只有 lineOfSightBlockers 裡的層會擋視線（敵人彼此不互擋）；
+    /// 打到的碰撞體屬於目標自己時也算看得到。
+    /// </summary>
+    private bool HasLineOfSight(Transform target, Vector3 targetPoint)
+    {
+        Vector3 from = mainCam.transform.position;
+        Vector3 dir = targetPoint - from;
+        float dist = dir.magnitude;
+        if (dist < 0.01f) return true;
+
+        if (!Physics.Raycast(from, dir / dist, out RaycastHit hit, dist, lineOfSightBlockers, QueryTriggerInteraction.Ignore))
+            return true;
+
+        return hit.collider.transform.IsChildOf(target);
+    }
+
+    /// <summary>準星壓在 _lockedTarget 上（圈內）時的鎖定狀態與 UI。</summary>
+    private void ApplyLockedTargetAim()
+    {
+        lockOn = true;
+        currentTargetRb = _lockedTargetRb;
+        targetDirection = (_lockedTarget.position - transform.position).normalized;
+
+        if (aimingPoint) aimingPoint.position = _lockedTarget.position;
+        SetDistanceText(targetDistance, locked: true);
+    }
+
+    /// <summary>沒有目標：準星回中心，打畫面中心的射線。</summary>
+    private void FreeAim()
+    {
         ray = mainCam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
         SmoothResetCrosshairToCenter();
+
         int layerMask = ~ignoreLayer;
         if (playerOrientation && Physics.Raycast(ray, out RaycastHit hit, freeAimMaxDistance, layerMask, QueryTriggerInteraction.Ignore))
         {
             if (aimingPoint) aimingPoint.position = hit.point;
-            if (UIManager.Instance != null)
-                UIManager.Instance.distanceText.text = hit.distance.ToString("F2");
+            SetDistanceText(hit.distance, locked: false);
         }
         else if (playerOrientation)
         {
             if (aimingPoint) aimingPoint.position = playerOrientation.transform.position + (playerOrientation.transform.forward * freeAimMaxDistance);
-            if (UIManager.Instance != null)
-                UIManager.Instance.distanceText.text = 0f.ToString("F2");
-        }
-
-        if (UIManager.Instance != null)
-        {
-            UIManager.Instance.distanceText.color = UIManager.Instance.normalColor;
-            UIManager.Instance.distanceText.fontStyle = FontStyles.Normal;
+            SetDistanceText(0f, locked: false);
         }
     }
 
+    private void SetDistanceText(float distance, bool locked)
+    {
+        if (UIManager.Instance == null) return;
+
+        UIManager.Instance.distanceText.text = distance.ToString("F2");
+        UIManager.Instance.distanceText.color = locked ? UIManager.Instance.lockonColor : UIManager.Instance.normalColor;
+        UIManager.Instance.distanceText.fontStyle = locked ? FontStyles.Bold : FontStyles.Normal;
+    }
 
     private void ClearLock()
     {

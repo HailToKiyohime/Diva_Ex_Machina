@@ -13,7 +13,8 @@ using UnityEngine.Events;
 ///      （TurretController.bulletTargetLayer / MeleeHitData.hittableLayers）。
 ///   2. 想讓敵人主動把它當目標，建築的 tag 設成 "Defence Fortifications"（EnemyDetection 用）。
 ///
-/// 防禦公式與 ModularEntityStats / PlayerStats 相同：defense 為 0~1000，最高減免 100%。
+/// 防禦公式與 ModularEntityStats / PlayerStats 相同（DefenseFormula）：
+/// 減傷 = 防禦 ÷ (防禦 + 1000)，防禦 1000 = 減傷 50%，永遠不會到 100%。
 /// </summary>
 [DisallowMultipleComponent]
 public class BuildingStats : MonoBehaviour, IDamageable
@@ -22,7 +23,7 @@ public class BuildingStats : MonoBehaviour, IDamageable
     [Min(1f)] public float maxHealth = 500f;
     [SerializeField] private float health;
 
-    [Header("Defense (0 ~ 1000)")]
+    [Header("Defense（1000 = 減傷 50%）")]
     public float physicalDefense;
     public float explosionDefense;
     public float energyDefense;
@@ -69,11 +70,7 @@ public class BuildingStats : MonoBehaviour, IDamageable
         // Destroy 要到這一幀結束才生效，同一幀的後續命中直接擋掉，避免死亡觸發多次
         if (_dead) return;
 
-        float amount =
-            dmg.physical * GetDefenseMultiplier(physicalDefense) +
-            dmg.explosion * GetDefenseMultiplier(explosionDefense) +
-            dmg.energy * GetDefenseMultiplier(energyDefense) +
-            dmg.cold * GetDefenseMultiplier(coldDefense);
+        float amount = DefenseFormula.Apply(dmg, physicalDefense, explosionDefense, energyDefense, coldDefense);
 
         if (amount <= 0f) return;
 
@@ -97,11 +94,6 @@ public class BuildingStats : MonoBehaviour, IDamageable
     {
         if (_dead || amount <= 0f) return;
         health = Mathf.Min(maxHealth, health + amount);
-    }
-
-    public static float GetDefenseMultiplier(float defenseValue)
-    {
-        return 1f - Mathf.Clamp01(defenseValue / 1000f);
     }
 
     private void Die()

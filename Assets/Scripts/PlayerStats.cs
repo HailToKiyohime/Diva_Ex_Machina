@@ -87,7 +87,7 @@ public enum Attributes
     //Melee Weapon Specific
     MeleeOutput = 34,
     MeleeSpeed = 35,
-    MeleeDashDistance = 36,
+    MeleeDashDistance = 36,   // 已停用：近戰突進距離改由 dashSpeed / sprintSpeed × 動畫長度決定。保留號碼當墓碑，不要重用
     MeleeReloadTime = 37,
 
     //Auto Aim Speed
@@ -214,7 +214,6 @@ public class BaseStats
     [Header("Base Melee")]
     public float meleeOutput = 1f; //The final damage is calculated by multiplying this value with weapon damage
     public float meleeSpeed = 1f;//The final attack speed is calculated by multiplying this value with weapon attack speed
-    public float meleeDashDistance = 5f; //The distance covered during a melee dash attack
     public float meleeReloadTime = 0.75f; //Cooldown after melee dash/attack
     [Header("Base Critical")]
     public float criticalChance = 0.05f;
@@ -285,7 +284,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
     [Header("MeleeWeapon")]
     public float meleeOutput;
     public float meleeSpeed;
-    public float meleeDashDistance;
     public float meleeReloadTime;
     [Header("RangeWeapon")]
     public float reloadTime;
@@ -477,13 +475,7 @@ public class PlayerStats : MonoBehaviour, IDamageable
 
     public void TakeDamage(DamageInfo dmg, GameObject attacker)
     {
-        float amount =
-            dmg.physical * GetDefenseMultiplier(physicalDefense) +
-            dmg.explosion * GetDefenseMultiplier(explosionDefense) +
-            dmg.energy * GetDefenseMultiplier(energyDefense) +
-            dmg.cold * GetDefenseMultiplier(coldDefense);
-
-        //Debug.Log($"[PlayerStats] 收到傷害 {amount}，來自 {attacker?.name}");  // ← 加這行
+        float amount = DefenseFormula.Apply(dmg, physicalDefense, explosionDefense, energyDefense, coldDefense);
 
         if (amount <= 0f) return;
 
@@ -505,13 +497,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
             currentHealth = 0f;
             // TODO: 玩家死亡處理（OnPlayerDeath?.Invoke(); 重生 / GameOver 等）
         }
-    }
-
-    // 與 EnemyStats 相同的防禦公式：defense 為 0~1000，最高減免 100%
-    public float GetDefenseMultiplier(float defenseValue)
-    {
-        float reduction = Mathf.Clamp01(defenseValue / 1000f);
-        return 1f - reduction;
     }
 
     void Awake()
@@ -563,7 +548,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
         accelerationSpeed = baseStats.accelerationSpeed;
         decelerationSpeed = baseStats.decelerationSpeed;
         dashSpeed = baseStats.dashSpeed;
-        meleeDashDistance = baseStats.meleeDashDistance;
         meleeReloadTime = baseStats.meleeReloadTime;
         meleeOutput = baseStats.meleeOutput;
         meleeSpeed = baseStats.meleeSpeed;
@@ -783,7 +767,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
             case Attributes.FiringMode:
             case Attributes.CriticalChance:
             case Attributes.CriticalMultiplier:
-            case Attributes.MeleeDashDistance:
             case Attributes.MeleeReloadTime:
                 return true;
             default:
@@ -846,14 +829,6 @@ public class PlayerStats : MonoBehaviour, IDamageable
         }
 
         return v;
-    }
-
-    // The effective melee dash distance for the specified hand:
-    // base PlayerStats.meleeDashDistance, then apply that hand's weapon-side buffs (weapon + attachments + armor weapon-side buffs).
-    public float GetMeleeDashDistanceForHand(bool isLeftHand)
-    {
-        var hand = isLeftHand ? leftHand : rightHand;
-        return ApplyBuffListToValue(hand.buffs, Attributes.MeleeDashDistance, baseStats.meleeDashDistance);
     }
 
     // 這隻手的最終後座力控制：baseStats.recoilControl 再吃該手的武器側 buff。

@@ -7,14 +7,15 @@ using UnityEngine.Rendering;
 /// <summary>
 /// 建立跳躍 / 落地塵土 prefab。
 ///
-/// 兩種風格：
-///   Realistic（預設）- 柔和、有雜訊邊緣的煙塵，慢慢擴散淡出，貼地的塵土波，細小碎粒
-///   Stylized        - 動畫式三階分色塵團、硬切換淡出、衝擊環與速度線
+/// 三種風格：
+///   Hybrid（預設）- 融合：塵團有清楚的團塊輪廓與柔和的兩階明暗（像手繪），
+///                   邊緣帶一點雜訊散開；先維持實心、再平滑淡出；貼地塵土波；重落地才有淡淡的速度線
+///   Stylized      - 動畫式三階分色塵團、硬切換淡出、衝擊環與速度線
+///   Realistic     - 柔和、有雜訊邊緣的煙塵，慢慢擴散淡出，細小碎粒，沒有速度線
 ///
 /// 開啟：Tools > Diva Ex Machina > Jump Dust Builder
 ///
-/// 需要 {Output Folder}/Textures 裡的 JD_*.png（Realistic 用 Smoke / SoftRing / Grit，
-/// Stylized 用 Puff / GroundRing / Debris / Streak）。
+/// 需要 {Output Folder}/Textures 裡對應風格的 JD_*.png。
 /// 材質建在 {Output Folder}/Materials，prefab 存成 {Output Folder}/{Prefab Name}.prefab。
 /// 重新建置會覆寫它們，所以可以改下面的數值再按一次 Build。
 ///
@@ -26,8 +27,8 @@ public class JumpDustBuilder : EditorWindow
     private string outputFolder = "Assets/VFX/JumpDust";
     private string prefabName = "JumpDust";
 
-    private enum Style { Realistic, Stylized }
-    private Style style = Style.Realistic;
+    private enum Style { Hybrid, Stylized, Realistic }
+    private Style style = Style.Hybrid;
 
     private float effectScale = 1f;
     private bool softParticles = true;
@@ -48,7 +49,7 @@ public class JumpDustBuilder : EditorWindow
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Look", EditorStyles.boldLabel);
         style = (Style)EditorGUILayout.EnumPopup(new GUIContent("Style",
-            "Realistic：柔和的煙塵。Stylized：動畫式分色塵團。"), style);
+            "Hybrid：風格化與寫實的融合（預設）。Stylized：動畫式分色塵團。Realistic：柔和的煙塵。"), style);
         effectScale = EditorGUILayout.Slider(new GUIContent("Effect Scale",
             "整體大小。1 = 以身高約 2 公尺的角色為準。"), effectScale, 0.25f, 4f);
         softParticles = EditorGUILayout.ToggleLeft(new GUIContent(
@@ -73,17 +74,33 @@ public class JumpDustBuilder : EditorWindow
     // Build
     // =====================================================================
 
+    /// <summary>依風格挑數值：V(Stylized, Hybrid, Realistic)。</summary>
+    private float V(float stylized, float hybrid, float realistic)
+    {
+        return style == Style.Stylized ? stylized : style == Style.Realistic ? realistic : hybrid;
+    }
+
+    /// <summary>依風格挑「隨機範圍」(min, max)，再乘上 scale。</summary>
+    private ParticleSystem.MinMaxCurve R(Vector2 stylized, Vector2 hybrid, Vector2 realistic, float scale = 1f)
+    {
+        return new ParticleSystem.MinMaxCurve(
+            V(stylized.x, hybrid.x, realistic.x) * scale,
+            V(stylized.y, hybrid.y, realistic.y) * scale);
+    }
+
     private void Build()
     {
         AssetDatabase.Refresh();
         EnsureFolder(outputFolder);
         EnsureFolder($"{outputFolder}/Materials");
 
-        bool real = style == Style.Realistic;
+        string texPuffName = style == Style.Stylized ? "JD_PuffSheet.png" : style == Style.Realistic ? "JD_SmokeSheet.png" : "JD_HybridPuffSheet.png";
+        string texRingName = style == Style.Stylized ? "JD_GroundRing.png" : style == Style.Realistic ? "JD_SoftRing.png" : "JD_HybridRing.png";
+        string texDebrisName = style == Style.Stylized ? "JD_DebrisSheet.png" : "JD_GritSheet.png";
 
-        Texture2D texPuff = LoadTexture(real ? "JD_SmokeSheet.png" : "JD_PuffSheet.png");
-        Texture2D texDebris = LoadTexture(real ? "JD_GritSheet.png" : "JD_DebrisSheet.png");
-        Texture2D texRing = LoadTexture(real ? "JD_SoftRing.png" : "JD_GroundRing.png");
+        Texture2D texPuff = LoadTexture(texPuffName);
+        Texture2D texDebris = LoadTexture(texDebrisName);
+        Texture2D texRing = LoadTexture(texRingName);
         Texture2D texStreak = LoadTexture("JD_Streak.png");
 
         if (texPuff == null || texDebris == null || texRing == null || texStreak == null)
@@ -93,7 +110,7 @@ public class JumpDustBuilder : EditorWindow
             return;
         }
 
-        string suffix = real ? "" : "_Stylized";
+        string suffix = style == Style.Hybrid ? "" : "_" + style;
         Material matPuff = MakeAlphaMaterial("JD_Puff" + suffix, texPuff, softParticles);
         Material matDebris = MakeAlphaMaterial("JD_Debris" + suffix, texDebris, false);
         Material matRing = MakeAlphaMaterial("JD_Ring" + suffix, texRing, softParticles);
@@ -107,27 +124,31 @@ public class JumpDustBuilder : EditorWindow
         ParticleSystem burst = CreateLayer("Burst", root.transform, matPuff, 120);
         {
             var main = burst.main;
-            main.startLifetime = real ? new ParticleSystem.MinMaxCurve(0.9f, 1.5f) : new ParticleSystem.MinMaxCurve(0.55f, 0.9f);
-            main.startSpeed = real ? new ParticleSystem.MinMaxCurve(4f * S, 7f * S) : new ParticleSystem.MinMaxCurve(5f * S, 8f * S);
-            main.startSize = real ? new ParticleSystem.MinMaxCurve(0.6f * S, 1.1f * S) : new ParticleSystem.MinMaxCurve(0.45f * S, 0.8f * S);
+            main.startLifetime = R(new Vector2(0.55f, 0.9f), new Vector2(0.7f, 1.1f), new Vector2(0.9f, 1.5f));
+            main.startSpeed = R(new Vector2(5f, 8f), new Vector2(4.5f, 7.5f), new Vector2(4f, 7f), S);
+            main.startSize = R(new Vector2(0.45f, 0.8f), new Vector2(0.55f, 0.95f), new Vector2(0.6f, 1.1f), S);
             main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
 
-            // 錐角 80° + 從邊緣發射 = 幾乎貼著地面往外推，略微上揚
-            SetUpCone(burst, angle: real ? 82f : 80f, radius: 0.35f * S, fromEdge: true);
-            SetDrag(burst, real ? 3.5f : 4f);               // 先快速推開，再被空氣拖住
-            SetRise(burst, (real ? 0.35f : 0.6f) * S);      // 停下來之後慢慢上浮
-            if (real)
+            // 錐角約 80° + 從邊緣發射 = 幾乎貼著地面往外推，略微上揚
+            SetUpCone(burst, angle: V(80f, 81f, 82f), radius: 0.35f * S, fromEdge: true);
+            SetDrag(burst, V(4f, 3.8f, 3.5f));                 // 先快速推開，再被空氣拖住
+            SetRise(burst, V(0.6f, 0.45f, 0.35f) * S);         // 停下來之後慢慢上浮
+            SetSpin(burst, V(0.7f, 0.45f, 0.3f));
+            switch (style)
             {
-                // 寫實：持續膨脹、半透明、長時間慢慢淡出
-                SetSizeOverLife(burst, (0f, 0.5f), (0.25f, 1.3f), (1f, 2.4f));
-                SetSpin(burst, 0.3f);
-                SetAlphaSmooth(burst, (0f, 0f), (0.55f, 0.08f), (0.4f, 0.45f), (0f, 1f));
-            }
-            else
-            {
-                SetSizeOverLife(burst, (0f, 0.6f), (0.3f, 1.2f), (1f, 1.6f));
-                SetSpin(burst, 0.7f);
-                SetAlphaSmooth(burst, (0f, 0f), (1f, 0.06f), (0.85f, 0.5f), (0f, 1f));
+                case Style.Stylized:
+                    SetSizeOverLife(burst, (0f, 0.6f), (0.3f, 1.2f), (1f, 1.6f));
+                    SetAlphaSmooth(burst, (0f, 0f), (1f, 0.06f), (0.85f, 0.5f), (0f, 1f));
+                    break;
+                case Style.Realistic:
+                    SetSizeOverLife(burst, (0f, 0.5f), (0.25f, 1.3f), (1f, 2.4f));
+                    SetAlphaSmooth(burst, (0f, 0f), (0.55f, 0.08f), (0.4f, 0.45f), (0f, 1f));
+                    break;
+                default:
+                    // 融合：先維持實心（讀得出團塊形狀），後半段才平滑淡出
+                    SetSizeOverLife(burst, (0f, 0.55f), (0.28f, 1.25f), (1f, 2.0f));
+                    SetAlphaSmooth(burst, (0f, 0f), (0.95f, 0.06f), (0.85f, 0.4f), (0.35f, 0.75f), (0f, 1f));
+                    break;
             }
             SetSheet(burst, 2, 2);
         }
@@ -136,25 +157,29 @@ public class JumpDustBuilder : EditorWindow
         ParticleSystem cloud = CreateLayer("Cloud", root.transform, matPuff, 40);
         {
             var main = cloud.main;
-            main.startLifetime = real ? new ParticleSystem.MinMaxCurve(1.4f, 2.2f) : new ParticleSystem.MinMaxCurve(0.8f, 1.2f);
-            main.startSpeed = real ? new ParticleSystem.MinMaxCurve(0.8f * S, 1.8f * S) : new ParticleSystem.MinMaxCurve(1.2f * S, 2.4f * S);
-            main.startSize = real ? new ParticleSystem.MinMaxCurve(1.2f * S, 2.0f * S) : new ParticleSystem.MinMaxCurve(0.9f * S, 1.5f * S);
+            main.startLifetime = R(new Vector2(0.8f, 1.2f), new Vector2(1.0f, 1.6f), new Vector2(1.4f, 2.2f));
+            main.startSpeed = R(new Vector2(1.2f, 2.4f), new Vector2(1.0f, 2.1f), new Vector2(0.8f, 1.8f), S);
+            main.startSize = R(new Vector2(0.9f, 1.5f), new Vector2(1.0f, 1.7f), new Vector2(1.2f, 2.0f), S);
             main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
 
-            SetUpCone(cloud, angle: real ? 55f : 40f, radius: 0.25f * S, fromEdge: false);
-            SetDrag(cloud, real ? 2f : 2.5f);
-            SetRise(cloud, (real ? 0.4f : 0.5f) * S);
-            if (real)
+            SetUpCone(cloud, angle: V(40f, 48f, 55f), radius: 0.25f * S, fromEdge: false);
+            SetDrag(cloud, V(2.5f, 2.2f, 2f));
+            SetRise(cloud, V(0.5f, 0.45f, 0.4f) * S);
+            SetSpin(cloud, V(0.4f, 0.25f, 0.15f));
+            switch (style)
             {
-                SetSizeOverLife(cloud, (0f, 0.6f), (0.4f, 1.5f), (1f, 2.2f));
-                SetSpin(cloud, 0.15f);
-                SetAlphaSmooth(cloud, (0f, 0f), (0.45f, 0.1f), (0.3f, 0.5f), (0f, 1f));
-            }
-            else
-            {
-                SetSizeOverLife(cloud, (0f, 0.7f), (0.4f, 1.25f), (1f, 1.5f));
-                SetSpin(cloud, 0.4f);
-                SetAlphaSmooth(cloud, (0f, 0f), (0.9f, 0.08f), (0.7f, 0.5f), (0f, 1f));
+                case Style.Stylized:
+                    SetSizeOverLife(cloud, (0f, 0.7f), (0.4f, 1.25f), (1f, 1.5f));
+                    SetAlphaSmooth(cloud, (0f, 0f), (0.9f, 0.08f), (0.7f, 0.5f), (0f, 1f));
+                    break;
+                case Style.Realistic:
+                    SetSizeOverLife(cloud, (0f, 0.6f), (0.4f, 1.5f), (1f, 2.2f));
+                    SetAlphaSmooth(cloud, (0f, 0f), (0.45f, 0.1f), (0.3f, 0.5f), (0f, 1f));
+                    break;
+                default:
+                    SetSizeOverLife(cloud, (0f, 0.65f), (0.4f, 1.35f), (1f, 1.85f));
+                    SetAlphaSmooth(cloud, (0f, 0f), (0.8f, 0.08f), (0.65f, 0.45f), (0f, 1f));
+                    break;
             }
             SetSheet(cloud, 2, 2);
 
@@ -168,14 +193,14 @@ public class JumpDustBuilder : EditorWindow
             var main = debris.main;
             main.startLifetime = new ParticleSystem.MinMaxCurve(0.45f, 0.8f);
             main.startSpeed = new ParticleSystem.MinMaxCurve(4f * S, 8f * S);
-            main.startSize = real ? new ParticleSystem.MinMaxCurve(0.03f * S, 0.08f * S) : new ParticleSystem.MinMaxCurve(0.06f * S, 0.14f * S);
+            main.startSize = R(new Vector2(0.06f, 0.14f), new Vector2(0.04f, 0.1f), new Vector2(0.03f, 0.08f), S);
             main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
             main.gravityModifier = 2.2f;
 
             SetUpCone(debris, angle: 50f, radius: 0.3f * S, fromEdge: false);
             SetSpin(debris, 6f);
-            if (real) SetAlphaSmooth(debris, (1f, 0f), (1f, 0.7f), (0f, 1f));   // 寫實：落地前淡出
-            else SetAlphaSteps(debris, (1f, 0f), (0f, 0.85f));                  // 動畫式：最後直接消失
+            if (style == Style.Stylized) SetAlphaSteps(debris, (1f, 0f), (0f, 0.85f));        // 最後直接消失
+            else SetAlphaSmooth(debris, (1f, 0f), (1f, V(0.7f, 0.75f, 0.7f)), (0f, 1f));       // 落地前淡出
             SetSheet(debris, 2, 2);
             debris.GetComponent<ParticleSystemRenderer>().sortingFudge = -5f;
         }
@@ -190,7 +215,8 @@ public class JumpDustBuilder : EditorWindow
 
             SetUpCone(streaks, angle: 88f, radius: 0.3f * S, fromEdge: true);
             SetDrag(streaks, 6f);
-            SetAlphaSteps(streaks, (1f, 0f), (0.6f, 0.5f), (0f, 0.85f));
+            if (style == Style.Stylized) SetAlphaSteps(streaks, (1f, 0f), (0.6f, 0.5f), (0f, 0.85f));
+            else SetAlphaSmooth(streaks, (0.8f, 0f), (0.5f, 0.5f), (0f, 1f));
 
             var r = streaks.GetComponent<ParticleSystemRenderer>();
             r.renderMode = ParticleSystemRenderMode.Stretch;
@@ -200,7 +226,7 @@ public class JumpDustBuilder : EditorWindow
             r.sortingFudge = -2f;
         }
 
-        // ---- Ring：地面上擴散的衝擊環 ----
+        // ---- Ring：貼著地面擴散的塵土波 / 衝擊環 ----
         ParticleSystem ring = CreateLayer("Ring", root.transform, matRing, 10);
         {
             // 平躺在地面：Billboard + Local 對齊時，面片朝向本地 +Z → 把 +Z 轉成朝上
@@ -208,7 +234,7 @@ public class JumpDustBuilder : EditorWindow
             ring.transform.localPosition = new Vector3(0f, 0.04f, 0f);
 
             var main = ring.main;
-            main.startLifetime = real ? 0.9f : 0.35f;
+            main.startLifetime = V(0.35f, 0.55f, 0.9f);
             main.startSpeed = 0f;
             main.startSize = 1f * S;
             main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
@@ -216,16 +242,20 @@ public class JumpDustBuilder : EditorWindow
             var shape = ring.shape;
             shape.enabled = false;
 
-            if (real)
+            switch (style)
             {
-                // 寫實：貼著地面往外滾開的一圈低矮塵土
-                SetSizeOverLife(ring, (0f, 0.5f), (0.3f, 2.2f), (1f, 3.4f));
-                SetAlphaSmooth(ring, (0f, 0f), (0.35f, 0.08f), (0.2f, 0.5f), (0f, 1f));
-            }
-            else
-            {
-                SetSizeOverLife(ring, (0f, 0.4f), (0.35f, 2.3f), (1f, 3.2f));
-                SetAlphaSteps(ring, (0.85f, 0f), (0.5f, 0.45f), (0f, 0.9f));
+                case Style.Stylized:
+                    SetSizeOverLife(ring, (0f, 0.4f), (0.35f, 2.3f), (1f, 3.2f));
+                    SetAlphaSteps(ring, (0.85f, 0f), (0.5f, 0.45f), (0f, 0.9f));
+                    break;
+                case Style.Realistic:
+                    SetSizeOverLife(ring, (0f, 0.5f), (0.3f, 2.2f), (1f, 3.4f));
+                    SetAlphaSmooth(ring, (0f, 0f), (0.35f, 0.08f), (0.2f, 0.5f), (0f, 1f));
+                    break;
+                default:
+                    SetSizeOverLife(ring, (0f, 0.45f), (0.3f, 2.2f), (1f, 3.3f));
+                    SetAlphaSmooth(ring, (0f, 0f), (0.7f, 0.06f), (0.45f, 0.45f), (0f, 1f));
+                    break;
             }
 
             var r = ring.GetComponent<ParticleSystemRenderer>();
@@ -243,9 +273,10 @@ public class JumpDustBuilder : EditorWindow
         so.FindProperty("streaks").objectReferenceValue = streaks;
         so.FindProperty("ring").objectReferenceValue = ring;
 
-        if (real)
+        // 各風格的數量與顏色（Stylized 用 JumpDustEffect 的預設值）
+        if (style == Style.Realistic)
         {
-            // 寫實：沒有速度線；塵團半透明；碎粒少一點
+            // 沒有速度線；塵團半透明；碎粒少一點
             so.FindProperty("streakCount").intValue = 0;
             so.FindProperty("debrisCount").intValue = 6;
             so.FindProperty("burstCount").intValue = 12;
@@ -255,6 +286,22 @@ public class JumpDustBuilder : EditorWindow
             so.FindProperty("cloudTint").colorValue = new Color(0.95f, 0.95f, 0.95f, 0.7f);
             so.FindProperty("debrisTint").colorValue = new Color(0.45f, 0.42f, 0.38f, 1f);
             so.FindProperty("ringTint").colorValue = new Color(1f, 1f, 1f, 0.6f);
+            so.FindProperty("colorVariation").floatValue = 0.9f;
+        }
+        else if (style == Style.Hybrid)
+        {
+            // 速度線只在重落地出現、而且很淡；塵團接近實心
+            so.FindProperty("streakCount").intValue = 6;
+            so.FindProperty("streakMinIntensity").floatValue = 0.6f;
+            so.FindProperty("debrisCount").intValue = 8;
+            so.FindProperty("burstCount").intValue = 13;
+            so.FindProperty("cloudCount").intValue = 5;
+            so.FindProperty("ringMinIntensity").floatValue = 0.25f;
+            so.FindProperty("burstTint").colorValue = new Color(1f, 1f, 1f, 0.95f);
+            so.FindProperty("cloudTint").colorValue = new Color(0.95f, 0.95f, 0.95f, 0.8f);
+            so.FindProperty("debrisTint").colorValue = new Color(0.5f, 0.47f, 0.42f, 1f);
+            so.FindProperty("streakTint").colorValue = new Color(1.1f, 1.1f, 1.1f, 0.6f);
+            so.FindProperty("ringTint").colorValue = new Color(1.05f, 1.05f, 1.05f, 0.7f);
             so.FindProperty("colorVariation").floatValue = 0.9f;
         }
         so.ApplyModifiedPropertiesWithoutUndo();

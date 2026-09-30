@@ -222,7 +222,6 @@ public class TooltipManager : MonoBehaviour
         // 近戰
         AppendStat(sb, stats, Attributes.MeleeOutput, "Melee Output");
         AppendStat(sb, stats, Attributes.MeleeSpeed, "Melee Speed");
-        AppendStat(sb, stats, Attributes.MeleeDashDistance, "Dash Distance");
         AppendStat(sb, stats, Attributes.MeleeReloadTime, "Melee Cooldown");
 
         // 其餘還沒被上面消化掉的屬性，原樣列出 ——
@@ -322,9 +321,16 @@ public class TooltipManager : MonoBehaviour
     {
         foreach (var kv in stats)
         {
+            if (IsRetired(kv.Key)) continue;
             if (Mathf.Approximately(kv.Value, 0f)) continue;
             sb.AppendLine($"{kv.Key}: {kv.Value:0.##}");
         }
+    }
+
+    // 已停用的屬性：舊裝備資料上可能還留著，但不再有任何效果，不顯示以免誤導玩家。
+    private static bool IsRetired(Attributes attr)
+    {
+        return attr == Attributes.MeleeDashDistance;
     }
 
     private float Take(Dictionary<Attributes, float> stats, Attributes attr)
@@ -343,6 +349,8 @@ public class TooltipManager : MonoBehaviour
 
         foreach (var buff in buffs)
         {
+            if (IsRetired(buff.attribute)) continue;
+
             string sign = buff.mode == BuffApplyMode.Multiplier
                 ? $"x{1f + buff.value:0.##}"
                 : $"{(buff.value >= 0 ? "+" : "")}{buff.value:0.##}";

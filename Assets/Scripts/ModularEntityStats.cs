@@ -1,15 +1,15 @@
 using UnityEngine;
 using System;
-using MoreMountains.Feedbacks;
 
 public class ModularEntityStats : MonoBehaviour, IDamageable
 {
     public float maxHealth;
     public float health;
-    public float physicalDefense; // in percentage (0-100)
-    public float explosionDefense; // in percentage (0-100)
-    public float energyDefense; // in percentage (0-100)
-    public float coldDefense; // in percentage (0-100)
+    // 防禦值（不是百分比）。減傷 = 防禦 ÷ (防禦 + 1000)，詳見 DefenseFormula。
+    public float physicalDefense;
+    public float explosionDefense;
+    public float energyDefense;
+    public float coldDefense;
 
     public float sprintSpeed;
     public float accelerationSpeed;
@@ -25,11 +25,7 @@ public class ModularEntityStats : MonoBehaviour, IDamageable
 
     public void TakeDamage(DamageInfo dmg, GameObject attacker)
     {
-        float amount =
-            dmg.physical * GetDefenseMultiplier(physicalDefense) +
-            dmg.explosion * GetDefenseMultiplier(explosionDefense) +
-            dmg.energy * GetDefenseMultiplier(energyDefense) +
-            dmg.cold * GetDefenseMultiplier(coldDefense);
+        float amount = DefenseFormula.Apply(dmg, physicalDefense, explosionDefense, energyDefense, coldDefense);
 
         if (amount <= 0f) return;
 
@@ -43,10 +39,4 @@ public class ModularEntityStats : MonoBehaviour, IDamageable
             Destroy(gameObject);
         }
     }
-    public float GetDefenseMultiplier(float defenseValue)
-    {
-        float reduction = Mathf.Clamp01(defenseValue / 1000f);
-        return 1f - reduction;
-    }
-
 }
