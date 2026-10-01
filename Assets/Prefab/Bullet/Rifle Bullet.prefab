@@ -5020,7 +5020,7 @@ MonoBehaviour:
   rb: {fileID: 0}
   ignoreLayer:
     serializedVersion: 2
-    m_Bits: 249207
+    m_Bits: 511351
   enemyLayer:
     serializedVersion: 2
     m_Bits: 512

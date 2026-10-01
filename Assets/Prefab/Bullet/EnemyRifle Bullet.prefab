@@ -348,10 +348,10 @@ MonoBehaviour:
   rb: {fileID: 0}
   ignoreLayer:
     serializedVersion: 2
-    m_Bits: 249591
+    m_Bits: 249847
   enemyLayer:
     serializedVersion: 2
-    m_Bits: 8448
+    m_Bits: 270336
   ignoreObstacles: 0
   hitEffect: {fileID: 5238538877814813142, guid: e4e263c1e88af644c8fb76d914e6b7e3, type: 3}
   hitEffectLifetime: 0

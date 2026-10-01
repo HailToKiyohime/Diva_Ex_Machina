@@ -135,6 +135,11 @@ public class Bullet : MonoBehaviour, IPooled
     // 共用暫存 buffer（同一 frame 內同步使用，不會互相干擾）
     private static readonly Collider[] _overlapBuffer = new Collider[64];
 
+    // AcquireTarget 用：同一次搜尋裡已經評估過的目標（IDamageable 的 instance id）。
+    // 玩家身上有十幾節肢體碰撞箱，不去重的話同一個目標會重複算距離、重複打視線射線。
+    // （只在「用目標本體瞄準」時去重；本體沒有 Collider 時每個碰撞體的瞄準點不同，照舊逐一評估）
+    private static readonly HashSet<int> _acquireSeen = new HashSet<int>();
+
     /// <summary>剩餘轉向額度（度）。maxHomingAngle 為負代表無限。</summary>
     public float RemainingTurnAngle =>
         (maxHomingAngle < 0f) ? float.PositiveInfinity : Mathf.Max(0f, maxHomingAngle - _turnUsed);
@@ -730,8 +735,10 @@ public class Bullet : MonoBehaviour, IPooled
         int mask = enemyLayer.value & ~ignoreLayer.value;
         if (mask == 0) return;
 
+        // Collide：玩家的肢體碰撞箱（Hurtbox）是 trigger，用 Ignore 會完全看不到。
+        // 不是目標的 trigger 由下面的 IDamageable 檢查過濾掉。
         int count = Physics.OverlapSphereNonAlloc(
-            transform.position, homingRange, _overlapBuffer, mask, QueryTriggerInteraction.Ignore);
+            transform.position, homingRange, _overlapBuffer, mask, QueryTriggerInteraction.Collide);
 
         Transform bestTf = null;
         Collider bestCol = null;
@@ -739,6 +746,8 @@ public class Bullet : MonoBehaviour, IPooled
         float bestSqr = float.MaxValue;
 
         float rangeSqr = homingRange * homingRange;
+
+        _acquireSeen.Clear();
 
         for (int i = 0; i < count; i++)
         {
@@ -751,13 +760,30 @@ public class Bullet : MonoBehaviour, IPooled
             var comp = damageable as Component;
             if (comp == null) continue;
 
+            int id = comp.GetInstanceID();
+
             // 穿透彈不要回頭鎖已經打過的目標
-            if (_hitEnemyIds.Contains(comp.GetInstanceID())) continue;
+            if (_hitEnemyIds.Contains(id)) continue;
 
             // 不要鎖自己人（開槍者自己）
             if (attacker != null && comp.transform.IsChildOf(attacker.transform)) continue;
 
-            Vector3 aim = col.bounds.center;
+            // 瞄準用的碰撞體：目標本體上有 Collider 就用它（例如玩家根物件的移動用 capsule），
+            // 而不是剛好被掃到的那一節手腳 —— 否則飛彈會追著手掌或腳踝跑。
+            // 本體上沒有 Collider（例如碰撞體掛在子物件的敵人）就維持原本的做法：瞄被掃到的那個。
+            Collider aimCol;
+            if (TryGetBodyCollider(comp, out Collider body))
+            {
+                // 用本體瞄準時，同一個目標不管從哪一節被掃到，結果都一樣 → 只評估一次
+                if (!_acquireSeen.Add(id)) continue;
+                aimCol = body;
+            }
+            else
+            {
+                aimCol = col;
+            }
+
+            Vector3 aim = aimCol.bounds.center;
             Vector3 to = aim - transform.position;
             float sqr = to.sqrMagnitude;
             if (sqr < 0.0001f || sqr > rangeSqr) continue;
@@ -770,7 +796,7 @@ public class Bullet : MonoBehaviour, IPooled
 
             bestSqr = sqr;
             bestTf = comp.transform;
-            bestCol = col;
+            bestCol = aimCol;
             bestRb = comp.GetComponentInParent<Rigidbody>();
         }
 
@@ -783,6 +809,16 @@ public class Bullet : MonoBehaviour, IPooled
         _homingTargetLastPos = bestCol.bounds.center;
         _hasTargetLastPos = true;
         _targetAssigned = false;
+    }
+
+    /// <summary>
+    /// 目標本體（IDamageable 所在物件）上第一個啟用中的 Collider。
+    /// 跟 SetHomingTarget(Transform) 用 GetComponentInChildren 取到的是同一個碰撞體，
+    /// 所以「發射器指定目標」與「飛彈自己找到目標」瞄的是同一點。
+    /// </summary>
+    private static bool TryGetBodyCollider(Component target, out Collider body)
+    {
+        return target.TryGetComponent(out body) && body.enabled;
     }
 
     private bool IsLineOfSightBlocked(Vector3 aim, Transform targetRoot)

@@ -21,7 +21,7 @@ MonoBehaviour:
   buffs:
   - attribute: 0
     mode: 0
-    value: 30
+    value: 300
   - attribute: 8
     mode: 0
     value: 1.8

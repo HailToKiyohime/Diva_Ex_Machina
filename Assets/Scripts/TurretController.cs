@@ -7,7 +7,35 @@ public class TurretController : MonoBehaviour
     public float BulletSpeed => bulletSpeed;
     public Vector3 MuzzlePosition => muzzle != null ? muzzle.position : transform.position;
 
+    /// <summary>
+    /// 砲塔這一幀要轉向的世界座標點。
+    ///
+    /// 由砲塔自己每幀重新計算（見 RefreshAimPoint）。外部請透過 TrackTarget / AimAlongDirection /
+    /// AimAtRest / AimAtPoint 指定「要瞄什麼」，不要直接寫這個欄位 —— 追蹤模式下會被下一幀覆蓋。
+    /// </summary>
     public Vector3 targetLocation;
+
+    // ── 瞄準模式 ────────────────────────────────────────────────
+    //
+    // 為什麼不讓 Brain 直接寫 targetLocation：
+    // Brain 降頻後每 0.1 秒才思考一次，寫進來的是「當下」的世界座標點。
+    // 站在移動的船上時，敵人、玩家、砲塔都跟著船跑，那個點卻留在原地 ——
+    // 船速 20 m/s 時，兩次思考之間瞄準點會落後最多 2 公尺，砲塔整段時間都在追一個過時的點。
+    // 現在 Brain 只告訴砲塔「瞄誰」，瞄準點由砲塔每幀用目標當下的位置與速度重算。
+    private enum AimMode { Point, Target, Direction, Rest }
+    private AimMode _aimMode = AimMode.Point;
+
+    private Transform _trackTarget;
+    private Rigidbody _trackTargetRb;
+    private float _trackExpireTime;
+    private Vector3 _aimDirection;
+
+    [Header("Target Tracking")]
+    [Tooltip("Brain 多久沒有再呼叫 TrackTarget 就停止追蹤（秒），停在最後的瞄準點。\n" +
+             "Brain 每次思考（預設 0.1 秒）都會更新，這只是保險：避免 Brain 換狀態卻沒通知時，砲塔永遠黏著舊目標。")]
+    [SerializeField, Min(0.1f)] private float trackTimeout = 0.5f;
+
+    private const float DirectionAimDistance = 20f;   // 方向模式的虛擬點距離（距離不重要，方向才重要）
 
     public Transform pitchTransform;
     public Transform yawTransform;
@@ -76,9 +104,121 @@ public class TurretController : MonoBehaviour
 
     public void Update()
     {
+        RefreshAimPoint();
         Yaw();
         Pitch();
         AimRaycast();
+    }
+
+    // ============================================================
+    // 瞄準指定：由 Brain 呼叫。只設定「瞄什麼」，實際瞄準點每幀在 RefreshAimPoint 重算。
+    // ============================================================
+
+    /// <summary>
+    /// 追蹤目標：每幀用目標當下的位置（collider 中心）與速度，以自己的彈速算攔截點。
+    /// Brain 每次思考都要呼叫一次續約，超過 trackTimeout 沒續約就停在最後的瞄準點。
+    /// </summary>
+    public void TrackTarget(Transform target)
+    {
+        if (target == null) return;
+
+        if (target != _trackTarget)
+        {
+            _trackTarget = target;
+            _trackTargetRb = target.GetComponentInParent<Rigidbody>();
+        }
+
+        _aimMode = AimMode.Target;
+        _trackExpireTime = Time.time + trackTimeout;
+
+        UpdateTrackedAim();   // 立刻算一次：同一次思考裡緊接著的 HasLineOfSightTo / Shoot 用的就是最新的點
+    }
+
+    /// <summary>沿某個水平方向放平（例如移動方向）。點每幀跟著砲塔位置走，船開多快都不會落後。</summary>
+    public void AimAlongDirection(Vector3 worldDirection)
+    {
+        worldDirection.y = 0f;
+        if (worldDirection.sqrMagnitude < 0.0001f)
+        {
+            AimAtRest();
+            return;
+        }
+
+        ClearTrackTarget();
+        _aimMode = AimMode.Direction;
+        _aimDirection = worldDirection.normalized;
+        targetLocation = PitchPivotPosition + _aimDirection * DirectionAimDistance;
+    }
+
+    /// <summary>回到中立朝向（RestAimPoint），每幀重算。</summary>
+    public void AimAtRest()
+    {
+        ClearTrackTarget();
+        _aimMode = AimMode.Rest;
+        targetLocation = RestAimPoint;
+    }
+
+    /// <summary>瞄準一個固定的世界座標點（不會跟著任何東西移動）。</summary>
+    public void AimAtPoint(Vector3 worldPoint)
+    {
+        ClearTrackTarget();
+        _aimMode = AimMode.Point;
+        targetLocation = worldPoint;
+    }
+
+    private void ClearTrackTarget()
+    {
+        _trackTarget = null;
+        _trackTargetRb = null;
+    }
+
+    private void RefreshAimPoint()
+    {
+        switch (_aimMode)
+        {
+            case AimMode.Target:
+                // 目標被摧毀 / Brain 太久沒續約 → 停在最後算出的點（跟以前「沒人更新就停住」的行為一樣）
+                if (_trackTarget == null || Time.time > _trackExpireTime)
+                {
+                    ClearTrackTarget();
+                    _aimMode = AimMode.Point;
+                    break;
+                }
+                UpdateTrackedAim();
+                break;
+
+            case AimMode.Direction:
+                targetLocation = PitchPivotPosition + _aimDirection * DirectionAimDistance;
+                break;
+
+            case AimMode.Rest:
+                targetLocation = RestAimPoint;
+                break;
+
+            // AimMode.Point：固定點，不用重算
+        }
+    }
+
+    /// <summary>
+    /// 以目標當下的位置與速度、自己的彈速算攔截點。
+    /// 算法跟原本 Brain 裡的完全相同，只是從「每次思考算一次」變成「每幀算一次」。
+    /// </summary>
+    private void UpdateTrackedAim()
+    {
+        // 瞄 collider 中心而不是 pivot（砲塔 / 建築的 pivot 在地面，會打到基座）
+        Vector3 aimPoint = GetAimPoint(_trackTarget);
+        Vector3 targetVelocity = _trackTargetRb != null ? _trackTargetRb.linearVelocity : Vector3.zero;
+
+        if (bulletSpeed > 0f &&
+            MathToolKit.InterceptionPoint(aimPoint, MuzzlePosition, targetVelocity, bulletSpeed, out Vector3 intercept))
+        {
+            targetLocation = intercept;
+        }
+        else
+        {
+            // 解不出攔截（目標太快 / 彈太慢）→ 直接瞄準目標現在的位置
+            targetLocation = aimPoint;
+        }
     }
 
     // ============================================================

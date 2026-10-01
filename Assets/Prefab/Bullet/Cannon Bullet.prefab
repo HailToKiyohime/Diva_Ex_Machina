@@ -50,7 +50,7 @@ SphereCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
@@ -106,11 +106,14 @@ MonoBehaviour:
   rb: {fileID: 0}
   ignoreLayer:
     serializedVersion: 2
-    m_Bits: 249335
+    m_Bits: 511479
   enemyLayer:
     serializedVersion: 2
     m_Bits: 512
   ignoreObstacles: 0
+  hitEffect: {fileID: 0}
+  hitEffectLifetime: 0
+  hitEffectSurfaceOffset: 0.05
   homingDegreePerSecond: 0
   homingRange: 30
   homingSearchAngle: 40
@@ -124,7 +127,7 @@ MonoBehaviour:
   alignToVelocity: 1
   homingStartDelay: 0
   lockAssignedTarget: 1
-  penetration: 0
+  penetration: -1
   meleeImpactOwnerAnim: {fileID: 0}
 --- !u!1001 &8511368318867935596
 PrefabInstance:

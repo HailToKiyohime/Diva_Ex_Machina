@@ -5060,10 +5060,10 @@ MonoBehaviour:
   isMelee: 0
   ignoreLayer:
     serializedVersion: 2
-    m_Bits: 66048
+    m_Bits: 66304
   enemyLayer:
     serializedVersion: 2
-    m_Bits: 256
+    m_Bits: 262144
   ignoreObstacles: 0
   homingDegreePerSecond: 160
   homingRange: 500

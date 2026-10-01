@@ -230,6 +230,10 @@ MonoBehaviour:
   dockDestinationUpdateRange: {x: 0.1, y: 0.5}
   attackSlotHoldSeconds: 30
   priorityRetentionRadius: 60
+  damageThreat: 1
+  maxThreatPriority: 60
+  damagePercentPerPriority: 0.5
+  threatPriorityDecreaseMultiplier: 1
   waypointArriveRadius: 1.5
   slowDownRadius: 10
   waypointSearchLookAhead: 2
@@ -282,6 +286,15 @@ MonoBehaviour:
   rotationSpeed: 180
   modularEntityEffectManager: {fileID: 7031235214745723284}
   jumpHeight: 10
+  deathEffect: {fileID: 173006041638346838, guid: 45ca010778930084a985a9cad82962b1, type: 3}
+  deathEffectLifetime: 3
+  deathExplosion: 1
+  deathExplosionHealthRatio: 0.1
+  deathExplosionRadius: 6
+  deathExplosionLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  chainExplosionDelay: 0.1
 --- !u!114 &8426514956781042070
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -724,6 +737,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   targetLocation: {x: 337, y: 38, z: -3997.4}
+  trackTimeout: 0.5
   pitchTransform: {fileID: 9142061728062058573}
   yawTransform: {fileID: 1796247725933527741}
   pitchSpeed: 30
@@ -736,7 +750,7 @@ MonoBehaviour:
   aimRayDistance: 500
   aimRayMask:
     serializedVersion: 2
-    m_Bits: 196599
+    m_Bits: 31223
   drawAimGizmo: 1
   bulletPrefab: {fileID: 3891428710695554583, guid: 68e2671b654f5c1459ceabba81c6cb34, type: 3}
   physicalDamage: 10
@@ -754,10 +768,10 @@ MonoBehaviour:
   magazineSize: 30
   bulletTargetLayer:
     serializedVersion: 2
-    m_Bits: 12544
+    m_Bits: 274432
   bulletIgnoreLayer:
     serializedVersion: 2
-    m_Bits: 230912
+    m_Bits: 231168
   attacker: {fileID: 4963351499911707288}
 --- !u!1001 &3335374069086650301
 PrefabInstance:

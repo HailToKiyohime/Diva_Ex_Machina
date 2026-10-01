@@ -117,6 +117,23 @@ public class ModularEntityBrain : MonoBehaviour, IManagedEntity
              "0 = 關閉此功能，維持原本的衰減行為。距離為 3D 直線距離。")]
     [SerializeField] protected float priorityRetentionRadius = 0f;
 
+    [Header("Damage Threat（被打就拉仇恨）")]
+    [Tooltip("受到傷害時提高攻擊者的優先度。\n" +
+             "· 用減防後的實際傷害計算\n" +
+             "· 其他敵人造成的傷害（例如死亡爆炸）不算\n" +
+             "· 玩家和玩家的防禦砲塔都算")]
+    public bool damageThreat = true;
+
+    [Tooltip("受傷累積出來的優先度上限。參考：防禦工事 50、Core 30、玩家 25。")]
+    [Min(0f)] public float maxThreatPriority = 60f;
+
+    [Tooltip("每造成「最大生命值的多少 %」的傷害，攻擊者的優先度 +1。\n" +
+             "0.5 = 最大生命值 100 時，一次 20 點傷害 +40、一次 2.5 點傷害 +0.5。")]
+    [Min(0.01f)] public float damagePercentPerPriority = 0.5f;
+
+    [Tooltip("攻擊者原本不在目標清單裡（例如從偵測範圍外開槍）時，新加入的那一筆用的衰減速度。跟感測器規則一樣預設 1。")]
+    [Min(0f)] public float threatPriorityDecreaseMultiplier = 1f;
+
     [SerializeField] protected float waypointArriveRadius = 5f;
     [SerializeField] protected float slowDownRadius = 6f;
 
@@ -152,7 +169,7 @@ public class ModularEntityBrain : MonoBehaviour, IManagedEntity
     // 思考之間的物理步，Movement 照常每步執行，沿用這次思考留下的：
     //   · 移動方向（HorizontalMovement）
     //   · 朝向（FaceMoveDirection → Movement.SetFacingTarget，Movement 每步轉過去）
-    //   · 砲塔瞄準點（turret.targetLocation，砲塔自己的 Update 每幀轉過去）
+    //   · 砲塔要瞄誰（turret.TrackTarget，砲塔自己每幀用目標當下的位置與速度重算瞄準點）
     //
     // ⚠ 寫在 Think() 裡、跟時間有關的計算，一律用 ThinkDeltaTime，不要用 Time.fixedDeltaTime ——
     //   兩次思考之間隔的是好幾個物理步，用 fixedDeltaTime 會讓計時器走慢好幾倍。
@@ -847,7 +864,13 @@ public class ModularEntityBrain : MonoBehaviour, IManagedEntity
         modularEntityMovement.SetFacingTarget(worldDir, facingDeadzone);
     }
 
-    // 每座砲塔用「自己的彈速」算自己的攔截點
+    // 砲塔瞄準 + 開火判定
+    //
+    // 只告訴砲塔「瞄誰」，攔截點由砲塔自己每幀用目標當下的位置與速度、自己的彈速重算。
+    // 以前是這裡算好一個世界座標點寫進 turret.targetLocation —— Brain 降頻成每 0.1 秒思考一次後，
+    // 那個點在兩次思考之間是靜止的；站在移動的船上時，砲塔會一直瞄在目標後方。
+    //
+    // targetVelocity 參數保留給子類別 / 呼叫端相容用；速度現在由砲塔自己每幀從目標的 Rigidbody 讀。
     protected virtual void UpdateTurretAiming(Transform target, Vector3 targetVelocity)
     {
         // ★ 攻擊名額只擋「開火」，不擋瞄準。
@@ -855,33 +878,15 @@ public class ModularEntityBrain : MonoBehaviour, IManagedEntity
         //   狀態機、路徑、移動邏輯完全不受影響。
         bool mayFire = TryAcquireAttackSlot(target);
 
-        // 瞄 collider 中心而不是 pivot（砲塔 / 建築的 pivot 在地面，會打到基座）
-        Vector3 aimPoint = TurretController.GetAimPoint(target);
-
         for (int i = 0; i < turrets.Length; i++)
         {
             TurretController turret = turrets[i];
             if (turret == null) continue;
 
-            // 讀 turret 自己的 bulletSpeed —— 資料在哪，就去哪讀
-            if (MathToolKit.InterceptionPoint(
-                    aimPoint,                  // a: 目標現在位置
-                    turret.MuzzlePosition,            // b: 這座砲塔的砲口
-                    targetVelocity,                   // vA: 目標速度
-                    turret.bulletSpeed,               // sB: 這座砲塔的彈速
-                    out Vector3 interceptPoint))
-            {
-                turret.targetLocation = interceptPoint;
-                if (mayFire && turret.HasLineOfSightTo(target))
-                    turret.Shoot();
-            }
-            else
-            {
-                // 解不出攔截（目標太快/彈太慢）→ 退回直接瞄準現在位置
-                turret.targetLocation = aimPoint;
-                if (mayFire && turret.HasLineOfSightTo(target))
-                    turret.Shoot();   // 直瞄退路也一樣:看得到就打
-            }
+            turret.TrackTarget(target);
+
+            if (mayFire && turret.HasLineOfSightTo(target))
+                turret.Shoot();
         }
     }
 
@@ -1007,13 +1012,13 @@ public class ModularEntityBrain : MonoBehaviour, IManagedEntity
 
             if (hasDirection)
             {
-                // 沿移動方向、與 pitch 軸同高的遠處虛擬點 → yaw 對準移動方向、pitch 歸零
-                turret.targetLocation = turret.PitchPivotPosition + moveDirection * 20f;
+                // 沿移動方向放平：yaw 對準移動方向、pitch 歸零（砲塔每幀重算，船上不會落後）
+                turret.AimAlongDirection(moveDirection);
             }
             else
             {
                 // 靜止（沒有移動方向）→ 回中立朝向
-                turret.targetLocation = turret.RestAimPoint;
+                turret.AimAtRest();
             }
         }
     }
@@ -1043,6 +1048,65 @@ public class ModularEntityBrain : MonoBehaviour, IManagedEntity
         // 預設值 Player。decayMultiplierByType 是用 type 查表的，等於
         // targetPreferences 對非玩家目標從來沒生效過。
         targets.Add(new Target(targetTransform, priority, priorityDecreaseMultiplier) { type = type });
+    }
+
+    /// <summary>
+    /// 受到傷害時由 ModularEntityStats 呼叫：依傷害量提高攻擊者的優先度（被打就拉仇恨）。
+    ///
+    /// 提升量 = (實際傷害 ÷ 最大生命值 × 100) ÷ damagePercentPerPriority，
+    /// 加完之後不超過 maxThreatPriority；原本就高於上限的優先度不會被拉低。
+    /// 攻擊者不在清單裡就新加一筆（從偵測範圍外開槍也會被找上）。
+    /// 閒置 / 巡邏中被打會立刻切到追擊。
+    /// </summary>
+    public virtual void OnDamaged(float damage, float maxHealth, GameObject attacker)
+    {
+        if (!damageThreat || attacker == null) return;
+        if (damage <= 0f || maxHealth <= 0f) return;
+
+        Transform source = attacker.transform;
+
+        // 自己打到自己 / 其他敵人造成的傷害（例如死亡爆炸）→ 不算仇恨，否則敵人會開始互打
+        if (source == transform || source.IsChildOf(transform)) return;
+        if (attacker.GetComponentInParent<ModularEntityStats>() != null) return;
+
+        float gain = (damage / maxHealth * 100f) / damagePercentPerPriority;
+        if (gain <= 0f) return;
+
+        Target entry = FindTargetEntry(source);
+        if (entry != null)
+        {
+            if (entry.targetPriority < maxThreatPriority)
+                entry.targetPriority = Mathf.Min(maxThreatPriority, entry.targetPriority + gain);
+        }
+        else
+        {
+            TargetType type = attacker.CompareTag("Player") ? TargetType.Player : TargetType.Building;
+            targets.Add(new Target(source, Mathf.Min(maxThreatPriority, gain), threatPriorityDecreaseMultiplier) { type = type });
+        }
+
+        if (currentState == EntityState.Idle || currentState == EntityState.Patrolling)
+            ChangeState(EntityState.Chasing);
+    }
+
+    /// <summary>
+    /// 找出清單裡代表這個攻擊者的那一筆。
+    ///
+    /// 感測器加進來的是「被掃到的 collider」所在的 Transform，攻擊者則是開火物件的根 ——
+    /// 玩家兩者都是 Player 根物件；防禦砲塔的 collider 可能在子物件上。
+    /// 所以除了完全相同，也接受「清單裡那一筆是攻擊者的子物件」。
+    /// 反方向（攻擊者是清單那一筆的子物件）不接受：砲塔掛在船底下，不能被當成船上其他目標。
+    /// </summary>
+    protected Target FindTargetEntry(Transform source)
+    {
+        for (int i = 0; i < targets.Count; i++)
+        {
+            Target t = targets[i];
+            if (t == null || t.targetTransform == null) continue;
+
+            if (t.targetTransform == source || t.targetTransform.IsChildOf(source))
+                return t;
+        }
+        return null;
     }
 
     protected virtual float DistanceToPoint(Vector3 point)

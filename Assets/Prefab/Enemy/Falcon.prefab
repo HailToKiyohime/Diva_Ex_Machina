@@ -1839,6 +1839,15 @@ MonoBehaviour:
   rotationSpeed: 270
   modularEntityEffectManager: {fileID: 6744390417566336108}
   jumpHeight: 0
+  deathEffect: {fileID: 173006041638346838, guid: 45ca010778930084a985a9cad82962b1, type: 3}
+  deathEffectLifetime: 3
+  deathExplosion: 1
+  deathExplosionHealthRatio: 0.1
+  deathExplosionRadius: 6
+  deathExplosionLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  chainExplosionDelay: 0.1
 --- !u!114 &5651169939837934045
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2294,7 +2303,7 @@ MonoBehaviour:
   aimRayDistance: 500
   aimRayMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 31223
   drawAimGizmo: 1
   bulletPrefab: {fileID: 3891428710695554583, guid: 68e2671b654f5c1459ceabba81c6cb34, type: 3}
   physicalDamage: 10
@@ -2312,10 +2321,10 @@ MonoBehaviour:
   magazineSize: 30
   bulletTargetLayer:
     serializedVersion: 2
-    m_Bits: 256
+    m_Bits: 274432
   bulletIgnoreLayer:
     serializedVersion: 2
-    m_Bits: 67072
+    m_Bits: 231168
   attacker: {fileID: 7283447650030811870}
 --- !u!1 &8767020011424996967
 GameObject:
