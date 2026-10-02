@@ -1,4 +1,5 @@
-﻿using MoreMountains.Feedbacks;
+﻿using System.Collections;
+using MoreMountains.Feedbacks;
 using System;
 using Unity.Cinemachine;
 using UnityEngine;
@@ -493,115 +494,142 @@ public class PlayerAnimation : MonoBehaviour
         _weaponHoldBlendRoutine = null;
     }
 
-    public void ShoulderWeaponAttackLeft()
+    // ────────────────────────────────────────────────
+    //  肩武器
+    //
+    //  舉起（left/rightShoulderAttacking）：只看「準星的鎖定圈裡有沒有目標」——
+    //    有目標 → 自動舉起、轉向前方待命（不用按鍵）
+    //    目標消失 shoulderLowerDelay 秒後 → 收回
+    //
+    //  開火：每一輪射擊觸發 fireShoulder_L / _R，等 Attack_Fire 開始播放才生成子彈
+    //    （見 FireShoulderAndWait，由 RangeAttackController 呼叫）。
+    //    沒有目標時武器是收著的 —— 請在 Animator 加一條 Idle → Attack_Fire（條件 fireShoulder_*），
+    //    武器會直接迅速轉向前方開火。
+    // ────────────────────────────────────────────────
+
+    [Header("Shoulder Weapon")]
+    [Tooltip("鎖定圈裡的目標消失後，肩武器維持舉起幾秒才收回。")]
+    [SerializeField, Min(0f)] private float shoulderLowerDelay = 1f;
+
+    [Tooltip("觸發開火後最多等幾秒讓 Attack_Fire 開始播放。逾時就直接生成子彈 ——\n" +
+             "避免 Animator 沒接好（缺轉場、圖層權重 0）時肩武器整個打不出去。")]
+    [SerializeField, Min(0.05f)] private float shoulderFireStateTimeout = 0.5f;
+
+    private static readonly int LeftShoulderAttackingHash = Animator.StringToHash("leftShoulderAttacking");
+    private static readonly int RightShoulderAttackingHash = Animator.StringToHash("rightShoulderAttacking");
+
+    private float _lastShoulderTargetTime = -1f;
+    private bool _leftShoulderRaised, _rightShoulderRaised;
+
+    void Update()
     {
-        CancelInvoke("StopShoulderWeaponAttackLeft");
-        anim.SetBool("leftShoulderAttacking", true);
-        Invoke("StopShoulderWeaponAttackLeft", 3f);
-    }
-    public void ShoulderWeaponAttackRight()
-    {
-        CancelInvoke("StopShoulderWeaponAttackRight");
-        anim.SetBool("rightShoulderAttacking", true);
-        Invoke("StopShoulderWeaponAttackRight", 3f);
+        UpdateShoulderAim();
     }
 
-    public void StopShoulderWeaponAttackLeft()
+    private void UpdateShoulderAim()
     {
-        ResetShoulderWeaponFireGate(true);
-        anim.SetBool("leftShoulderAttacking", false);
+        if (anim == null) return;
+
+        PlayerAiming aiming = PlayerAiming.Instance;
+        if (aiming != null && aiming.lockOn)
+            _lastShoulderTargetTime = Time.time;
+
+        bool raise = _lastShoulderTargetTime >= 0f && (Time.time - _lastShoulderTargetTime) <= shoulderLowerDelay;
+
+        bool left = raise && HasShoulderWeapon(attackManager != null ? attackManager.leftShoulderWeapon : null);
+        bool right = raise && HasShoulderWeapon(attackManager != null ? attackManager.rightShoulderWeapon : null);
+
+        if (left != _leftShoulderRaised)
+        {
+            _leftShoulderRaised = left;
+            anim.SetBool(LeftShoulderAttackingHash, left);
+        }
+        if (right != _rightShoulderRaised)
+        {
+            _rightShoulderRaised = right;
+            anim.SetBool(RightShoulderAttackingHash, right);
+        }
     }
-    public void StopShoulderWeaponAttackRight()
+
+    /// <summary>這個肩槽有裝遠程武器（AttackManager.ClearWeaponOutput 會把 bullet 清成 null）。</summary>
+    private static bool HasShoulderWeapon(Weapon w) => w != null && w.bullet != null;
+
+    // 開火後座的狀態。Attack_Fire 0 是給連射用的第二份複本（跟手持武器的 Range_Fire / Range_Fire 0 一樣），
+    // 沒有建也沒關係，只是多比對一個 hash。
+    private static readonly int AttackFireStateHash = Animator.StringToHash("Attack_Fire");
+    private static readonly int AttackFire0StateHash = Animator.StringToHash("Attack_Fire 0");
+
+    private static bool IsShoulderFireState(int shortNameHash)
     {
-        ResetShoulderWeaponFireGate(false);
-        anim.SetBool("rightShoulderAttacking", false);
+        return shortNameHash == AttackFireStateHash || shortNameHash == AttackFire0StateHash;
     }
-
-    private static readonly int AttackStateHash = Animator.StringToHash("Attack");
-
-    // 記錄「進入 Attack state」的時間點（秒）
-    private float _leftShoulderAttackEnteredTime = -1f;
-    private float _rightShoulderAttackEnteredTime = -1f;
-
-    // 用來偵測“剛進入 Attack state”的邊沿
-    private bool _leftShoulderWasInAttack = false;
-    private bool _rightShoulderWasInAttack = false;
 
     /// <summary>
-    /// Shoulder layer 已完成轉場且在 Attack state 後，延遲 fireDelaySeconds 秒才回傳 true
+    /// 觸發肩武器的開火動畫，等到 Attack_Fire「開始播放」那一刻才結束。
+    /// RangeAttackController 每一輪射擊都 yield 它一次，之後才生成子彈。
+    ///
+    /// 「開始播放」= 往 Attack_Fire（或 Attack_Fire 0）的轉場開始的那一刻，包含：
+    ///   Idle → Attack_Fire（沒有目標時直接開火）、Attack → Attack_Fire、
+    ///   Attack_Fire ↔ Attack_Fire 0（連射）、Attack_Fire → Attack_Fire（自我轉場）。
+    ///
+    /// Animator 沒有 fireShoulder_* 參數、或圖層不存在時立刻結束（子彈照常生成，不會卡住）；
+    /// 等超過 shoulderFireStateTimeout 也會結束，並清掉沒被消耗的 Trigger。
     /// </summary>
-    public bool IsShoulderWeaponReadyToFire(bool isLeft, float fireDelaySeconds)
+    public IEnumerator FireShoulderAndWait(bool isLeft)
     {
-        if (anim == null) return false;
+        if (anim == null) yield break;
 
         int layer = isLeft ? Shoulder_Weapon_LeftLayer : Shoulder_Weapon_RightLayer;
-        if (layer < 0) return false;
+        if (layer < 0 || !HasShoulderFireTrigger(isLeft)) yield break;
 
-        // 還在任何 transition 中：不允許
+        int trigger = isLeft ? FireShoulderLeftTriggerHash : FireShoulderRightTriggerHash;
+
+        // 觸發前的狀態當基準：之後只要「進入了另一個開火狀態」或「同一個開火狀態從頭播」就算開始
+        bool hadFire = TryGetFireStateKey(layer, out int baseHash, out float baseTime);
+
+        anim.SetTrigger(trigger);
+
+        float waited = 0f;
+        while (waited < shoulderFireStateTimeout)
+        {
+            yield return null;
+            waited += Time.deltaTime;
+
+            bool inFire = TryGetFireStateKey(layer, out int hash, out float time);
+            if (inFire && (!hadFire || hash != baseHash || time < baseTime - 0.0001f))
+                yield break;   // Attack_Fire 開始播放 → 生成子彈
+
+            // 還在上一發的後座裡：持續更新基準，才偵測得到之後「從頭播」
+            hadFire = inFire;
+            baseHash = hash;
+            baseTime = time;
+        }
+
+        // 逾時：Animator 沒反應（缺轉場、圖層權重 0…）→ 不等了，清掉 Trigger 免得之後無緣無故補播一次
+        anim.ResetTrigger(trigger);
+    }
+
+    /// <summary>
+    /// 這個圖層「正在進入或正在播」的開火狀態。轉場中優先看目標狀態 ——
+    /// 0.01 秒的轉場可能整個落在兩幀之間，所以也接受直接看到目前狀態已經是開火狀態。
+    /// </summary>
+    private bool TryGetFireStateKey(int layer, out int hash, out float normalizedTime)
+    {
         if (anim.IsInTransition(layer))
         {
-            // transition 期間也視為未進入 attack
-            if (isLeft) _leftShoulderWasInAttack = false;
-            else _rightShoulderWasInAttack = false;
-            return false;
-        }
-
-        var st = anim.GetCurrentAnimatorStateInfo(layer);
-        bool inAttack = (st.shortNameHash == AttackStateHash);
-
-        if (isLeft)
-        {
-            if (inAttack)
+            AnimatorStateInfo next = anim.GetNextAnimatorStateInfo(layer);
+            if (IsShoulderFireState(next.shortNameHash))
             {
-                // 第一次進入 Attack 的那一幀
-                if (!_leftShoulderWasInAttack)
-                {
-                    _leftShoulderWasInAttack = true;
-                    _leftShoulderAttackEnteredTime = Time.time;
-                }
-
-                return (Time.time - _leftShoulderAttackEnteredTime) >= fireDelaySeconds;
-            }
-            else
-            {
-                // 離開 Attack：重置
-                _leftShoulderWasInAttack = false;
-                _leftShoulderAttackEnteredTime = -1f;
-                return false;
+                hash = next.shortNameHash;
+                normalizedTime = next.normalizedTime;
+                return true;
             }
         }
-        else
-        {
-            if (inAttack)
-            {
-                if (!_rightShoulderWasInAttack)
-                {
-                    _rightShoulderWasInAttack = true;
-                    _rightShoulderAttackEnteredTime = Time.time;
-                }
 
-                return (Time.time - _rightShoulderAttackEnteredTime) >= fireDelaySeconds;
-            }
-            else
-            {
-                _rightShoulderWasInAttack = false;
-                _rightShoulderAttackEnteredTime = -1f;
-                return false;
-            }
-        }
-    }
-    public void ResetShoulderWeaponFireGate(bool isLeft)
-    {
-        if (isLeft)
-        {
-            _leftShoulderWasInAttack = false;
-            _leftShoulderAttackEnteredTime = -1f;
-        }
-        else
-        {
-            _rightShoulderWasInAttack = false;
-            _rightShoulderAttackEnteredTime = -1f;
-        }
+        AnimatorStateInfo cur = anim.GetCurrentAnimatorStateInfo(layer);
+        hash = cur.shortNameHash;
+        normalizedTime = cur.normalizedTime;
+        return IsShoulderFireState(cur.shortNameHash);
     }
 
     public void LeftWeaponMuzzleFlash()
@@ -633,6 +661,29 @@ public class PlayerAnimation : MonoBehaviour
     {
         if (anim == null) return;
         anim.SetTrigger(FireRightTriggerHash);
+    }
+
+    // 肩武器的開火後座 Trigger：
+    //   左肩 → fireShoulder_L（Shoulder_Weapon_Left 層）
+    //   右肩 → fireShoulder_R（Shoulder_Weapon_Right 層）
+    // Animator 裡還沒建這兩個參數時 FireShoulderAndWait 直接跳過，不會每發子彈都噴一次警告。
+    private static readonly int FireShoulderLeftTriggerHash = Animator.StringToHash("fireShoulder_L");
+    private static readonly int FireShoulderRightTriggerHash = Animator.StringToHash("fireShoulder_R");
+    private bool _shoulderFireParamsChecked;
+    private bool _hasFireShoulderL, _hasFireShoulderR;
+
+    private bool HasShoulderFireTrigger(bool isLeft)
+    {
+        if (!_shoulderFireParamsChecked)
+        {
+            _shoulderFireParamsChecked = true;
+            foreach (AnimatorControllerParameter p in anim.parameters)
+            {
+                if (p.nameHash == FireShoulderLeftTriggerHash) _hasFireShoulderL = true;
+                else if (p.nameHash == FireShoulderRightTriggerHash) _hasFireShoulderR = true;
+            }
+        }
+        return isLeft ? _hasFireShoulderL : _hasFireShoulderR;
     }
     public void DustEffect()
     {

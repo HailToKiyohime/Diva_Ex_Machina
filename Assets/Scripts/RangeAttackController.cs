@@ -118,8 +118,16 @@ public class RangeAttackController : MonoBehaviour
         // 這一次射擊共用同一個偏移角（圖上的一個紫點對應一個紅圈）
         float deviationDeg = w.isShoulder ? 0f : w.rangeRuntime.accumulatedDeviation;
 
+        bool isLeftShoulder = (w == attackManager.leftShoulderWeapon);
+        bool isRightShoulder = (w == attackManager.rightShoulderWeapon);
+
         for (int i = 0; i < shotsToFire; i++)
         {
+            // 肩武器：先觸發開火動畫，等 Attack_Fire 開始播放才生成這一輪的子彈。
+            // 沒有目標時武器是收著的，這段等待也涵蓋「迅速轉向前方」的時間。
+            if ((isLeftShoulder || isRightShoulder) && attackManager.playerAnimation != null)
+                yield return attackManager.playerAnimation.FireShoulderAndWait(isLeftShoulder);
+
             for (int x = 0; x < w.range.bulletPerShot; x++)
             {
                 bool isLeft = (w == attackManager.leftHandWeapon);

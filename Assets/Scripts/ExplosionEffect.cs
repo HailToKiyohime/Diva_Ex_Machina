@@ -31,6 +31,9 @@ public class ExplosionEffect : MonoBehaviour, IPooled
     [Tooltip("燈光顏色跟著這個粒子層的 Start Color（通常是核心閃光）。留空就用燈光本身的顏色。")]
     [SerializeField] private ParticleSystem lightColorSource;
 
+    [Tooltip("燈光閃爍程度。0 = 平滑衰減；越大越像電弧那樣忽明忽暗（Lightning 類型預設 0.7、Fire 0.15）。")]
+    [SerializeField, Range(0f, 1f)] private float lightFlicker = 0f;
+
     [Header("Lifetime")]
     [Tooltip("播完後自動回收（有物件池就回池子，沒有就 Destroy）。\n\n" +
              "· 給 Bullet 的 Hit Effect 用時請保持關閉 —— Bullet 已經會自己排程回收，兩邊都排會互相干擾。\n" +
@@ -95,7 +98,8 @@ public class ExplosionEffect : MonoBehaviour, IPooled
 
         // 一開始掉得快、尾巴拖得長，比線性衰減更像真實的閃光
         float k = 1f - t;
-        flashLight.intensity = lightPeakIntensity * k * k;
+        float flicker = lightFlicker > 0f ? 1f - lightFlicker * Random.value : 1f;
+        flashLight.intensity = lightPeakIntensity * k * k * flicker;
     }
 
     /// <summary>整個爆炸播完需要的時間：所有粒子層中「延遲 + 持續時間 + 最長粒子壽命」的最大值。</summary>

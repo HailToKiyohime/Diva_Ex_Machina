@@ -81,7 +81,6 @@ public class Bullet : MonoBehaviour, IPooled
     // ★ 注意：這個欄位是「就地遞減」的 —— 打穿一個目標就 --。
     //   所以它必須進 prefab 快照，回收重用時還原，否則穿透彈只有第一輪有穿透。
     public int penetration = 0;
-    [SerializeField] private PlayerAnimation meleeImpactOwnerAnim;
 
     // _live：這顆子彈是否「在場上活著」。
     // 取代原本的 _destroyed —— 池化之後子彈不會真的被銷毀，只會在 live / 待命之間切換。
@@ -149,6 +148,8 @@ public class Bullet : MonoBehaviour, IPooled
 
     /// <summary>這顆子彈是否在場上飛行中。</summary>
     public bool IsLive => _live;
+
+    public GameObject explodePrefab;
 
     // ═══════════════════ 外部指定目標 API ═══════════════════
 

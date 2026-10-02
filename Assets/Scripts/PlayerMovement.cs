@@ -203,8 +203,6 @@ public class PlayerMovement : MonoBehaviour
         var stats = PlayerStats.Instance;
         bool isLeft = (attackManager != null && w == attackManager.leftHandWeapon);
         bool isRight = (attackManager != null && w == attackManager.rightHandWeapon);
-        bool isLeftShoulderAttack = (attackManager != null && w == attackManager.leftShoulderWeapon);
-        bool isRightShoulderAttack = (attackManager != null && w == attackManager.rightShoulderWeapon);
 
 
         if (stats != null && (isLeft || isRight))
@@ -241,14 +239,7 @@ public class PlayerMovement : MonoBehaviour
 
                 pendingSingleUntil[w] = Time.time + bufferTime;
                 alignStartTime[w] = Time.time;
-                if (isLeftShoulderAttack)
-                {
-                    playerAnimation.ShoulderWeaponAttackLeft();
-                }
-                else if (isRightShoulderAttack)
-                {
-                    playerAnimation.ShoulderWeaponAttackRight();
-                }
+                // 肩武器的舉起 / 收回改由 PlayerAnimation 依「鎖定圈裡有沒有目標」自動控制，這裡不再處理
             }
 
             // 提早丟掉沒救的近戰緩衝（例如終結技播放中），
@@ -273,14 +264,6 @@ public class PlayerMovement : MonoBehaviour
             {
                 alignStartTime.Remove(w);
                 ClearAttackFacingOwnerIfSelf(w);
-                if (isLeftShoulderAttack)
-                {
-                    playerAnimation.ShoulderWeaponAttackLeft();
-                }
-                else if (isRightShoulderAttack)
-                {
-                    playerAnimation.ShoulderWeaponAttackRight();
-                }
                 return;
             }
 
@@ -326,16 +309,8 @@ public class PlayerMovement : MonoBehaviour
                 StartAimHold(aimHoldAfterShootNoLock);
             }
 
-            if (isLeftShoulderAttack)
-            {
-                if (playerAnimation != null && !playerAnimation.IsShoulderWeaponReadyToFire(true, 0.1f))
-                    return; // 還未完成 Idle->Attack 轉場，先不要射（保留 pendingSingleUntil，下一幀再試）
-            }
-            else if (isRightShoulderAttack)
-            {
-                if (playerAnimation != null && !playerAnimation.IsShoulderWeaponReadyToFire(false, 0.1f))
-                    return;
-            }
+            // 肩武器不用等舉起：RangeAttackController 會觸發 fireShoulder_*，
+            // 等 Attack_Fire 開始播放才生成子彈（沒目標時武器會直接迅速轉向前方開火）
 
             // 4) 真正觸發射擊（由 AttackManager 管理 cooldown/bullets）
             bool didShoot = attackManager.TryStartShoot(w);
